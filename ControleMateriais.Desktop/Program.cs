@@ -1,16 +1,22 @@
 ﻿using Avalonia;
 using System;
+using System.Globalization;
 
 namespace ControleMateriais.Desktop;
 
-sealed class Program
+public class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
+    public static void Main(string[] args)
+    {
+      
+      var culture = CultureInfo.GetCultureInfo("pt-BR");
+      CultureInfo.DefaultThreadCurrentCulture = culture;
+      CultureInfo.DefaultThreadCurrentUICulture = culture;
+
+      BuildAvaloniaApp()
         .StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()

@@ -8,8 +8,25 @@
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
+
+    <Application.Resources>
+      <ResourceDictionary>
+        <SolidColorBrush x:Key="Color.Surface" Color="#121212"/>
+        <SolidColorBrush x:Key="Color.SurfaceAlt" Color="#1A1A1A"/>
+        <SolidColorBrush x:Key="Color.Border" Color="#A0A0A0"/>
+        <SolidColorBrush x:Key="Color.InputBg" Color="#E5E5E5"/>
+        <SolidColorBrush x:Key="Color.TextPrimary" Color="#EDEDED"/>
+      </ResourceDictionary>
+    </Application.Resources>
   
+    
+
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme/>
+        
+        <!-- Adding Datagrid -->
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+
+
     </Application.Styles>
 </Application>

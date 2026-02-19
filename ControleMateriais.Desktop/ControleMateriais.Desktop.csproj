@@ -2,10 +2,10 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <PublishAot>true</PublishAot>
-    <OptimizationPreference>Speed<OptimizationPreference>
+    <OptimizationPreference>speed</OptimizationPreference>
     <StackTraceSupport>false</StackTraceSupport>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <TrimMode>link</TrimMode
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <TrimMode>link</TrimMode>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.12" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.12" />

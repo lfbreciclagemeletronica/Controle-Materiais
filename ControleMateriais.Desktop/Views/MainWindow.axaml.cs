@@ -5,6 +5,7 @@ namespace ControleMateriais.Desktop.Views;
 
 public partial class MainWindow : Window
 {
+    private readonly MainWindowViewModel viewModel;
     public MainWindow()
     {
         InitializeComponent();

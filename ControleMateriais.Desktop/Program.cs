@@ -12,6 +12,7 @@ public class Program
     {
       QuestPDF.Settings.License = LicenseType.Community;
       var culture = CultureInfo.GetCultureInfo("pt-BR");
+      Console.OutputEncoding = System.Text.Encoding.UTF8;
       CultureInfo.DefaultThreadCurrentCulture = culture;
       CultureInfo.DefaultThreadCurrentUICulture = culture;
 

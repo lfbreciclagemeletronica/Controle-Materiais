@@ -1,0 +1,71 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Tipografia semântica -->
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="20"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}"/>
+  </Style>
+
+  <!-- Botão "primário" (Exportar) -->
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Brush.Primary}"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="10,6"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+
+  <Style Selector="Button.primary:pointerover">
+    <Setter Property="Background" Value="{DynamicResource Brush.PrimaryHover}"/>
+  </Style>
+
+  <!-- DataGrid: base escura elegante -->
+  <Style Selector="DataGrid">
+    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="GridLinesVisibility" Value="None"/>
+    <Setter Property="HeadersVisibility" Value="Column"/>
+  </Style>
+
+  <!-- Cabeçalho das colunas -->
+  <Style Selector="DataGridColumnHeader">
+    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    <Setter Property="Padding" Value="8,6"/>
+  </Style>
+
+  <!-- Linhas alternadas (nth-child em v11) -->
+  <Style Selector="DataGridRow">
+    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+  </Style>
+
+  <Style Selector="DataGridRow:nth-child(odd)">
+    <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+  </Style>
+
+  <!-- Hover/seleção -->
+  <Style Selector="DataGridRow:pointerover">
+    <Setter Property="Background" Value="#222831"/>
+  </Style>
+
+  <Style Selector="DataGridRow:selected">
+    <Setter Property="Background" Value="#27374D"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+  </Style>
+
+  <!-- Células: ajuste de padding -->
+  <Style Selector="DataGridCell">
+    <Setter Property="Padding" Value="10,4"/>
+  </Style>
+</Styles>

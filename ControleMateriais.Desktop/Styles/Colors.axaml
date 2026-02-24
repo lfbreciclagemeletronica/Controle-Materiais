@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Paleta base (Dark) -->
+  <Color x:Key="Brand.Primary">#3B82F6</Color>     <!-- Azul elegante -->
+  <Color x:Key="Brand.PrimaryHover">#2563EB</Color>
+  <Color x:Key="Brand.Border">#2F2F2F</Color>
+  <Color x:Key="Brand.Surface">#141414</Color>     <!-- Fundo de tela -->
+  <Color x:Key="Brand.SurfaceAlt">#1B1B1B</Color>  <!-- Cards -->
+  <Color x:Key="Brand.TextPrimary">#EDEDED</Color>
+  <Color x:Key="Brand.TextMuted">#B5B5B5</Color>
+
+  <SolidColorBrush x:Key="Brush.Primary" Color="{DynamicResource Brand.Primary}"/>
+  <SolidColorBrush x:Key="Brush.PrimaryHover" Color="{DynamicResource Brand.PrimaryHover}"/>
+  <SolidColorBrush x:Key="Brush.Border" Color="{DynamicResource Brand.Border}"/>
+  <SolidColorBrush x:Key="Brush.Surface" Color="{DynamicResource Brand.Surface}"/>
+  <SolidColorBrush x:Key="Brush.SurfaceAlt" Color="{DynamicResource Brand.SurfaceAlt}"/>
+  <SolidColorBrush x:Key="Brush.TextPrimary" Color="{DynamicResource Brand.TextPrimary}"/>
+  <SolidColorBrush x:Key="Brush.TextMuted" Color="{DynamicResource Brand.TextMuted}"/>
+</ResourceDictionary>

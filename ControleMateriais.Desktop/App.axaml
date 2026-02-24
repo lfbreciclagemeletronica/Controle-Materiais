@@ -2,8 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="ControleMateriais.Desktop.App"
              xmlns:local="using:ControleMateriais.Desktop"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
 
     <Application.DataTemplates>
         <local:ViewLocator/>
@@ -11,22 +10,27 @@
 
     <Application.Resources>
       <ResourceDictionary>
-        <SolidColorBrush x:Key="Color.Surface" Color="#121212"/>
-        <SolidColorBrush x:Key="Color.SurfaceAlt" Color="#1A1A1A"/>
-        <SolidColorBrush x:Key="Color.Border" Color="#A0A0A0"/>
-        <SolidColorBrush x:Key="Color.InputBg" Color="#E5E5E5"/>
-        <SolidColorBrush x:Key="Color.TextPrimary" Color="#EDEDED"/>
+        <ResourceDictionary.MergedDictionaries>
+        <!-- Caminho relativo, funciona dentro do mesmo assembly -->
+        <ResourceInclude Source="Styles/Colors.axaml"/>
+    </ResourceDictionary.MergedDictionaries>
       </ResourceDictionary>
     </Application.Resources>
   
-    
 
     <Application.Styles>
-        <FluentTheme/>
-        
+
+        <FluentTheme DensityStyle="Compact"/>
+
+        <Style Selector=":is(Window)">
+            <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter#Inter"/>
+        </Style>
+
         <!-- Adding Datagrid -->
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
 
+        <!-- Botões e outros estilos -->
+        <StyleInclude Source="avares://ControleMateriais.Desktop/Styles/Controls.axaml"/>
 
     </Application.Styles>
 </Application>

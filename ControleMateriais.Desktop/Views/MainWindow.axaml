@@ -12,62 +12,73 @@
 
     <!-- Conteúdo central -->
     
-<Grid>
-  <Grid.RowDefinitions>
-    <RowDefinition Height="Auto"/>
-    <RowDefinition Height="*"/>
-  </Grid.RowDefinitions>
+<Grid Background="{DynamicResource Brush.Surface}">
+  <Grid>
+    <Border Background="{DynamicResource Brush.SurfaceAlt}"
+            BorderBrush="{DynamicResource Brush.Border}"
+            BorderThickness="1"
+            CornerRadius="10"
+            BoxShadow="0 8 24 0 #80000000"
+            Padding="16">
 
-  <!-- Linha 0: Total Geral -->
-  <TextBlock Grid.Row="0"
-             Text="{Binding TotalGeral, StringFormat={}{0:C}}"
-             HorizontalAlignment="Center"
-             FontWeight="Bold"
-             Margin="0,8,0,12"/>
+      <Grid RowDefinitions="Auto,*">
+        <!-- Cabeçalho: total central + botão à direita -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
 
+          <!-- Botão onde tem a tabela de preços -->
+          <Button Grid.Column="0"
+                  Content="Tabela de Preços"
+                  HorizontalAlignment="Left"
+                  Click="OnAbrirTabelaPrecosClick"/>
 
-<Button Grid.Column="1"
-            Content="Exportar"
-            HorizontalAlignment="Right"
-            Command="{Binding ExportarCommand}"/>
+          <!-- Total centralizado --> 
+          <TextBlock Grid.ColumnSpan="2"
+                     Classes="h1"
+                     HorizontalAlignment="Center"
+                     Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
 
+          <!-- Botão para exportar em PDF -->
+          <Button Grid.Column="1"
+                  Classes="primary"
+                  Content="Exportar"
+                  Command="{Binding ExportarCommand}"/>
+        </Grid>
 
-  <!-- Linha 1: DataGrid -->
-  <DataGrid Grid.Row="1"
-            ItemsSource="{Binding Itens}"
-            AutoGenerateColumns="False"
-            IsReadOnly="False"> <!-- Permite edição em colunas não ReadOnly -->
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding Itens}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="False">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Material"
+                                x:DataType="models:MaterialItem"
+                                Binding="{Binding Nome}"
+                                IsReadOnly="True"
+                                Width="2*"/>
 
-    <DataGrid.Columns>
-      <!-- Nome do material (somente leitura) -->
-      <DataGridTextColumn Header="Material"
-                          x:DataType="models:MaterialItem"
-                          Binding="{Binding Nome}"
-                          IsReadOnly="True"
-                          Width="2*"/>
+            <DataGridTextColumn Header="Peso atual (kg)"
+                                x:DataType="models:MaterialItem"
+                                Binding="{Binding PesoAtual, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:N3}}"
+                                IsReadOnly="False"
+                                Width="*"/>
 
-      <!-- Peso atual (kg) - editável -->
-      <DataGridTextColumn Header="Peso atual (kg)"
-                          x:DataType="models:MaterialItem"
-                          Binding="{Binding PesoAtual, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                          IsReadOnly="False"
-                          Width="*"/>
+            <DataGridTextColumn Header="Preço por kg"
+                                x:DataType="models:MaterialItem"
+                                Binding="{Binding PrecoPorKg, Mode=OneWay, StringFormat={}{0:C}}"
+                                IsReadOnly="True"
+                                Width="*"/>
 
-      <!-- Preço por Kg (R$) - somente leitura por enquanto -->
-      <DataGridTextColumn Header="Preço por kg"
-                          x:DataType="models:MaterialItem"
-                          Binding="{Binding PrecoPorKg, Mode=OneWay}"
-                          IsReadOnly="True"
-                          Width="*"/>
+            <DataGridTextColumn Header="Total"
+                                x:DataType="models:MaterialItem"
+                                Binding="{Binding Total, Mode=OneWay, StringFormat={}{0:C}}"
+                                IsReadOnly="True"
+                                Width="*"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
 
-      <!-- Total (R$) - somente leitura -->
-      <DataGridTextColumn Header="Total"
-                          x:DataType="models:MaterialItem"
-                          Binding="{Binding Total, Mode=OneWay}"
-                          IsReadOnly="True"
-                          Width="*"/>
-    </DataGrid.Columns>
-  </DataGrid>
+    </Border>
+  </Grid>
 </Grid>
 
 

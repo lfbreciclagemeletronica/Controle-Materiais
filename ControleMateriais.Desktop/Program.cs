@@ -1,4 +1,5 @@
 ﻿using Avalonia;
+using QuestPDF.Infrastructure;
 using System;
 using System.Globalization;
 
@@ -9,7 +10,7 @@ public class Program
     [STAThread]
     public static void Main(string[] args)
     {
-      
+      QuestPDF.Settings.License = LicenseType.Community;
       var culture = CultureInfo.GetCultureInfo("pt-BR");
       CultureInfo.DefaultThreadCurrentCulture = culture;
       CultureInfo.DefaultThreadCurrentUICulture = culture;

@@ -8,6 +8,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -22,6 +23,7 @@ namespace ControleMateriais.Desktop.ViewModels;
 public class MainWindowViewModel : ViewModelBase
 {
     public ObservableCollection<MaterialItem> Itens { get; } = new();
+    public ObservableCollection<PesoWrapper> ItensEditaveis { get; } = new();
     private decimal _totalGeral;
     public DelegateCommand ExportarCommand { get; }
 
@@ -100,6 +102,7 @@ public class MainWindowViewModel : ViewModelBase
         foreach (var it in Itens)
         {
             SubscribeItem(it);
+            ItensEditaveis.Add(new PesoWrapper(it));
         }
         RecalcularTotalGeral();
 
@@ -205,7 +208,7 @@ public class MainWindowViewModel : ViewModelBase
         // 2) Gerar o PDF com QuestPDF
         GerarReciboPdf(filePath);
 
-        // (Opcional) você pode exibir uma notificação/toast/snackbar
+        ShowToast($"PDF exportado com sucesso: {Path.GetFileName(filePath)}", isError: false);
     }
 
 
@@ -361,6 +364,80 @@ public class MainWindowViewModel : ViewModelBase
 
 
 }
+public class PesoWrapper : ViewModelBase
+{
+    private readonly MaterialItem _item;
+    private string _pesoTexto;
+    private bool _editando;
+
+    public string Nome => _item.Nome;
+
+    public decimal PrecoPorKg => _item.PrecoPorKg;
+    public decimal Total => _item.Total;
+
+    public string PesoTexto
+    {
+        get => _pesoTexto;
+        set
+        {
+            if (value != _pesoTexto)
+            {
+                _pesoTexto = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public PesoWrapper(MaterialItem item)
+    {
+        _item = item;
+        _pesoTexto = item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+        _item.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MaterialItem.PrecoPorKg) ||
+                e.PropertyName == nameof(MaterialItem.Total))
+            {
+                OnPropertyChanged(nameof(PrecoPorKg));
+                OnPropertyChanged(nameof(Total));
+            }
+            if (e.PropertyName == nameof(MaterialItem.PesoAtual) && !_editando)
+            {
+                _pesoTexto = _item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+                OnPropertyChanged(nameof(PesoTexto));
+            }
+        };
+    }
+
+    public void IniciarEdicao()
+    {
+        _editando = true;
+        PesoTexto = string.Empty;
+    }
+
+    public void ConfirmarEdicao()
+    {
+        if (!_editando) return;
+        _editando = false;
+
+        var raw = PesoTexto.Trim().Replace(" ", "");
+
+        if (raw.Contains(',') && raw.Contains('.'))
+        {
+            raw = raw.Replace(".", "").Replace(",", ".");
+        }
+        else
+        {
+            raw = raw.Replace(",", ".");
+        }
+
+        if (!decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            parsed = _item.PesoAtual;
+
+        _item.PesoAtual = parsed;
+        PesoTexto = parsed.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+    }
+}
+
 public sealed class DelegateCommand : ICommand
 {
     private readonly Func<bool>? _canExecute;

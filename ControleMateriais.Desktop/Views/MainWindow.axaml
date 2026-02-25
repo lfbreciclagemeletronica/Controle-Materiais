@@ -29,15 +29,20 @@
       <!-- CONTAINER PRINCIPAL -->
       <Grid Grid.Row="1" Margin="10">
         <!-- Painel INICIAL -->
-        <Grid>
+        <Grid IsVisible="{Binding IsGerindoTabela, Converter={StaticResource BoolNot}}">
           <Border Background="{DynamicResource Brush.SurfaceAlt}"
                   BorderBrush="{DynamicResource Brush.Border}"
                   BorderThickness="1" CornerRadius="10" Padding="16">
             <Grid RowDefinitions="Auto,*">
               <!-- Cabeçalho -->
               <StackPanel Margin="0,0,0,12" Spacing="6">
-                <Grid ColumnDefinitions="*,Auto">
-                  <StackPanel Grid.ColumnSpan="2"
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <Button Grid.Column="0"
+                          Content="Tabela de Preços"
+                          HorizontalAlignment="Left"
+                          Command="{Binding AbrirTabelaPrecosCommand}"/>
+
+                  <StackPanel Grid.Column="1"
                               HorizontalAlignment="Center"
                               Spacing="0">
                     <TextBlock Text="Valor Total"
@@ -53,7 +58,7 @@
                                Text="{Binding PesoTotal, StringFormat={}Peso total: {0:N3} kg}"/>
                   </StackPanel>
 
-                  <Button Grid.Column="1"
+                  <Button Grid.Column="2"
                           Classes="primary"
                           Content="Exportar"
                           HorizontalAlignment="Right"
@@ -129,6 +134,139 @@
             </Grid>
           </Border>
         </Grid>
+
+        <!-- Painel TABELA DE PREÇOS -->
+        <Grid IsVisible="{Binding IsGerindoTabela}"
+              x:DataType="vm:MainWindowViewModel">
+          <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                  BorderBrush="{DynamicResource Brush.Border}"
+                  BorderThickness="1" CornerRadius="10" Padding="16">
+            <Grid RowDefinitions="Auto,*,Auto">
+
+              <!-- Cabeçalho -->
+              <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <TextBlock Text="Tabela de Preços"
+                           FontSize="16" FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                <TextBlock Text="{Binding TabelaVM.TabelaAtivaLabel}"
+                           VerticalAlignment="Center"
+                           Classes="muted" FontSize="11"/>
+              </StackPanel>
+
+              <!-- Corpo: lista à esquerda + editor à direita -->
+              <Grid Grid.Row="1" ColumnDefinitions="220,*">
+
+                <!-- Lista de tabelas salvas -->
+                <Border Grid.Column="0"
+                        Background="{DynamicResource Brush.Surface}"
+                        BorderBrush="{DynamicResource Brush.Border}"
+                        BorderThickness="1" CornerRadius="6" Padding="8"
+                        Margin="0,0,8,0">
+                  <Grid RowDefinitions="Auto,*,Auto">
+                    <TextBlock Grid.Row="0" Text="Tabelas salvas"
+                               FontWeight="Bold" Margin="0,0,0,6"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding TabelaVM.Tabelas}"
+                             SelectedItem="{Binding TabelaVM.TabelaSelecionada, Mode=TwoWay}"
+                             Background="Transparent">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TabelaPrecoInfo">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding Nome}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            <Border IsVisible="{Binding IsAtiva}"
+                                    Background="{DynamicResource Brush.Primary}"
+                                    CornerRadius="4" Padding="4,1">
+                              <TextBlock Text="ATIVA" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                            </Border>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Button Grid.Row="2"
+                            Content="+ Nova Tabela"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,6,0,0"
+                            Command="{Binding TabelaVM.NovaTabelaCommand}"/>
+                  </Grid>
+                </Border>
+
+                <!-- Editor da tabela selecionada / nova tabela -->
+                <Border Grid.Column="1"
+                        Background="{DynamicResource Brush.Surface}"
+                        BorderBrush="{DynamicResource Brush.Border}"
+                        BorderThickness="1" CornerRadius="6" Padding="8">
+                  <Grid RowDefinitions="Auto,Auto,*">
+
+                    <!-- Nome da tabela -->
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                      <TextBlock Grid.Column="0" Text="Nome:"
+                                 VerticalAlignment="Center" Margin="0,0,8,0"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                      <TextBox Grid.Column="1"
+                               Text="{Binding TabelaVM.NovoNome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                               Watermark="Nome da tabela"
+                               HorizontalAlignment="Stretch"/>
+                    </Grid>
+
+                    <!-- Cabeçalho da grade de preços -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*,150" Margin="4,0,12,4">
+                      <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                      <TextBlock Grid.Column="1" Text="Preço por kg" FontWeight="Bold"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    </Grid>
+
+                    <!-- Lista de preços editável -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                      <ItemsControl ItemsSource="{Binding TabelaVM.ItensEdicao}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ItemPrecoWrapper">
+                            <Grid ColumnDefinitions="*,150" Margin="4,2">
+                              <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource Brush.TextPrimary}"/>
+                              <TextBox Grid.Column="1"
+                                       Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                       Width="140" HorizontalAlignment="Left"
+                                       HorizontalContentAlignment="Right"
+                                       GotFocus="TabelaPrecoTextBox_GotFocus"
+                                       KeyDown="TabelaPrecoTextBox_KeyDown"
+                                       LostFocus="TabelaPrecoTextBox_LostFocus"/>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </Grid>
+                </Border>
+              </Grid>
+
+              <!-- Ações -->
+              <StackPanel Grid.Row="2" Orientation="Horizontal"
+                          HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
+                <Button Content="Fechar"
+                        Command="{Binding TabelaVM.FecharCommand}"/>
+                <Button Content="Excluir Tabela"
+                        IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
+                        Command="{Binding TabelaVM.DeletarTabelaCommand}"/>
+                <Button Classes="primary"
+                        Content="Salvar Como Nova"
+                        IsVisible="{Binding TabelaVM.CriandoNova}"
+                        Command="{Binding TabelaVM.SalvarNovaCommand}"/>
+                <Button Classes="primary"
+                        Content="Ativar Tabela"
+                        IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
+                        Command="{Binding TabelaVM.AtivarTabelaCommand}"/>
+              </StackPanel>
+
+            </Grid>
+          </Border>
+        </Grid>
+
       </Grid>
     </Grid>
   </Grid>

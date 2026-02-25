@@ -38,6 +38,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private void TabelaPrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        {
+            wrapper.IniciarEdicao();
+            tb.SelectAll();
+        }
+    }
+
+    private void TabelaPrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicao();
+            e.Handled = true;
+        }
+    }
+
+    private void TabelaPrecoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicao();
+        }
+    }
+
     private void PesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
         if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)

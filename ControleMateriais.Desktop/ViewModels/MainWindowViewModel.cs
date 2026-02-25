@@ -96,12 +96,67 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
-      Itens.Add(new MaterialItem
-        {Nome = "Placas pesadas", PesoAtual = 0m, PrecoPorKg = 2.00m}
-      );
-      Itens.Add(new MaterialItem
-        { Nome = "Placas leves", PesoAtual = 0m, PrecoPorKg = 4.00m }
-      );
+        var nomes = new[]
+        {
+            "PLACA MAE DE NOTEBOOK A",
+            "PLACA MAE DE NOTEBOOK B",
+            "PLACA MAE DE NOTEBOOK C",
+            "PLACA MAE A",
+            "PLACA MAE B",
+            "PLACA MAE C",
+            "PLACA MAE D",
+            "PLACA SERVIDOR",
+            "PLACA LEVE ESPECIAL",
+            "PLACA LEVE ESPECIAL COM PONTA",
+            "PLACA LEVE ESPECIAL COMPLETA",
+            "PLACA DOURADA",
+            "PLACA DOURADA B",
+            "PLACA TAPETE A",
+            "PLACA TAPETE B",
+            "PLACA CONECTOR",
+            "PLACA LEVE",
+            "PLACA LEVE COM PONTA",
+            "PLACA INTERMEDIÁRIA A",
+            "PLACA INTERMEDIÁRIA B",
+            "PLACA INTERMEDIÁRIA C",
+            "PLACA PESADA",
+            "PLACA PESADA COM PONTA",
+            "PLACA TABLET",
+            "PLACA MARROM",
+            "HD COMPLETO",
+            "HD SEM PLACA E SUCATEADO",
+            "PLACA HD",
+            "PLACA DE CELULAR MISTA",
+            "CELULAR BOTAO E FLIP",
+            "SMARTPHONE SEM BATERIA",
+            "SMARTPHONE COM BATERIA",
+            "CELULAR REPLICA COM E SEM BATERIA",
+            "MEMORIA DOURADA",
+            "MEMORIA PRATEADA",
+            "PROCESSADOR PLASTICO CHAPA A",
+            "PROCESSADOR PLASTICO CHAPA B",
+            "PROCESSADOR PLASTICO",
+            "PROCESSADOR SLOT",
+            "PROCESSADOR PLASTICO PRETO",
+            "PROCESSADOR CERAMICO A",
+            "PROCESSADOR CERAMICO B",
+            "PROCESSADOR CERAMICO C",
+            "BATERIA DE NOTEBOOK",
+            "BATERIA DE TABLET",
+            "BATERIA DE CELULAR",
+            "FONTE 1",
+            "RAIO X",
+            "DESMANCHE",
+            "SERVIDOR",
+            "FONTE 2",
+            "OUTROS 1",
+            "OUTROS 2",
+            "OUTROS 3",
+            "IMPUREZAS (PLASTICOS, FERRO, ALUMINIOS, PAPEL)",
+        };
+
+        foreach (var nome in nomes)
+            Itens.Add(new MaterialItem { Nome = nome, PesoAtual = 0m, PrecoPorKg = 0m });
 
         // Controlar os valores
         Itens.CollectionChanged += OnItensCollectionChanged;

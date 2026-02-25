@@ -1,24 +1,40 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using ControleMateriais.Desktop.ViewModels;
-using System.Linq;
 
 namespace ControleMateriais.Desktop.Views;
 
 public partial class MainWindow : Window
 {
-    private readonly MainWindowViewModel viewModel;
     public MainWindow()
     {
         InitializeComponent();
         DataContext = new MainWindowViewModel();
     }
 
-    private async void OnAbrirTabelaPrecosClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void PrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        // Obter itens pré configurados para colocar na página de preços
-        if (DataContext is MainWindowViewModel vm)
+        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
         {
-            vm.AbrirEdicaoPrecosCommand.Execute(null);
+            wrapper.IniciarEdicao();
+            tb.SelectAll();
+        }
+    }
+
+    private void PrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicao();
+            e.Handled = true;
+        }
+    }
+
+    private void PrecoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicao();
         }
     }
 }

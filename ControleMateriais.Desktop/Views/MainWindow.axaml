@@ -80,35 +80,55 @@
         <Grid IsVisible="{Binding IsEditandoPrecos}">
           <Border Background="{DynamicResource Brush.Surface}" Padding="16">
             <Grid RowDefinitions="Auto,*,Auto">
-              <!-- Cabeçalho: competência -->
+              <!-- Cabeçalho: competência como texto -->
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="Competência (mês/ano):"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource Brush.TextPrimary}"/>
-                <DatePicker SelectedDate="{Binding PriceVM.Competencia, Mode=TwoWay}"
-                            Width="180"/>
+                <TextBox Text="{Binding PriceVM.CompetenciaMes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Width="50" MaxLength="2" VerticalAlignment="Center"/>
+                <TextBlock Text="/" VerticalAlignment="Center"
+                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                <TextBox Text="{Binding PriceVM.CompetenciaAno, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Width="65" MaxLength="4" VerticalAlignment="Center"/>
                 <TextBlock Text="(ao trocar, carrega valores, se houver JSON)"
                            Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0"/>
               </StackPanel>
 
-              <!-- Grade de preços -->
+              <!-- Grade de preços usando ItemsControl para controle total de eventos -->
               <Border Grid.Row="1"
                       Background="{DynamicResource Brush.SurfaceAlt}"
                       BorderBrush="{DynamicResource Brush.Border}"
                       BorderThickness="1" CornerRadius="8" Padding="8">
-                <DataGrid ItemsSource="{Binding PriceVM.Precos}"
-                          AutoGenerateColumns="False" IsReadOnly="False">
-                  <DataGrid.Columns>
-                    <DataGridTextColumn Header="Material"
-                                        x:DataType="models:MaterialItem"
-                                        Binding="{Binding Nome}" IsReadOnly="True" Width="2*"/>
-                    <!-- edição de moeda: use seu converter ou TwoWay direto se preferir -->
-                    <DataGridTextColumn Header="Preço por kg"
-                                        x:DataType="models:MaterialItem"
-                                        Binding="{Binding PrecoPorKg, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:C}}"
-                                        Width="*"/>
-                  </DataGrid.Columns>
-                </DataGrid>
+                <StackPanel>
+                  <!-- Cabeçalho -->
+                  <Grid ColumnDefinitions="2*,*" Margin="4,0,4,4">
+                    <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="1" Text="Preço por kg" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Right"/>
+                  </Grid>
+                  <ItemsControl ItemsSource="{Binding PriceVM.PrecosEditaveis}"
+                                x:Name="ListaPrecos">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ItemPrecoWrapper">
+                        <Grid ColumnDefinitions="2*,*" Margin="4,2">
+                          <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
+                          <TextBox Grid.Column="1"
+                                   Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                   HorizontalAlignment="Right"
+                                   HorizontalContentAlignment="Right"
+                                   Width="140"
+                                   GotFocus="PrecoTextBox_GotFocus"
+                                   KeyDown="PrecoTextBox_KeyDown"
+                                   LostFocus="PrecoTextBox_LostFocus"/>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </Border>
 
               <!-- Ações -->

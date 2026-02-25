@@ -5,6 +5,8 @@
 # --- Build output (solução/projetos) ---
 **/bin/
 **/obj/
+ControleMateriais.Desktop/bin
+ControleMateriais.Desktop/obj
 **/out/
 **/artifacts/
 

@@ -42,10 +42,21 @@
                           HorizontalAlignment="Left"
                           Command="{Binding AbrirEdicaoPrecosCommand}"/>
 
-                  <TextBlock Grid.ColumnSpan="2"
-                             Classes="h1"
-                             HorizontalAlignment="Center"
-                             Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
+                  <StackPanel Grid.ColumnSpan="2"
+                              HorizontalAlignment="Center"
+                              Spacing="0">
+                    <TextBlock Text="Valor Total"
+                               Classes="muted"
+                               HorizontalAlignment="Center"
+                               FontSize="11"/>
+                    <TextBlock Classes="h1"
+                               HorizontalAlignment="Center"
+                               Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
+                    <TextBlock HorizontalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Brush.TextPrimary}"
+                               Text="{Binding PesoTotal, StringFormat={}Peso total: {0:N3} kg}"/>
+                  </StackPanel>
 
                   <Button Grid.Column="1"
                           Classes="primary"
@@ -146,11 +157,11 @@
                       BorderThickness="1" CornerRadius="8" Padding="8">
                 <Grid RowDefinitions="Auto,*">
                   <!-- Cabeçalho fixo -->
-                  <Grid ColumnDefinitions="2*,*" Margin="4,0,4,4">
+                  <Grid ColumnDefinitions="*,150" Margin="4,0,12,4">
                     <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
                     <TextBlock Grid.Column="1" Text="Preço por kg" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Right"/>
+                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
                   </Grid>
                   <!-- Linhas com scroll -->
                   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -158,15 +169,15 @@
                                   x:Name="ListaPrecos">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ItemPrecoWrapper">
-                          <Grid ColumnDefinitions="2*,*" Margin="4,2">
+                          <Grid ColumnDefinitions="*,150" Margin="4,2">
                             <TextBlock Grid.Column="0" Text="{Binding Nome}"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource Brush.TextPrimary}"/>
                             <TextBox Grid.Column="1"
                                      Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     HorizontalAlignment="Right"
-                                     HorizontalContentAlignment="Right"
+                                     HorizontalAlignment="Left"
                                      Width="140"
+                                     HorizontalContentAlignment="Right"
                                      GotFocus="PrecoTextBox_GotFocus"
                                      KeyDown="PrecoTextBox_KeyDown"
                                      LostFocus="PrecoTextBox_LostFocus"/>
@@ -184,7 +195,7 @@
                 <Button Content="Fechar"
                         Command="{Binding PriceVM.RetornarCommand}"/>
                 <Button Classes="primary"
-                        Content="Salvar (JSON)"
+                        Content="Salvar"
                         Command="{Binding PriceVM.SalvarCommand}"
                         IsVisible="{Binding PriceVM.SalvoComSucesso, Converter={StaticResource BoolNot}}"/>
               </StackPanel>

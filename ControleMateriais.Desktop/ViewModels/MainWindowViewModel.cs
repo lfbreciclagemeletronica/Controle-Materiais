@@ -25,6 +25,20 @@ public class MainWindowViewModel : ViewModelBase
     public ObservableCollection<MaterialItem> Itens { get; } = new();
     public ObservableCollection<PesoWrapper> ItensEditaveis { get; } = new();
     private decimal _totalGeral;
+    private decimal _pesoTotal;
+
+    public decimal PesoTotal
+    {
+        get => _pesoTotal;
+        private set
+        {
+            if (value != _pesoTotal)
+            {
+                _pesoTotal = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     private string _nomeCliente = string.Empty;
     public string NomeCliente
@@ -237,10 +251,14 @@ public class MainWindowViewModel : ViewModelBase
     private void RecalcularTotalGeral()
     {
         decimal soma = 0m;
+        decimal peso = 0m;
         foreach (var it in Itens)
+        {
             soma += it.Total;
-
+            peso += it.PesoAtual;
+        }
         TotalGeral = soma;
+        PesoTotal = peso;
     }
 
 

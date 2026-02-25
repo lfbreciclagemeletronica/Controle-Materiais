@@ -143,11 +143,10 @@ public class MainWindowViewModel : ViewModelBase
             "BATERIA DE NOTEBOOK",
             "BATERIA DE TABLET",
             "BATERIA DE CELULAR",
-            "FONTE 1",
+            "FONTE",
             "RAIO X",
             "DESMANCHE",
             "SERVIDOR",
-            "FONTE 2",
             "OUTROS 1",
             "OUTROS 2",
             "OUTROS 3",
@@ -230,18 +229,26 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task ExportarAsync()
     {
-        // 1) Pedir caminho do arquivo
+        if (string.IsNullOrWhiteSpace(NomeCliente))
+        {
+            ShowToast("Informe o nome do fornecedor antes de exportar.", isError: true);
+            return;
+        }
+
+        var data = DateTime.Now;
+        var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
+            .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
+
         var sfd = new SaveFileDialog
         {
             Title = "Salvar recibo em PDF",
             Filters =
-        {
-            new FileDialogFilter() { Name = "PDF", Extensions = { "pdf" } }
-        },
-            InitialFileName = "recibo.pdf"
+            {
+                new FileDialogFilter() { Name = "PDF", Extensions = { "pdf" } }
+            },
+            InitialFileName = nomeArquivo
         };
 
-        // O dialog precisa de uma Window; vamos tentar usar a Window ativa:
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
                         .MainWindow;
@@ -250,7 +257,6 @@ public class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(filePath))
             return;
 
-        // 2) Gerar o PDF com QuestPDF
         GerarReciboPdf(filePath);
 
         ShowToast($"PDF exportado com sucesso: {Path.GetFileName(filePath)}", isError: false);
@@ -259,91 +265,134 @@ public class MainWindowViewModel : ViewModelBase
 
 
 
-    // Gera um PDF simples com cabeçalho, tabela dos itens e total geral
     private void GerarReciboPdf(string filePath)
     {
-        // Se quiser usar a licença Community de forma explícita:
-        // QuestPDF.Settings.License = LicenseType.Community;
-
-        var itensSnapshot = Itens.ToList(); // congelar a coleção no momento do export
+        var itensSnapshot = Itens.ToList();
+        var pesoTotalSnapshot = itensSnapshot.Sum(i => i.PesoAtual);
         var totalGeralSnapshot = itensSnapshot.Sum(i => i.Total);
         var nomeClienteSnapshot = NomeCliente;
         var dataGeracao = DateTime.Now;
+
+        var borderColor = Colors.Grey.Darken2;
+        var headerBg = Colors.Grey.Lighten3;
+        var cellFontSize = 7f;
+        var headerFontSize = 7f;
+
+        static IContainer InfoCell(IContainer c) =>
+            c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
+             .PaddingVertical(3).PaddingHorizontal(5);
+
+        static IContainer InfoLabelCell(IContainer c) =>
+            c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
+             .Background(Colors.Grey.Lighten3)
+             .PaddingVertical(3).PaddingHorizontal(5);
 
         Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.Margin(2, Unit.Centimetre);
+                page.MarginTop(1.5f, Unit.Centimetre);
+                page.MarginBottom(1.5f, Unit.Centimetre);
+                page.MarginHorizontal(1.5f, Unit.Centimetre);
                 page.PageColor(Colors.White);
-                page.DefaultTextStyle(x => x.FontSize(12));
-
-                page.Header().Column(col =>
-                {
-                    col.Item().AlignCenter().Text("Recibo LFB Reciclagem Eletrônica").SemiBold().FontSize(18);
-                    col.Item().AlignCenter().Text($"Gerado em: {dataGeracao:dd/MM/yyyy}").FontSize(10);
-                });
+                page.DefaultTextStyle(x => x.FontSize(cellFontSize).FontFamily("Arial"));
 
                 page.Content().Column(col =>
                 {
-                    col.Spacing(10);
+                    col.Spacing(0);
 
-                    if (!string.IsNullOrWhiteSpace(nomeClienteSnapshot))
-                        col.Item().Text($"Cliente: {nomeClienteSnapshot}").FontSize(12);
+                    // Título
+                    col.Item()
+                       .Border(0.5f).BorderColor(borderColor)
+                       .Background(Colors.White)
+                       .PaddingVertical(6)
+                       .AlignCenter()
+                       .Text("LFB RECICLAGEM ELETRONICA")
+                       .Bold().FontSize(11);
 
-                    // Total geral em destaque
-                    col.Item().AlignCenter().Text($"Total: {totalGeralSnapshot:C}")
-                        .SemiBold().FontSize(14);
+                    // Bloco de informações: FORNECEDOR | PESO TOTAL | VALOR TOTAL | DATA
+                    col.Item().Table(info =>
+                    {
+                        info.ColumnsDefinition(c =>
+                        {
+                            c.RelativeColumn(1);  // label
+                            c.RelativeColumn(3);  // value
+                        });
+
+                        info.Cell().Element(InfoLabelCell).Text("FORNECEDOR").Bold().FontSize(7);
+                        info.Cell().Element(InfoCell).Text(nomeClienteSnapshot).FontSize(7);
+
+                        info.Cell().Element(InfoLabelCell).Text("PESO TOTAL").Bold().FontSize(7);
+                        info.Cell().Element(InfoCell)
+                            .Text(pesoTotalSnapshot > 0 ? $"{pesoTotalSnapshot:N3} kg" : string.Empty)
+                            .FontSize(7);
+
+                        info.Cell().Element(InfoLabelCell).Text("VALOR TOTAL").Bold().FontSize(7);
+                        info.Cell().Element(InfoCell)
+                            .Text(totalGeralSnapshot > 0 ? totalGeralSnapshot.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : string.Empty)
+                            .FontSize(7);
+
+                        info.Cell().Element(InfoLabelCell).Text("DATA").Bold().FontSize(7);
+                        info.Cell().Element(InfoCell).Text($"{dataGeracao:dd/MM/yyyy}").FontSize(7);
+                    });
+
+                    // Espaçamento
+                    col.Item().Height(4);
 
                     // Tabela de itens
                     col.Item().Table(table =>
                     {
-                        // Definição de colunas (Material | Peso | Preço | Total)
-                        table.ColumnsDefinition(columns =>
+                        table.ColumnsDefinition(c =>
                         {
-                            columns.RelativeColumn(3);  // Material
-                            columns.RelativeColumn(1);  // Peso
-                            columns.RelativeColumn(1);  // Preço/kg
-                            columns.RelativeColumn(1);  // Total
+                            c.RelativeColumn(4);  // Material
+                            c.RelativeColumn(1.2f); // KG
+                            c.RelativeColumn(1.5f); // VALOR
+                            c.RelativeColumn(1.5f); // TOTAL
                         });
 
-                        // Cabeçalho
+                        // Cabeçalho da tabela
                         table.Header(header =>
                         {
-                            header.Cell().Element(CellHeader).Text("Material");
-                            header.Cell().Element(CellHeader).AlignRight().Text("Peso (kg)");
-                            header.Cell().Element(CellHeader).AlignRight().Text("Preço/kg");
-                            header.Cell().Element(CellHeader).AlignRight().Text("Total");
+                            static IContainer HeaderCell(IContainer c) =>
+                                c.Background(Colors.Grey.Lighten3)
+                                 .Border(0.5f).BorderColor(Colors.Grey.Darken2)
+                                 .PaddingVertical(3).PaddingHorizontal(4);
+
+                            header.Cell().Element(HeaderCell).Text(string.Empty);
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("KG").Bold().FontSize(headerFontSize);
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("VALOR").Bold().FontSize(headerFontSize);
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("TOTAL").Bold().FontSize(headerFontSize);
                         });
 
-                        // Linhas
+                        // Linhas de itens
                         foreach (var it in itensSnapshot)
                         {
-                            table.Cell().Element(CellBody).Text(string.IsNullOrWhiteSpace(it.Nome) ? "-" : it.Nome);
-                            table.Cell().Element(CellBody).AlignRight().Text($"{it.PesoAtual:N3}");
-                            table.Cell().Element(CellBody).AlignRight().Text($"{it.PrecoPorKg:C}");
-                            table.Cell().Element(CellBody).AlignRight().Text($"{it.Total:C}");
+                            static IContainer BodyCell(IContainer c) =>
+                                c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
+                                 .PaddingVertical(2).PaddingHorizontal(4);
+
+                            static IContainer BodyCellRight(IContainer c) =>
+                                c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
+                                 .PaddingVertical(2).PaddingHorizontal(4);
+
+                            table.Cell().Element(BodyCell)
+                                 .Text(it.Nome ?? string.Empty).FontSize(cellFontSize);
+
+                            table.Cell().Element(BodyCellRight).AlignRight()
+                                 .Text(it.PesoAtual > 0 ? it.PesoAtual.ToString("N3") : string.Empty)
+                                 .FontSize(cellFontSize);
+
+                            table.Cell().Element(BodyCellRight).AlignRight()
+                                 .Text(it.PrecoPorKg > 0 ? it.PrecoPorKg.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : string.Empty)
+                                 .FontSize(cellFontSize);
+
+                            table.Cell().Element(BodyCellRight).AlignRight()
+                                 .Text(it.Total > 0 ? it.Total.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : string.Empty)
+                                 .FontSize(cellFontSize);
                         }
-
-                        static IContainer CellHeader(IContainer c) =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .BorderBottom(1).PaddingVertical(6).PaddingHorizontal(4);
-
-                        static IContainer CellBody(IContainer c) =>
-                            c.BorderBottom(0.5f).PaddingVertical(4).PaddingHorizontal(4);
                     });
                 });
-
-                page.Footer()
-                    .AlignCenter()
-                    .Text(txt =>
-                    {
-                        txt.Span("Página ");
-                        txt.CurrentPageNumber();
-                        txt.Span(" / ");
-                        txt.TotalPages();
-                    });
             });
         })
         .GeneratePdf(filePath);

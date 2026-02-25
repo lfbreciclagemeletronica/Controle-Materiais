@@ -6,6 +6,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
@@ -62,22 +63,6 @@ public class MainWindowViewModel : ViewModelBase
     }
 
 
-    private bool _isEditandoPrecos;
-    public bool IsEditandoPrecos
-    {
-        get => _isEditandoPrecos;
-        set
-        {
-            if (value != _isEditandoPrecos)
-            {
-                _isEditandoPrecos = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public PriceTableViewModel PriceVM { get; }
-    public ICommand AbrirEdicaoPrecosCommand { get; }
 
 
     // Toast simples (banner no topo)
@@ -183,26 +168,6 @@ public class MainWindowViewModel : ViewModelBase
         RecalcularTotalGeral();
 
         ExportarCommand = new DelegateCommand(async () => await ExportarAsync());
-
-        PriceVM = new PriceTableViewModel(Itens);
-
-
-        PriceVM.ValoresAtualizados += async (_, __) =>
-        {
-            await CarregarPrecosNaInicializacaoAsync();
-            ShowToast("Valores salvos no JSON com sucesso.", isError: false);
-        };
-
-        PriceVM.CloseRequested += (_, __) =>
-        {
-            IsEditandoPrecos = false;
-        };
-
-        AbrirEdicaoPrecosCommand = new DelegateCommand(() =>
-        {
-            PriceVM.ResetarAposAbrir();
-            IsEditandoPrecos = true;
-        });
 
         _ = CarregarPrecosNaInicializacaoAsync();
 
@@ -384,12 +349,22 @@ public class MainWindowViewModel : ViewModelBase
         .GeneratePdf(filePath);
     }
 
+    public class ValoresMensais
+    {
+        public string Competencia { get; set; } = string.Empty;
+        public List<LinhaPreco> Itens { get; set; } = new();
+    }
+
+    public class LinhaPreco
+    {
+        public string Nome { get; set; } = string.Empty;
+        public decimal PrecoPorKg { get; set; }
+    }
+
     public async Task CarregarPrecosNaInicializacaoAsync()
     {
-        // pega o mês atual
         var competencia = new DateTimeOffset(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
-        // monta o caminho igual ao PriceTable
         var baseDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             "Downloads", "Controle-Materiais-Registros");
@@ -399,10 +374,8 @@ public class MainWindowViewModel : ViewModelBase
         var competenciaStr = competencia.ToString("yyyy-MM");
         var filePath = Path.Combine(baseDir, $"valores_{competenciaStr}.json");
 
-
         if (File.Exists(filePath))
         {
-
             await using var fs = new FileStream(
                 filePath,
                 FileMode.Open,
@@ -416,7 +389,6 @@ public class MainWindowViewModel : ViewModelBase
             if (loaded?.Itens is null)
                 return;
 
-            // aplica preços por nome (case-sensitive como seu código)
             var dict = loaded.Itens.ToDictionary(x => x.Nome ?? string.Empty, x => x.PrecoPorKg);
 
             foreach (var item in Itens)
@@ -425,27 +397,11 @@ public class MainWindowViewModel : ViewModelBase
                     item.PrecoPorKg = preco;
             }
 
+            foreach (var w in ItensEditaveis)
+                w.AtualizarExibicaoPreco();
+
             RecalcularTotalGeral();
         }
-        else
-        {
-
-            // --- CRIA JSON PADRÃO CASO NÃO EXISTA ---
-            var novo = new PriceTableViewModel.ValoresMensais
-            {
-                Competencia = competenciaStr,
-                Itens = Itens.Select(i => new PriceTableViewModel.Linha
-                {
-                    Nome = i.Nome,
-                    PrecoPorKg = i.PrecoPorKg
-                }).ToList()
-            };
-
-
-            await using (var fsNew = File.Create(filePath))
-                await JsonSerializer.SerializeAsync(fsNew, novo, AppJsonContext.Default.ValoresMensais);
-        }
-
     }
 
 
@@ -455,6 +411,8 @@ public class PesoWrapper : ViewModelBase
     private readonly MaterialItem _item;
     private string _pesoTexto;
     private bool _editando;
+    private string _precoTexto;
+    private bool _editandoPreco;
 
     public string Nome => _item.Nome;
 
@@ -474,10 +432,24 @@ public class PesoWrapper : ViewModelBase
         }
     }
 
+    public string PrecoTexto
+    {
+        get => _precoTexto;
+        set
+        {
+            if (value != _precoTexto)
+            {
+                _precoTexto = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public PesoWrapper(MaterialItem item)
     {
         _item = item;
         _pesoTexto = item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+        _precoTexto = item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
         _item.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MaterialItem.PrecoPorKg) ||
@@ -485,6 +457,11 @@ public class PesoWrapper : ViewModelBase
             {
                 OnPropertyChanged(nameof(PrecoPorKg));
                 OnPropertyChanged(nameof(Total));
+                if (!_editandoPreco)
+                {
+                    _precoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
+                    OnPropertyChanged(nameof(PrecoTexto));
+                }
             }
             if (e.PropertyName == nameof(MaterialItem.PesoAtual) && !_editando)
             {
@@ -521,6 +498,44 @@ public class PesoWrapper : ViewModelBase
 
         _item.PesoAtual = parsed;
         PesoTexto = parsed.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+    }
+
+    public void IniciarEdicaoPreco()
+    {
+        _editandoPreco = true;
+        PrecoTexto = string.Empty;
+    }
+
+    public void ConfirmarEdicaoPreco()
+    {
+        if (!_editandoPreco) return;
+        _editandoPreco = false;
+
+        var raw = PrecoTexto.Trim()
+                            .Replace("R$", "")
+                            .Replace(" ", "")
+                            .Trim();
+
+        if (raw.Contains(',') && raw.Contains('.'))
+        {
+            raw = raw.Replace(".", "").Replace(",", ".");
+        }
+        else
+        {
+            raw = raw.Replace(",", ".");
+        }
+
+        if (!decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            parsed = _item.PrecoPorKg;
+
+        _item.PrecoPorKg = parsed;
+        PrecoTexto = parsed.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
+    }
+
+    public void AtualizarExibicaoPreco()
+    {
+        _editandoPreco = false;
+        PrecoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
     }
 }
 

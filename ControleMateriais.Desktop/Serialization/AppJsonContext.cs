@@ -14,8 +14,8 @@ namespace ControleMateriais.Desktop.Serialization
     [JsonSourceGenerationOptions(
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonSerializable(typeof(PriceTableViewModel.ValoresMensais))]
-    [JsonSerializable(typeof(System.Collections.Generic.List<PriceTableViewModel.Linha>))]
+    [JsonSerializable(typeof(MainWindowViewModel.ValoresMensais))]
+    [JsonSerializable(typeof(System.Collections.Generic.List<MainWindowViewModel.LinhaPreco>))]
 
     internal partial class AppJsonContext : JsonSerializerContext
     {

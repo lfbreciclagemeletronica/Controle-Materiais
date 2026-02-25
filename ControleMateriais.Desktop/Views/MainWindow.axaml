@@ -6,7 +6,9 @@
     x:Class="ControleMateriais.Desktop.Views.MainWindow"
     xmlns:conv="using:ControleMateriais.Desktop.Converters"
     x:DataType="vm:MainWindowViewModel"
-    Width="800" Height="500"
+    Width="900" Height="680"
+    MinWidth="700" MinHeight="500"
+    CanResize="True"
     Title="Controle de Materiais"
     Icon="avares://ControleMateriais.Desktop/Assets/avalonia-logo.ico">
 
@@ -68,48 +70,51 @@
                       Background="{DynamicResource Brush.SurfaceAlt}"
                       BorderBrush="{DynamicResource Brush.Border}"
                       BorderThickness="1" CornerRadius="8" Padding="8">
-                <StackPanel>
-                  <!-- Cabeçalho da tabela -->
-                  <Grid ColumnDefinitions="2*,*,*,*" Margin="4,0,4,6">
+                <Grid RowDefinitions="Auto,*">
+                  <!-- Cabeçalho fixo -->
+                  <Grid ColumnDefinitions="*,120,110,100" Margin="4,0,12,6">
                     <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
                     <TextBlock Grid.Column="1" Text="Peso atual (kg)" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
                     <TextBlock Grid.Column="2" Text="Preço por kg" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Right"/>
+                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
                     <TextBlock Grid.Column="3" Text="Total" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Right"/>
+                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
                   </Grid>
-                  <!-- Linhas dos itens -->
-                  <ItemsControl ItemsSource="{Binding ItensEditaveis}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:PesoWrapper">
-                        <Grid ColumnDefinitions="2*,*,*,*" Margin="4,3">
-                          <TextBlock Grid.Column="0" Text="{Binding Nome}"
-                                     VerticalAlignment="Center"
-                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
-                          <TextBox Grid.Column="1"
-                                   Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                   HorizontalAlignment="Stretch"
-                                   HorizontalContentAlignment="Center"
-                                   GotFocus="PesoTextBox_GotFocus"
-                                   KeyDown="PesoTextBox_KeyDown"
-                                   LostFocus="PesoTextBox_LostFocus"/>
-                          <TextBlock Grid.Column="2"
-                                     Text="{Binding PrecoPorKg, StringFormat={}{0:C}}"
-                                     VerticalAlignment="Center"
-                                     HorizontalAlignment="Right"
-                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
-                          <TextBlock Grid.Column="3"
-                                     Text="{Binding Total, StringFormat={}{0:C}}"
-                                     VerticalAlignment="Center"
-                                     HorizontalAlignment="Right"
-                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
+                  <!-- Linhas com scroll -->
+                  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding ItensEditaveis}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PesoWrapper">
+                          <Grid ColumnDefinitions="*,120,110,100" Margin="4,3">
+                            <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     HorizontalAlignment="Left"
+                                     Width="110"
+                                     HorizontalContentAlignment="Center"
+                                     GotFocus="PesoTextBox_GotFocus"
+                                     KeyDown="PesoTextBox_KeyDown"
+                                     LostFocus="PesoTextBox_LostFocus"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding PrecoPorKg, StringFormat={}{0:C}}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Left"
+                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding Total, StringFormat={}{0:C}}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Left"
+                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </Grid>
               </Border>
             </Grid>
           </Border>
@@ -139,35 +144,38 @@
                       Background="{DynamicResource Brush.SurfaceAlt}"
                       BorderBrush="{DynamicResource Brush.Border}"
                       BorderThickness="1" CornerRadius="8" Padding="8">
-                <StackPanel>
-                  <!-- Cabeçalho -->
+                <Grid RowDefinitions="Auto,*">
+                  <!-- Cabeçalho fixo -->
                   <Grid ColumnDefinitions="2*,*" Margin="4,0,4,4">
                     <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
                     <TextBlock Grid.Column="1" Text="Preço por kg" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Right"/>
                   </Grid>
-                  <ItemsControl ItemsSource="{Binding PriceVM.PrecosEditaveis}"
-                                x:Name="ListaPrecos">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:ItemPrecoWrapper">
-                        <Grid ColumnDefinitions="2*,*" Margin="4,2">
-                          <TextBlock Grid.Column="0" Text="{Binding Nome}"
-                                     VerticalAlignment="Center"
-                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
-                          <TextBox Grid.Column="1"
-                                   Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                   HorizontalAlignment="Right"
-                                   HorizontalContentAlignment="Right"
-                                   Width="140"
-                                   GotFocus="PrecoTextBox_GotFocus"
-                                   KeyDown="PrecoTextBox_KeyDown"
-                                   LostFocus="PrecoTextBox_LostFocus"/>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
+                  <!-- Linhas com scroll -->
+                  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding PriceVM.PrecosEditaveis}"
+                                  x:Name="ListaPrecos">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ItemPrecoWrapper">
+                          <Grid ColumnDefinitions="2*,*" Margin="4,2">
+                            <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     HorizontalAlignment="Right"
+                                     HorizontalContentAlignment="Right"
+                                     Width="140"
+                                     GotFocus="PrecoTextBox_GotFocus"
+                                     KeyDown="PrecoTextBox_KeyDown"
+                                     LostFocus="PrecoTextBox_LostFocus"/>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </Grid>
               </Border>
 
               <!-- Ações -->

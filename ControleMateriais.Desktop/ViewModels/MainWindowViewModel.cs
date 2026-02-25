@@ -25,6 +25,13 @@ public class MainWindowViewModel : ViewModelBase
     public ObservableCollection<MaterialItem> Itens { get; } = new();
     public ObservableCollection<PesoWrapper> ItensEditaveis { get; } = new();
     private decimal _totalGeral;
+
+    private string _nomeCliente = string.Empty;
+    public string NomeCliente
+    {
+        get => _nomeCliente;
+        set { if (value != _nomeCliente) { _nomeCliente = value; OnPropertyChanged(); } }
+    }
     public DelegateCommand ExportarCommand { get; }
 
     public decimal TotalGeral
@@ -222,6 +229,8 @@ public class MainWindowViewModel : ViewModelBase
 
         var itensSnapshot = Itens.ToList(); // congelar a coleção no momento do export
         var totalGeralSnapshot = itensSnapshot.Sum(i => i.Total);
+        var nomeClienteSnapshot = NomeCliente;
+        var dataGeracao = DateTime.Now;
 
         Document.Create(container =>
         {
@@ -232,14 +241,18 @@ public class MainWindowViewModel : ViewModelBase
                 page.PageColor(Colors.White);
                 page.DefaultTextStyle(x => x.FontSize(12));
 
-                page.Header()
-                    .AlignCenter()
-                    .Text("Recibo de Materiais")
-                    .SemiBold().FontSize(18);
+                page.Header().Column(col =>
+                {
+                    col.Item().AlignCenter().Text("Recibo LFB Reciclagem Eletrônica").SemiBold().FontSize(18);
+                    col.Item().AlignCenter().Text($"Gerado em: {dataGeracao:dd/MM/yyyy}").FontSize(10);
+                });
 
                 page.Content().Column(col =>
                 {
                     col.Spacing(10);
+
+                    if (!string.IsNullOrWhiteSpace(nomeClienteSnapshot))
+                        col.Item().Text($"Cliente: {nomeClienteSnapshot}").FontSize(12);
 
                     // Total geral em destaque
                     col.Item().AlignCenter().Text($"Total: {totalGeralSnapshot:C}")

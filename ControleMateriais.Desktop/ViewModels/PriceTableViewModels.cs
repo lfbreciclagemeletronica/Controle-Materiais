@@ -1,7 +1,9 @@
 ﻿using ControleMateriais.Desktop.Serialization;
 using ControleMateriais.Models;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -16,6 +18,7 @@ namespace ControleMateriais.Desktop.ViewModels
     public class PriceTableViewModel : ViewModelBase
     {
         public ObservableCollection<MaterialItem> Precos { get; }
+        public ObservableCollection<ItemPrecoWrapper> PrecosEditaveis { get; }
 
         private bool _salvoComSucesso;
         public bool SalvoComSucesso
@@ -26,21 +29,35 @@ namespace ControleMateriais.Desktop.ViewModels
 
         public ICommand RetornarCommand { get; }
 
-
-        private DateTimeOffset? _competencia = DateTimeOffset.Now; // mês/ano atual como padrão
-
         public event EventHandler? ValoresAtualizados;
-        public DateTimeOffset? Competencia
+
+        private string _competenciaMes = DateTime.Now.Month.ToString("D2");
+        public string CompetenciaMes
         {
-            get => _competencia;
+            get => _competenciaMes;
             set
             {
-                if (value != _competencia)
+                if (value != _competenciaMes)
                 {
-                    _competencia = value;
+                    _competenciaMes = value;
                     OnPropertyChanged();
                     (SalvarCommand as DelegateCommand)?.RaiseCanExecuteChanged();
-                    // Carrega automaticamente os preços da competência (se existir o JSON)
+                    _ = TryLoadFromJsonAsync();
+                }
+            }
+        }
+
+        private string _competenciaAno = DateTime.Now.Year.ToString();
+        public string CompetenciaAno
+        {
+            get => _competenciaAno;
+            set
+            {
+                if (value != _competenciaAno)
+                {
+                    _competenciaAno = value;
+                    OnPropertyChanged();
+                    (SalvarCommand as DelegateCommand)?.RaiseCanExecuteChanged();
                     _ = TryLoadFromJsonAsync();
                 }
             }
@@ -55,28 +72,37 @@ namespace ControleMateriais.Desktop.ViewModels
         {
             // Usamos os MESMOS objetos MaterialItem da tela principal
             Precos = itens;
+            PrecosEditaveis = new ObservableCollection<ItemPrecoWrapper>(
+                itens.Select(i => new ItemPrecoWrapper(i)));
 
             SalvarCommand = new DelegateCommand(async () => await SalvarAsync(), PodeSalvar);
             RetornarCommand = new DelegateCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
         }
+
         public void ResetarAposAbrir()
         {
             SalvoComSucesso = false; // botão volta a mostrar "Salvar (JSON)"
             (SalvarCommand as DelegateCommand)?.RaiseCanExecuteChanged();
+            foreach (var w in PrecosEditaveis)
+                w.AtualizarExibicao();
         }
 
-
         private bool PodeSalvar()
-            => Competencia.HasValue && Competencia.Value.Year >= 2000;
+        {
+            if (!int.TryParse(CompetenciaMes, out var m) || m < 1 || m > 12) return false;
+            if (!int.TryParse(CompetenciaAno, out var a) || a < 2000) return false;
+            return true;
+        }
 
         private string GetBaseDir()
-            => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                            "ControleMateriais", "Valores");
+            => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            "Downloads", "Controle-Materiais-Registros");
 
         private (string competenciaStr, string filePath) GetTargetFile()
         {
-            var dt = new DateTime(Competencia!.Value.Year, Competencia.Value.Month, 1);
-            var competenciaStr = dt.ToString("yyyy-MM");
+            int.TryParse(CompetenciaMes, out var m);
+            int.TryParse(CompetenciaAno, out var a);
+            var competenciaStr = $"{a:D4}-{m:D2}";
             var path = Path.Combine(GetBaseDir(), $"valores_{competenciaStr}.json");
             return (competenciaStr, path);
         }
@@ -95,22 +121,12 @@ namespace ControleMateriais.Desktop.ViewModels
                 Itens = Precos.Select(p => new Linha { Nome = p.Nome, PrecoPorKg = p.PrecoPorKg }).ToList()
             };
 
-            // CRIAR ARQUIVO TEMPORARIO
-
-            var tmpPath = filePath + ".tmp";
-            await using (var fs = File.Create(tmpPath))
-            await System.Text.Json.JsonSerializer.SerializeAsync(
-                fs,
-                payload,
-                AppJsonContext.Default.ValoresMensais
-            );
-
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
+            await using (var fs = File.Create(filePath))
+                await System.Text.Json.JsonSerializer.SerializeAsync(
+                    fs,
+                    payload,
+                    AppJsonContext.Default.ValoresMensais
+                );
 
             //Notificar
             SalvoComSucesso = true;
@@ -121,7 +137,7 @@ namespace ControleMateriais.Desktop.ViewModels
         // Carrega JSON (se existir) e APLICA nos mesmos MaterialItem (atualizando a tela principal)
         private async Task TryLoadFromJsonAsync()
         {
-            if (!Competencia.HasValue) return;
+            if (!PodeSalvar()) return;
 
             var (_, filePath) = GetTargetFile();
             if (!File.Exists(filePath))
@@ -153,6 +169,9 @@ namespace ControleMateriais.Desktop.ViewModels
                         item.PrecoPorKg = preco;
                     }
                 }
+
+                foreach (var w in PrecosEditaveis)
+                    w.AtualizarExibicao();
             }
             catch
             {
@@ -164,13 +183,87 @@ namespace ControleMateriais.Desktop.ViewModels
         public class ValoresMensais
         {
             public string Competencia { get; set; } = string.Empty; // "yyyy-MM"
-            public System.Collections.Generic.List<Linha> Itens { get; set; } = new();
+            public List<Linha> Itens { get; set; } = new();
         }
 
         public class Linha
         {
             public string Nome { get; set; } = string.Empty;
             public decimal PrecoPorKg { get; set; }
+        }
+    }
+
+    // Wrapper para edição de preço com suporte a vírgula/ponto e formatação em reais
+    public class ItemPrecoWrapper : ViewModelBase
+    {
+        private readonly MaterialItem _item;
+        private string _precoTexto;
+        private bool _editando;
+
+        public string Nome => _item.Nome;
+
+        public string PrecoTexto
+        {
+            get => _precoTexto;
+            set
+            {
+                if (value != _precoTexto)
+                {
+                    _precoTexto = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public ItemPrecoWrapper(MaterialItem item)
+        {
+            _item = item;
+            _precoTexto = item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
+        }
+
+        // Chamado quando o campo recebe foco: limpa para digitação
+        public void IniciarEdicao()
+        {
+            _editando = true;
+            PrecoTexto = string.Empty;
+        }
+
+        // Chamado ao pressionar Enter ou perder foco: converte e formata
+        public void ConfirmarEdicao()
+        {
+            if (!_editando) return;
+            _editando = false;
+
+            var raw = PrecoTexto.Trim()
+                                .Replace("R$", "")
+                                .Replace(" ", "")
+                                .Trim();
+
+            // suporta tanto ponto quanto vírgula como separador decimal
+            // se houver os dois, trata ponto como milhar e vírgula como decimal (ex: 1.234,56)
+            // caso contrário, aceita ambos como separador decimal
+            decimal parsed = 0m;
+            if (raw.Contains(',') && raw.Contains('.'))
+            {
+                raw = raw.Replace(".", "").Replace(",", ".");
+            }
+            else
+            {
+                raw = raw.Replace(",", ".");
+            }
+
+            if (!decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+                parsed = _item.PrecoPorKg;
+
+            _item.PrecoPorKg = parsed;
+            PrecoTexto = parsed.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
+        }
+
+        // Atualiza a exibição quando o item é alterado externamente (ex: carregamento do JSON)
+        public void AtualizarExibicao()
+        {
+            _editando = false;
+            PrecoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
         }
     }
 

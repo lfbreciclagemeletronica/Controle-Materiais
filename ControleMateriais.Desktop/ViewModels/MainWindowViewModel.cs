@@ -302,8 +302,8 @@ public class MainWindowViewModel : ViewModelBase
 
         // monta o caminho igual ao PriceTable
         var baseDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ControleMateriais", "Valores");
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads", "Controle-Materiais-Registros");
 
         Directory.CreateDirectory(baseDir);
 
@@ -353,10 +353,8 @@ public class MainWindowViewModel : ViewModelBase
             };
 
 
-            var tmp = filePath + ".tmp";
-            await using (var fsNew = File.Create(tmp))
+            await using (var fsNew = File.Create(filePath))
                 await JsonSerializer.SerializeAsync(fsNew, novo, AppJsonContext.Default.ValoresMensais);
-            File.Replace(tmp, filePath, null); // troca atômica
         }
 
     }

@@ -16,13 +16,9 @@ public partial class MainWindow : Window
     private async void OnAbrirTabelaPrecosClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         // Obter itens pré configurados para colocar na página de preços
-        if (DataContext is not MainWindowViewModel vm) return;
-
-        var delegation = new PriceTableWindow
+        if (DataContext is MainWindowViewModel vm)
         {
-            DataContext = new PriceTableViewModel(vm.Itens)
-        };
-
-        await delegation.ShowDialog(this);
+            vm.AbrirEdicaoPrecosCommand.Execute(null);
+        }
     }
 }

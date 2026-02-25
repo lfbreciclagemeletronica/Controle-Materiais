@@ -14,27 +14,27 @@ public partial class MainWindow : Window
 
     private void PrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
         {
-            wrapper.IniciarEdicao();
+            wrapper.IniciarEdicaoPreco();
             tb.SelectAll();
         }
     }
 
     private void PrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
         {
-            wrapper.ConfirmarEdicao();
+            wrapper.ConfirmarEdicaoPreco();
             e.Handled = true;
         }
     }
 
     private void PrecoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
         {
-            wrapper.ConfirmarEdicao();
+            wrapper.ConfirmarEdicaoPreco();
         }
     }
 

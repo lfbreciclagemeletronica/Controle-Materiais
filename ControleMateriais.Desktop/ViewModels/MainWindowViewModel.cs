@@ -1,4 +1,5 @@
 ﻿using Avalonia.Controls;
+using ControleMateriais.Desktop.Serialization;
 using ControleMateriais.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -7,7 +8,10 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using IContainer = QuestPDF.Infrastructure.IContainer;
@@ -20,16 +24,6 @@ public class MainWindowViewModel : ViewModelBase
     public ObservableCollection<MaterialItem> Itens { get; } = new();
     private decimal _totalGeral;
     public DelegateCommand ExportarCommand { get; }
-    static IContainer CellHeader(IContainer c) =>
-        c.DefaultTextStyle(x => x.SemiBold())
-        .BorderBottom(1)
-        .PaddingVertical(6)
-        .PaddingHorizontal(4);
-
-    static IContainer CellBody(IContainer c) =>
-        c.BorderBottom(0.5f)
-         .PaddingVertical(4)
-         .PaddingHorizontal(4);
 
     public decimal TotalGeral
     {
@@ -43,6 +37,53 @@ public class MainWindowViewModel : ViewModelBase
             }
         }
     }
+
+
+    private bool _isEditandoPrecos;
+    public bool IsEditandoPrecos
+    {
+        get => _isEditandoPrecos;
+        set
+        {
+            if (value != _isEditandoPrecos)
+            {
+                _isEditandoPrecos = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public PriceTableViewModel PriceVM { get; }
+    public ICommand AbrirEdicaoPrecosCommand { get; }
+
+
+    // Toast simples (banner no topo)
+    private string? _toastMessage;
+    private bool _toastIsError;
+    private bool _toastVisible;
+
+
+    public string? ToastMessage { get => _toastMessage; private set { _toastMessage = value; OnPropertyChanged(); } }
+    public bool ToastIsError { get => _toastIsError; private set { _toastIsError = value; OnPropertyChanged(); } }
+    public bool ToastVisible { get => _toastVisible; private set { _toastVisible = value; OnPropertyChanged(); } }
+
+
+    private void ShowToast(string message, bool isError = false)
+    {
+        ToastMessage = message;
+        ToastIsError = isError;
+        ToastVisible = true;
+        // opcional: timer para ocultar após alguns segundos
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            ToastVisible = false;
+            OnPropertyChanged(nameof(ToastVisible));
+        });
+        OnPropertyChanged(nameof(ToastVisible));
+    }
+
+
 
     public MainWindowViewModel()
     {
@@ -63,6 +104,31 @@ public class MainWindowViewModel : ViewModelBase
         RecalcularTotalGeral();
 
         ExportarCommand = new DelegateCommand(async () => await ExportarAsync());
+
+        PriceVM = new PriceTableViewModel(Itens);
+
+
+        PriceVM.ValoresAtualizados += async (_, __) =>
+        {
+            await CarregarPrecosNaInicializacaoAsync();
+            ShowToast("Valores salvos no JSON com sucesso.", isError: false);
+        };
+
+        PriceVM.CloseRequested += (_, __) =>
+        {
+            IsEditandoPrecos = false;
+        };
+
+        AbrirEdicaoPrecosCommand = new DelegateCommand(() =>
+        {
+            PriceVM.ResetarAposAbrir();
+            IsEditandoPrecos = true;
+        });
+
+        _ = CarregarPrecosNaInicializacaoAsync();
+
+
+
     }
 
     private void OnItensCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -227,6 +293,72 @@ public class MainWindowViewModel : ViewModelBase
             });
         })
         .GeneratePdf(filePath);
+    }
+
+    public async Task CarregarPrecosNaInicializacaoAsync()
+    {
+        // pega o mês atual
+        var competencia = new DateTimeOffset(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        // monta o caminho igual ao PriceTable
+        var baseDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ControleMateriais", "Valores");
+
+        Directory.CreateDirectory(baseDir);
+
+        var competenciaStr = competencia.ToString("yyyy-MM");
+        var filePath = Path.Combine(baseDir, $"valores_{competenciaStr}.json");
+
+
+        if (File.Exists(filePath))
+        {
+
+            await using var fs = new FileStream(
+                filePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+
+            var loaded = await JsonSerializer.DeserializeAsync(
+                fs,
+                AppJsonContext.Default.ValoresMensais);
+
+            if (loaded?.Itens is null)
+                return;
+
+            // aplica preços por nome (case-sensitive como seu código)
+            var dict = loaded.Itens.ToDictionary(x => x.Nome ?? string.Empty, x => x.PrecoPorKg);
+
+            foreach (var item in Itens)
+            {
+                if (dict.TryGetValue(item.Nome ?? string.Empty, out var preco))
+                    item.PrecoPorKg = preco;
+            }
+
+            RecalcularTotalGeral();
+        }
+        else
+        {
+
+            // --- CRIA JSON PADRÃO CASO NÃO EXISTA ---
+            var novo = new PriceTableViewModel.ValoresMensais
+            {
+                Competencia = competenciaStr,
+                Itens = Itens.Select(i => new PriceTableViewModel.Linha
+                {
+                    Nome = i.Nome,
+                    PrecoPorKg = i.PrecoPorKg
+                }).ToList()
+            };
+
+
+            var tmp = filePath + ".tmp";
+            await using (var fsNew = File.Create(tmp))
+                await JsonSerializer.SerializeAsync(fsNew, novo, AppJsonContext.Default.ValoresMensais);
+            File.Replace(tmp, filePath, null); // troca atômica
+        }
+
     }
 
 

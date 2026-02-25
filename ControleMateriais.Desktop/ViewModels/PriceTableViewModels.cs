@@ -1,4 +1,5 @@
-﻿using ControleMateriais.Models;
+﻿using ControleMateriais.Desktop.Serialization;
+using ControleMateriais.Models;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -16,7 +17,19 @@ namespace ControleMateriais.Desktop.ViewModels
     {
         public ObservableCollection<MaterialItem> Precos { get; }
 
+        private bool _salvoComSucesso;
+        public bool SalvoComSucesso
+        {
+            get => _salvoComSucesso;
+            private set { if (value != _salvoComSucesso) { _salvoComSucesso = value; OnPropertyChanged(); } }
+        }
+
+        public ICommand RetornarCommand { get; }
+
+
         private DateTimeOffset? _competencia = DateTimeOffset.Now; // mês/ano atual como padrão
+
+        public event EventHandler? ValoresAtualizados;
         public DateTimeOffset? Competencia
         {
             get => _competencia;
@@ -44,8 +57,14 @@ namespace ControleMateriais.Desktop.ViewModels
             Precos = itens;
 
             SalvarCommand = new DelegateCommand(async () => await SalvarAsync(), PodeSalvar);
-            FecharCommand = new DelegateCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
+            RetornarCommand = new DelegateCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
         }
+        public void ResetarAposAbrir()
+        {
+            SalvoComSucesso = false; // botão volta a mostrar "Salvar (JSON)"
+            (SalvarCommand as DelegateCommand)?.RaiseCanExecuteChanged();
+        }
+
 
         private bool PodeSalvar()
             => Competencia.HasValue && Competencia.Value.Year >= 2000;
@@ -76,18 +95,27 @@ namespace ControleMateriais.Desktop.ViewModels
                 Itens = Precos.Select(p => new Linha { Nome = p.Nome, PrecoPorKg = p.PrecoPorKg }).ToList()
             };
 
+            // CRIAR ARQUIVO TEMPORARIO
+
+            var tmpPath = filePath + ".tmp";
+            await using (var fs = File.Create(tmpPath))
+            await System.Text.Json.JsonSerializer.SerializeAsync(
+                fs,
+                payload,
+                AppJsonContext.Default.ValoresMensais
+            );
+
+
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
 
-            await using var fs = File.Create(filePath);
-            await JsonSerializer.SerializeAsync(fs, payload, options);
-            await fs.FlushAsync();
-
-            // Fecha após salvar (opcional)
+            //Notificar
+            SalvoComSucesso = true;
             CloseRequested?.Invoke(this, EventArgs.Empty);
+            ValoresAtualizados?.Invoke(this, EventArgs.Empty);
         }
 
         // Carrega JSON (se existir) e APLICA nos mesmos MaterialItem (atualizando a tela principal)
@@ -101,8 +129,15 @@ namespace ControleMateriais.Desktop.ViewModels
 
             try
             {
-                await using var fs = File.OpenRead(filePath);
-                var loaded = await JsonSerializer.DeserializeAsync<ValoresMensais>(fs);
+                await using var fs = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+
+                var loaded = await System.Text.Json.JsonSerializer.DeserializeAsync(
+                    fs,
+                    AppJsonContext.Default.ValoresMensais);
                 if (loaded?.Itens is null) return;
 
                 // aplica por nome (case-insensitive)

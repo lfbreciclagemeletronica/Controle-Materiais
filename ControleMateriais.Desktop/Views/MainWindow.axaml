@@ -1,85 +1,130 @@
 <Window
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:ControleMateriais.Models"
     xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
     x:Class="ControleMateriais.Desktop.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
-        Width="800" Height="450"
-        Title="Controle de Materiais">
+    xmlns:conv="using:ControleMateriais.Desktop.Converters"
+    x:DataType="vm:MainWindowViewModel"
+    Width="800" Height="500"
+    Title="Controle de Materiais">
 
-    <!-- Conteúdo central -->
-    
-<Grid Background="{DynamicResource Brush.Surface}">
-  <Grid>
-    <Border Background="{DynamicResource Brush.SurfaceAlt}"
-            BorderBrush="{DynamicResource Brush.Border}"
-            BorderThickness="1"
-            CornerRadius="10"
-            BoxShadow="0 8 24 0 #80000000"
-            Padding="16">
+    <Window.Resources>
+        <conv:BooleanNegationConverter x:Key="BoolNot"/>
+    </Window.Resources>
 
-      <Grid RowDefinitions="Auto,*">
-        <!-- Cabeçalho: total central + botão à direita -->
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+  <Grid Background="{DynamicResource Brush.Surface}">
+    <Grid RowDefinitions="Auto,*">
 
-          <!-- Botão onde tem a tabela de preços -->
-          <Button Grid.Column="0"
-                  Content="Tabela de Preços"
-                  HorizontalAlignment="Left"
-                  Click="OnAbrirTabelaPrecosClick"/>
+      <!-- TOAST (notificação simples) -->
+      <Border IsVisible="{Binding ToastVisible}"
+              Background="{DynamicResource ToastOkBrush}"
+              Padding="10" Margin="10" CornerRadius="6">
+        <TextBlock Text="{Binding ToastMessage}" Foreground="White"/>
+      </Border>
 
-          <!-- Total centralizado --> 
-          <TextBlock Grid.ColumnSpan="2"
-                     Classes="h1"
-                     HorizontalAlignment="Center"
-                     Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
+      <!-- CONTAINER PRINCIPAL -->
+      <Grid Grid.Row="1" Margin="10">
+        <!-- Painel INICIAL -->
+        <Grid IsVisible="{Binding IsEditandoPrecos, Converter={StaticResource BoolNot}}">
+          <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                  BorderBrush="{DynamicResource Brush.Border}"
+                  BorderThickness="1" CornerRadius="10" Padding="16">
+            <Grid RowDefinitions="Auto,*">
+              <!-- Cabeçalho -->
+              <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                <Button Grid.Column="0"
+                        Content="Tabela de Preços"
+                        HorizontalAlignment="Left"
+                        Command="{Binding AbrirEdicaoPrecosCommand}"/>
 
-          <!-- Botão para exportar em PDF -->
-          <Button Grid.Column="1"
-                  Classes="primary"
-                  Content="Exportar"
-                  Command="{Binding ExportarCommand}"/>
+                <TextBlock Grid.ColumnSpan="2"
+                           Classes="h1"
+                           HorizontalAlignment="Center"
+                           Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
+
+                <Button Grid.Column="1"
+                        Classes="primary"
+                        Content="Exportar"
+                        Command="{Binding ExportarCommand}"/>
+              </Grid>
+
+              <!-- DataGrid principal -->
+              <DataGrid Grid.Row="1"
+                        ItemsSource="{Binding Itens}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="False">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Material"
+                                      x:DataType="models:MaterialItem"
+                                      Binding="{Binding Nome}" IsReadOnly="True" Width="2*"/>
+                  <DataGridTextColumn Header="Peso atual (kg)"
+                                      x:DataType="models:MaterialItem"
+                                      Binding="{Binding PesoAtual, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:N3}}"
+                                      IsReadOnly="False" Width="*"/>
+                  <DataGridTextColumn Header="Preço por kg"
+                                      x:DataType="models:MaterialItem"
+                                      Binding="{Binding PrecoPorKg, Mode=OneWay, StringFormat={}{0:C}}"
+                                      IsReadOnly="True" Width="*"/>
+                  <DataGridTextColumn Header="Total"
+                                      x:DataType="models:MaterialItem"
+                                      Binding="{Binding Total, Mode=OneWay, StringFormat={}{0:C}}"
+                                      IsReadOnly="True" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </Border>
         </Grid>
 
-        <!-- DataGrid -->
-        <DataGrid Grid.Row="1"
-                  ItemsSource="{Binding Itens}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="False">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Material"
-                                x:DataType="models:MaterialItem"
-                                Binding="{Binding Nome}"
-                                IsReadOnly="True"
-                                Width="2*"/>
+        <!-- Painel de EDIÇÃO DE PREÇOS (embute o antigo PriceTableWindow) -->
+        <Grid IsVisible="{Binding IsEditandoPrecos}">
+          <Border Background="{DynamicResource Brush.Surface}" Padding="16">
+            <Grid RowDefinitions="Auto,*,Auto">
+              <!-- Cabeçalho: competência -->
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Competência (mês/ano):"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                <DatePicker SelectedDate="{Binding PriceVM.Competencia, Mode=TwoWay}"
+                            Width="180"/>
+                <TextBlock Text="(ao trocar, carrega valores, se houver JSON)"
+                           Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              </StackPanel>
 
-            <DataGridTextColumn Header="Peso atual (kg)"
-                                x:DataType="models:MaterialItem"
-                                Binding="{Binding PesoAtual, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:N3}}"
-                                IsReadOnly="False"
-                                Width="*"/>
+              <!-- Grade de preços -->
+              <Border Grid.Row="1"
+                      Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="{DynamicResource Brush.Border}"
+                      BorderThickness="1" CornerRadius="8" Padding="8">
+                <DataGrid ItemsSource="{Binding PriceVM.Precos}"
+                          AutoGenerateColumns="False" IsReadOnly="False">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Material"
+                                        x:DataType="models:MaterialItem"
+                                        Binding="{Binding Nome}" IsReadOnly="True" Width="2*"/>
+                    <!-- edição de moeda: use seu converter ou TwoWay direto se preferir -->
+                    <DataGridTextColumn Header="Preço por kg"
+                                        x:DataType="models:MaterialItem"
+                                        Binding="{Binding PrecoPorKg, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:C}}"
+                                        Width="*"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Border>
 
-            <DataGridTextColumn Header="Preço por kg"
-                                x:DataType="models:MaterialItem"
-                                Binding="{Binding PrecoPorKg, Mode=OneWay, StringFormat={}{0:C}}"
-                                IsReadOnly="True"
-                                Width="*"/>
-
-            <DataGridTextColumn Header="Total"
-                                x:DataType="models:MaterialItem"
-                                Binding="{Binding Total, Mode=OneWay, StringFormat={}{0:C}}"
-                                IsReadOnly="True"
-                                Width="*"/>
-          </DataGrid.Columns>
-        </DataGrid>
+              <!-- Ações -->
+              <StackPanel Grid.Row="2" Orientation="Horizontal"
+                          HorizontalAlignment="Right" Spacing="8">
+                <Button Content="Fechar"
+                        Command="{Binding PriceVM.RetornarCommand}"/>
+                <Button Classes="primary"
+                        Content="Salvar (JSON)"
+                        Command="{Binding PriceVM.SalvarCommand}"
+                        IsVisible="{Binding PriceVM.SalvoComSucesso, Converter={StaticResource BoolNot}}"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+        </Grid>
       </Grid>
-
-    </Border>
+    </Grid>
   </Grid>
-</Grid>
-
-
 </Window>

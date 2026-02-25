@@ -1,0 +1,98 @@
+#
+# CONTROLE MATERIAIS GITIGNORE
+#
+
+# --- Build output (solução/projetos) ---
+**/bin/
+**/obj/
+**/out/
+**/artifacts/
+
+# Perfis de build (por precaução)
+**/Debug/
+**/Release/
+
+# Publish (inclui Native AOT publish)
+**/publish/
+**/native/
+
+# Avalonia designer (tudo que estiver em obj/ já é ignorado; deixe esta seção para futuro)
+# (NÃO ignore *.axaml / *.axaml.cs — são código-fonte!)
+
+# --- IDEs/Editors ---
+# Visual Studio
+.vs/
+
+# VS Code (ajuste se quiser versionar configs do workspace)
+.vscode/
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.sln.iml
+
+# --- SO / sistema de arquivos ---
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux / editores
+*~
+.*.swp
+.*.swo
+
+# --- NuGet / pacotes ---
+# Com PackageReference, os pacotes ficam em cache global; não versionar diretórios locais
+packages/
+# Gerados localmente
+*.nupkg
+*.snupkg
+
+# --- Logs / temporários / dumps ---
+*.log
+*.tlog
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.dmp
+
+# --- Testes / cobertura ---
+TestResults/
+**/TestResult.xml
+*.coverage
+*.coveragexml
+.coverage/
+.coverage-results/
+coverage/
+lcov.info
+
+# --- Configurações de usuário / solução ---
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# --- Ferramentas / analisadores / NCrunch ---
+*.ncrunch*
+_Resharper.*
+.ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# --- Arquivos de travamento de MSBuild/lock ---
+project.lock.json
+project.fragment.lock.json
+
+# --- Diretórios de dados do app (se você resolveu usar "data/" junto ao executável) ---
+# Mantém seus JSONs de preços fora do repositório
+data/
+
+# --- Conteúdos gerados por tasks customizadas (se aplicável)

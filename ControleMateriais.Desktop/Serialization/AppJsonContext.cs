@@ -16,6 +16,8 @@ namespace ControleMateriais.Desktop.Serialization
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonSerializable(typeof(MainWindowViewModel.ValoresMensais))]
     [JsonSerializable(typeof(System.Collections.Generic.List<MainWindowViewModel.LinhaPreco>))]
+    [JsonSerializable(typeof(PriceTableManagerViewModel.TabelaPrecoJson))]
+    [JsonSerializable(typeof(System.Collections.Generic.List<PriceTableManagerViewModel.LinhaPrecoTabela>))]
 
     internal partial class AppJsonContext : JsonSerializerContext
     {

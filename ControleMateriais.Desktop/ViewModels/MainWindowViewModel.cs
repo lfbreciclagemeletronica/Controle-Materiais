@@ -49,6 +49,16 @@ public class MainWindowViewModel : ViewModelBase
     }
     public DelegateCommand ExportarCommand { get; }
 
+    public PriceTableManagerViewModel TabelaVM { get; }
+    public ICommand AbrirTabelaPrecosCommand { get; }
+
+    private bool _isGerindoTabela;
+    public bool IsGerindoTabela
+    {
+        get => _isGerindoTabela;
+        set { if (value != _isGerindoTabela) { _isGerindoTabela = value; OnPropertyChanged(); } }
+    }
+
     public decimal TotalGeral
     {
         get => _totalGeral;
@@ -167,6 +177,22 @@ public class MainWindowViewModel : ViewModelBase
         RecalcularTotalGeral();
 
         ExportarCommand = new DelegateCommand(async () => await ExportarAsync());
+
+        TabelaVM = new PriceTableManagerViewModel(Itens);
+        TabelaVM.CloseRequested += (_, __) => IsGerindoTabela = false;
+        TabelaVM.PrecosAtualizados += (_, e) =>
+        {
+            foreach (var w in ItensEditaveis)
+                w.AtualizarExibicaoPreco();
+            RecalcularTotalGeral();
+            ShowToast($"Tabela \"{e.NomeTabela}\" ativada com sucesso.", isError: false);
+        };
+
+        AbrirTabelaPrecosCommand = new DelegateCommand(async () =>
+        {
+            await TabelaVM.InicializarAsync();
+            IsGerindoTabela = true;
+        });
 
         _ = CarregarPrecosNaInicializacaoAsync();
 
@@ -501,22 +527,25 @@ public class PesoWrapper : ViewModelBase
         _precoTexto = item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
         _item.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MaterialItem.PrecoPorKg) ||
-                e.PropertyName == nameof(MaterialItem.Total))
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                OnPropertyChanged(nameof(PrecoPorKg));
-                OnPropertyChanged(nameof(Total));
-                if (!_editandoPreco)
+                if (e.PropertyName == nameof(MaterialItem.PrecoPorKg) ||
+                    e.PropertyName == nameof(MaterialItem.Total))
                 {
-                    _precoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
-                    OnPropertyChanged(nameof(PrecoTexto));
+                    OnPropertyChanged(nameof(PrecoPorKg));
+                    OnPropertyChanged(nameof(Total));
+                    if (!_editandoPreco)
+                    {
+                        _precoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
+                        OnPropertyChanged(nameof(PrecoTexto));
+                    }
                 }
-            }
-            if (e.PropertyName == nameof(MaterialItem.PesoAtual) && !_editando)
-            {
-                _pesoTexto = _item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
-                OnPropertyChanged(nameof(PesoTexto));
-            }
+                if (e.PropertyName == nameof(MaterialItem.PesoAtual) && !_editando)
+                {
+                    _pesoTexto = _item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+                    OnPropertyChanged(nameof(PesoTexto));
+                }
+            });
         };
     }
 

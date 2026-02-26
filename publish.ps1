@@ -37,5 +37,26 @@ foreach ($t in $targets) {
 }
 
 Write-Host ""
+Write-Host "==> Publicando instalador Windows (LFB-Installer.exe) ..." -ForegroundColor Cyan
+dotnet publish Installer/Installer.csproj `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    /p:PublishSingleFile=true `
+    -o "$outDir/installer"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERRO ao publicar instalador" -ForegroundColor Red
+    exit 1
+}
+Write-Host "    -> $outDir/installer/LFB-Installer.exe" -ForegroundColor Green
+
+Write-Host ""
 Write-Host "Builds concluidos! Arquivos em ./$outDir/" -ForegroundColor Green
-Write-Host "Faca o upload dos .zip em: https://github.com/lfbreciclagemeletronica/Controle-Materiais/releases/new"
+Write-Host ""
+Write-Host "Para o GitHub Release, faca upload de:" -ForegroundColor Yellow
+Write-Host "  - $outDir/ControleMateriais-win-x64.zip" -ForegroundColor White
+Write-Host "  - $outDir/ControleMateriais-linux-x64.zip" -ForegroundColor White
+Write-Host "  - $outDir/installer/LFB-Installer.exe" -ForegroundColor White
+Write-Host ""
+Write-Host "Acesse: https://github.com/lfbreciclagemeletronica/Controle-Materiais/releases/new"

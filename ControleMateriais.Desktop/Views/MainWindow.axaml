@@ -19,21 +19,55 @@
   <Grid Background="{DynamicResource Brush.Surface}">
     <Grid RowDefinitions="Auto,*">
 
-      <!-- TOAST (notificação simples) -->
+      <!-- TOAST (notificação estilo terminal) -->
       <Border IsVisible="{Binding ToastVisible}"
-              Background="{DynamicResource ToastOkBrush}"
-              Padding="10,8" Margin="10" CornerRadius="6">
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <!-- Ícone de erro -->
-          <TextBlock IsVisible="{Binding ToastIsError}"
-                     Text="✕" FontSize="14" FontWeight="Bold"
-                     Foreground="White" VerticalAlignment="Center"/>
-          <!-- Ícone de sucesso (checkmark) -->
-          <TextBlock IsVisible="{Binding ToastIsSuccess}"
-                     Text="✔" FontSize="14" FontWeight="Bold"
-                     Foreground="White" VerticalAlignment="Center"/>
-          <TextBlock Text="{Binding ToastMessage}" Foreground="White"
-                     VerticalAlignment="Center" TextWrapping="Wrap"/>
+              Background="#E8111418"
+              BorderBrush="{DynamicResource ToastOkBrush}"
+              BorderThickness="3,0,0,0"
+              CornerRadius="0,6,6,0"
+              Padding="14,10" Margin="12,8"
+              MaxWidth="600"
+              HorizontalAlignment="Left"
+              BoxShadow="4 4 12 2 #AA000000">
+        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+
+          <!-- Badge ícone ERRO -->
+          <Border IsVisible="{Binding ToastIsError}"
+                  Background="#CC2222" CornerRadius="4"
+                  Width="28" Height="28" VerticalAlignment="Center">
+            <TextBlock Text="✕" FontSize="13" FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Border>
+
+          <!-- Badge ícone SUCESSO -->
+          <Border IsVisible="{Binding ToastIsSuccess}"
+                  Background="#1A9E3F" CornerRadius="4"
+                  Width="28" Height="28" VerticalAlignment="Center">
+            <TextBlock Text="✔" FontSize="13" FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Border>
+
+          <!-- Badge ícone INFO (quando não é erro nem sucesso) -->
+          <Border IsVisible="{Binding ToastIsInfo}"
+                  Background="#1565C0" CornerRadius="4"
+                  Width="28" Height="28" VerticalAlignment="Center">
+            <TextBlock Text="i" FontSize="13" FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Border>
+
+          <TextBlock Text="{Binding ToastMessage}"
+                     Foreground="#E8E8E8"
+                     FontSize="13"
+                     FontWeight="SemiBold"
+                     LetterSpacing="0.3"
+                     VerticalAlignment="Center"
+                     TextWrapping="Wrap"/>
         </StackPanel>
       </Border>
 
@@ -77,13 +111,14 @@
                 </Grid>
                 <Grid ColumnDefinitions="Auto,*">
                   <TextBlock Grid.Column="0"
-                             Text="Nome:"
                              VerticalAlignment="Center"
                              Margin="0,0,8,0"
-                             Foreground="{DynamicResource Brush.TextPrimary}"/>
+                             Foreground="{DynamicResource Brush.TextPrimary}">
+                    <Run Text="Nome: "/><Run Text="*" Foreground="#FF4444" FontWeight="Bold"/>
+                  </TextBlock>
                   <TextBox Grid.Column="1"
                            Text="{Binding NomeCliente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                           Watermark="Nome do cliente / responsável (opcional)"
+                           Watermark="Nome do cliente / responsável (obrigatório)"
                            HorizontalAlignment="Stretch"/>
                 </Grid>
               </StackPanel>
@@ -110,32 +145,41 @@
                     <ItemsControl ItemsSource="{Binding ItensEditaveis}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PesoWrapper">
-                          <Grid ColumnDefinitions="*,120,130,100" Margin="4,3">
-                            <TextBlock Grid.Column="0" Text="{Binding Nome}"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     HorizontalAlignment="Left"
-                                     Width="110"
-                                     HorizontalContentAlignment="Center"
-                                     GotFocus="PesoTextBox_GotFocus"
-                                     KeyDown="PesoTextBox_KeyDown"
-                                     LostFocus="PesoTextBox_LostFocus"/>
-                            <TextBox Grid.Column="2"
-                                     Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     HorizontalAlignment="Left"
-                                     Width="120"
-                                     HorizontalContentAlignment="Right"
-                                     GotFocus="PrecoTextBox_GotFocus"
-                                     KeyDown="PrecoTextBox_KeyDown"
-                                     LostFocus="PrecoTextBox_LostFocus"/>
-                            <TextBlock Grid.Column="3"
-                                       Text="{Binding Total, StringFormat={}{0:C}}"
-                                       VerticalAlignment="Center"
+                          <Border BorderBrush="{DynamicResource Brush.Border}"
+                                  BorderThickness="0,0,0,1"
+                                  Padding="0,1">
+                            <Border.Styles>
+                              <Style Selector="Border:focus-within">
+                                <Setter Property="Background" Value="#1A4FC3F7"/>
+                              </Style>
+                            </Border.Styles>
+                            <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
+                              <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource Brush.TextPrimary}"/>
+                              <TextBox Grid.Column="1"
+                                       Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                        HorizontalAlignment="Left"
-                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
-                          </Grid>
+                                       Width="110"
+                                       HorizontalContentAlignment="Center"
+                                       GotFocus="PesoTextBox_GotFocus"
+                                       KeyDown="PesoTextBox_KeyDown"
+                                       LostFocus="PesoTextBox_LostFocus"/>
+                              <TextBox Grid.Column="2"
+                                       Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                       HorizontalAlignment="Left"
+                                       Width="120"
+                                       HorizontalContentAlignment="Right"
+                                       GotFocus="PrecoTextBox_GotFocus"
+                                       KeyDown="PrecoTextBox_KeyDown"
+                                       LostFocus="PrecoTextBox_LostFocus"/>
+                              <TextBlock Grid.Column="3"
+                                         Text="{Binding Total, StringFormat={}{0:C}}"
+                                         VerticalAlignment="Center"
+                                         HorizontalAlignment="Left"
+                                         Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            </Grid>
+                          </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -236,18 +280,27 @@
                       <ItemsControl ItemsSource="{Binding TabelaVM.ItensEdicao}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:ItemPrecoWrapper">
-                            <Grid ColumnDefinitions="*,150" Margin="4,2">
-                              <TextBlock Grid.Column="0" Text="{Binding Nome}"
-                                         VerticalAlignment="Center"
-                                         Foreground="{DynamicResource Brush.TextPrimary}"/>
-                              <TextBox Grid.Column="1"
-                                       Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                       Width="140" HorizontalAlignment="Left"
-                                       HorizontalContentAlignment="Right"
-                                       GotFocus="TabelaPrecoTextBox_GotFocus"
-                                       KeyDown="TabelaPrecoTextBox_KeyDown"
-                                       LostFocus="TabelaPrecoTextBox_LostFocus"/>
-                            </Grid>
+                            <Border BorderBrush="{DynamicResource Brush.Border}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="0,1">
+                              <Border.Styles>
+                                <Style Selector="Border:focus-within">
+                                  <Setter Property="Background" Value="#1A4FC3F7"/>
+                                </Style>
+                              </Border.Styles>
+                              <Grid ColumnDefinitions="*,150" Margin="4,2">
+                                <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="140" HorizontalAlignment="Left"
+                                         HorizontalContentAlignment="Right"
+                                         GotFocus="TabelaPrecoTextBox_GotFocus"
+                                         KeyDown="TabelaPrecoTextBox_KeyDown"
+                                         LostFocus="TabelaPrecoTextBox_LostFocus"/>
+                              </Grid>
+                            </Border>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>

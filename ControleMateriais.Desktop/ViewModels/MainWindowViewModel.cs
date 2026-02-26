@@ -86,6 +86,7 @@ public class MainWindowViewModel : ViewModelBase
     public bool ToastIsError { get => _toastIsError; private set { _toastIsError = value; OnPropertyChanged(); } }
     public bool ToastIsSuccess { get => _toastIsSuccess; private set { _toastIsSuccess = value; OnPropertyChanged(); } }
     public bool ToastVisible { get => _toastVisible; private set { _toastVisible = value; OnPropertyChanged(); } }
+    public bool ToastIsInfo => !_toastIsError && !_toastIsSuccess;
 
 
     private void ShowToast(string message, bool isError = false, bool isSuccess = false)
@@ -94,10 +95,10 @@ public class MainWindowViewModel : ViewModelBase
         ToastIsError = isError;
         ToastIsSuccess = isSuccess;
         ToastVisible = true;
-        // opcional: timer para ocultar após alguns segundos
+        OnPropertyChanged(nameof(ToastIsInfo));
         _ = Task.Run(async () =>
         {
-            await Task.Delay(3000);
+            await Task.Delay(5000);
             ToastVisible = false;
             OnPropertyChanged(nameof(ToastVisible));
         });

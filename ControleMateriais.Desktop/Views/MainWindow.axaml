@@ -258,6 +258,10 @@
                         IsVisible="{Binding TabelaVM.CriandoNova}"
                         Command="{Binding TabelaVM.SalvarNovaCommand}"/>
                 <Button Classes="primary"
+                        Content="Salvar Tabela"
+                        IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
+                        Command="{Binding TabelaVM.SalvarTabelaCommand}"/>
+                <Button Classes="primary"
                         Content="Ativar Tabela"
                         IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
                         Command="{Binding TabelaVM.AtivarTabelaCommand}"/>

@@ -36,6 +36,7 @@ namespace ControleMateriais.Desktop.ViewModels
                     _tabelaSelecionada = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(TemTabelaSelecionada));
+                    (SalvarTabelaCommand as DelegateCommand)?.RaiseCanExecuteChanged();
                     (AtivarTabelaCommand as DelegateCommand)?.RaiseCanExecuteChanged();
                     (DeletarTabelaCommand as DelegateCommand)?.RaiseCanExecuteChanged();
                     if (value != null)
@@ -93,6 +94,7 @@ namespace ControleMateriais.Desktop.ViewModels
         public ICommand NovaTabelaCommand { get; }
         public ICommand SalvarNovaCommand { get; }
         public ICommand CancelarNovaCommand { get; }
+        public ICommand SalvarTabelaCommand { get; }
         public ICommand AtivarTabelaCommand { get; }
         public ICommand DeletarTabelaCommand { get; }
 
@@ -108,6 +110,8 @@ namespace ControleMateriais.Desktop.ViewModels
             NovaTabelaCommand  = new DelegateCommand(IniciarNova);
             SalvarNovaCommand  = new DelegateCommand(async () => await SalvarNovaAsync(), PodeSalvarNova);
             CancelarNovaCommand = new DelegateCommand(CancelarNova);
+            SalvarTabelaCommand = new DelegateCommand(async () => await SalvarTabelaSelecionadaAsync(),
+                                                      () => TemTabelaSelecionada);
             AtivarTabelaCommand = new DelegateCommand(async () => await AtivarTabelaSelecionadaAsync(),
                                                       () => TemTabelaSelecionada);
             DeletarTabelaCommand = new DelegateCommand(async () => await DeletarTabelaSelecionadaAsync(),
@@ -227,6 +231,20 @@ namespace ControleMateriais.Desktop.ViewModels
             // Seleciona a tabela recém-criada
             TabelaSelecionada = Tabelas.FirstOrDefault(t => t.Arquivo == arquivo);
         }
+
+        // ── Salvar tabela selecionada ─────────────────────────────────────────
+        private async Task SalvarTabelaSelecionadaAsync()
+        {
+            if (_tabelaSelecionada is null) return;
+
+            foreach (var w in ItensEdicao)
+                w.ConfirmarEdicao();
+
+            await SalvarTabelaAtualAsync(_tabelaSelecionada);
+            TabelaSalvaRequested?.Invoke(this, _tabelaSelecionada.Nome);
+        }
+
+        public event EventHandler<string>? TabelaSalvaRequested;
 
         // ── Ativar tabela ─────────────────────────────────────────────────────
         private async Task AtivarTabelaSelecionadaAsync()

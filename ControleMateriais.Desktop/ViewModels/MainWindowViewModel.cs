@@ -180,6 +180,7 @@ public class MainWindowViewModel : ViewModelBase
 
         TabelaVM = new PriceTableManagerViewModel(Itens);
         TabelaVM.CloseRequested += (_, __) => IsGerindoTabela = false;
+        TabelaVM.TabelaSalvaRequested += (_, nome) => ShowToast($"Tabela \"{nome}\" salva com sucesso.", isError: false);
         TabelaVM.PrecosAtualizados += (_, e) =>
         {
             foreach (var w in ItensEditaveis)

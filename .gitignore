@@ -97,4 +97,7 @@ project.fragment.lock.json
 # Mantém seus JSONs de preços fora do repositório
 data/
 
+# --- Release builds (gerados por publish.ps1 / publish-mac.sh) ---
+release/
+
 # --- Conteúdos gerados por tasks customizadas (se aplicável)

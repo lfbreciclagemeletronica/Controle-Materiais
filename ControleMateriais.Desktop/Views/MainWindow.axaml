@@ -22,8 +22,19 @@
       <!-- TOAST (notificação simples) -->
       <Border IsVisible="{Binding ToastVisible}"
               Background="{DynamicResource ToastOkBrush}"
-              Padding="10" Margin="10" CornerRadius="6">
-        <TextBlock Text="{Binding ToastMessage}" Foreground="White"/>
+              Padding="10,8" Margin="10" CornerRadius="6">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <!-- Ícone de erro -->
+          <TextBlock IsVisible="{Binding ToastIsError}"
+                     Text="✕" FontSize="14" FontWeight="Bold"
+                     Foreground="White" VerticalAlignment="Center"/>
+          <!-- Ícone de sucesso (checkmark) -->
+          <TextBlock IsVisible="{Binding ToastIsSuccess}"
+                     Text="✔" FontSize="14" FontWeight="Bold"
+                     Foreground="White" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding ToastMessage}" Foreground="White"
+                     VerticalAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
       </Border>
 
       <!-- CONTAINER PRINCIPAL -->
@@ -250,6 +261,8 @@
                           HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
                 <Button Content="Fechar"
                         Command="{Binding TabelaVM.FecharCommand}"/>
+                <Button Content="Importar PDF"
+                        Command="{Binding TabelaVM.ImportarDePdfCommand}"/>
                 <Button Content="Excluir Tabela"
                         IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
                         Command="{Binding TabelaVM.DeletarTabelaCommand}"/>
@@ -261,6 +274,9 @@
                         Content="Salvar Tabela"
                         IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
                         Command="{Binding TabelaVM.SalvarTabelaCommand}"/>
+                <Button Content="Exportar PDF"
+                        IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
+                        Command="{Binding TabelaVM.ExportarTabelaPdfCommand}"/>
                 <Button Classes="primary"
                         Content="Ativar Tabela"
                         IsVisible="{Binding TabelaVM.TemTabelaSelecionada}"
@@ -268,6 +284,27 @@
               </StackPanel>
 
             </Grid>
+          </Border>
+
+          <!-- OVERLAY DE LOADING (importação PDF) -->
+          <Border IsVisible="{Binding TabelaVM.IsImportando}"
+                  Background="#CC000000" CornerRadius="10">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+              <Border Width="56" Height="56"
+                      CornerRadius="28"
+                      Background="{DynamicResource Brush.Primary}"
+                      HorizontalAlignment="Center">
+                <TextBlock Text="⏳" FontSize="28"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+              </Border>
+              <TextBlock Text="Lendo PDF e extraindo preços..."
+                         Foreground="White" FontSize="14" FontWeight="SemiBold"
+                         HorizontalAlignment="Center"/>
+              <TextBlock Text="Aguarde um momento"
+                         Foreground="#AAFFFFFF" FontSize="11"
+                         HorizontalAlignment="Center"/>
+            </StackPanel>
           </Border>
         </Grid>
 

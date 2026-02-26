@@ -78,18 +78,21 @@ public class MainWindowViewModel : ViewModelBase
     // Toast simples (banner no topo)
     private string? _toastMessage;
     private bool _toastIsError;
+    private bool _toastIsSuccess;
     private bool _toastVisible;
 
 
     public string? ToastMessage { get => _toastMessage; private set { _toastMessage = value; OnPropertyChanged(); } }
     public bool ToastIsError { get => _toastIsError; private set { _toastIsError = value; OnPropertyChanged(); } }
+    public bool ToastIsSuccess { get => _toastIsSuccess; private set { _toastIsSuccess = value; OnPropertyChanged(); } }
     public bool ToastVisible { get => _toastVisible; private set { _toastVisible = value; OnPropertyChanged(); } }
 
 
-    private void ShowToast(string message, bool isError = false)
+    private void ShowToast(string message, bool isError = false, bool isSuccess = false)
     {
         ToastMessage = message;
         ToastIsError = isError;
+        ToastIsSuccess = isSuccess;
         ToastVisible = true;
         // opcional: timer para ocultar após alguns segundos
         _ = Task.Run(async () =>
@@ -105,65 +108,7 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
-        var nomes = new[]
-        {
-            "PLACA MAE DE NOTEBOOK A",
-            "PLACA MAE DE NOTEBOOK B",
-            "PLACA MAE DE NOTEBOOK C",
-            "PLACA MAE A",
-            "PLACA MAE B",
-            "PLACA MAE C",
-            "PLACA MAE D",
-            "PLACA SERVIDOR",
-            "PLACA LEVE ESPECIAL",
-            "PLACA LEVE ESPECIAL COM PONTA",
-            "PLACA LEVE ESPECIAL COMPLETA",
-            "PLACA DOURADA",
-            "PLACA DOURADA B",
-            "PLACA TAPETE A",
-            "PLACA TAPETE B",
-            "PLACA CONECTOR",
-            "PLACA LEVE",
-            "PLACA LEVE COM PONTA",
-            "PLACA INTERMEDIÁRIA A",
-            "PLACA INTERMEDIÁRIA B",
-            "PLACA INTERMEDIÁRIA C",
-            "PLACA PESADA",
-            "PLACA PESADA COM PONTA",
-            "PLACA TABLET",
-            "PLACA MARROM",
-            "HD COMPLETO",
-            "HD SEM PLACA E SUCATEADO",
-            "PLACA HD",
-            "PLACA DE CELULAR MISTA",
-            "CELULAR BOTAO E FLIP",
-            "SMARTPHONE SEM BATERIA",
-            "SMARTPHONE COM BATERIA",
-            "CELULAR REPLICA COM E SEM BATERIA",
-            "MEMORIA DOURADA",
-            "MEMORIA PRATEADA",
-            "PROCESSADOR PLASTICO CHAPA A",
-            "PROCESSADOR PLASTICO CHAPA B",
-            "PROCESSADOR PLASTICO",
-            "PROCESSADOR SLOT",
-            "PROCESSADOR PLASTICO PRETO",
-            "PROCESSADOR CERAMICO A",
-            "PROCESSADOR CERAMICO B",
-            "PROCESSADOR CERAMICO C",
-            "BATERIA DE NOTEBOOK",
-            "BATERIA DE TABLET",
-            "BATERIA DE CELULAR",
-            "FONTE",
-            "RAIO X",
-            "DESMANCHE",
-            "SERVIDOR",
-            "OUTROS 1",
-            "OUTROS 2",
-            "OUTROS 3",
-            "IMPUREZAS (PLASTICOS, FERRO, ALUMINIOS, PAPEL)",
-        };
-
-        foreach (var nome in nomes)
+        foreach (var nome in ItemCatalog.OrderedItems)
             Itens.Add(new MaterialItem { Nome = nome, PesoAtual = 0m, PrecoPorKg = 0m });
 
         // Controlar os valores
@@ -181,6 +126,7 @@ public class MainWindowViewModel : ViewModelBase
         TabelaVM = new PriceTableManagerViewModel(Itens);
         TabelaVM.CloseRequested += (_, __) => IsGerindoTabela = false;
         TabelaVM.TabelaSalvaRequested += (_, nome) => ShowToast($"Tabela \"{nome}\" salva com sucesso.", isError: false);
+        TabelaVM.ImportToastRequested += (_, t) => ShowToast(t.Mensagem, isError: t.IsErro, isSuccess: t.IsSuccess);
         TabelaVM.PrecosAtualizados += (_, e) =>
         {
             foreach (var w in ItensEditaveis)
@@ -299,19 +245,21 @@ public class MainWindowViewModel : ViewModelBase
         var totalGeralSnapshot = itensSnapshot.Sum(i => i.Total);
         var nomeClienteSnapshot = NomeCliente;
         var dataGeracao = DateTime.Now;
+        var ptBR = CultureInfo.GetCultureInfo("pt-BR");
 
         var borderColor = Colors.Grey.Darken2;
-        var headerBg = Colors.Grey.Lighten3;
         var cellFontSize = 7f;
         var headerFontSize = 7f;
 
-        static IContainer InfoCell(IContainer c) =>
-            c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
-             .PaddingVertical(3).PaddingHorizontal(5);
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "lfb-logo.png");
 
         static IContainer InfoLabelCell(IContainer c) =>
             c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
              .Background(Colors.Grey.Lighten3)
+             .PaddingVertical(3).PaddingHorizontal(5);
+
+        static IContainer InfoCell(IContainer c) =>
+            c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
              .PaddingVertical(3).PaddingHorizontal(5);
 
         Document.Create(container =>
@@ -319,8 +267,8 @@ public class MainWindowViewModel : ViewModelBase
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.MarginTop(1.5f, Unit.Centimetre);
-                page.MarginBottom(1.5f, Unit.Centimetre);
+                page.MarginTop(1.2f, Unit.Centimetre);
+                page.MarginBottom(1.2f, Unit.Centimetre);
                 page.MarginHorizontal(1.5f, Unit.Centimetre);
                 page.PageColor(Colors.White);
                 page.DefaultTextStyle(x => x.FontSize(cellFontSize).FontFamily("Arial"));
@@ -329,16 +277,47 @@ public class MainWindowViewModel : ViewModelBase
                 {
                     col.Spacing(0);
 
-                    // Título
-                    col.Item()
-                       .Border(0.5f).BorderColor(borderColor)
-                       .Background(Colors.White)
-                       .PaddingVertical(6)
-                       .AlignCenter()
-                       .Text("LFB RECICLAGEM ELETRONICA")
-                       .Bold().FontSize(11);
+                    // ── TÍTULO: texto empresa (esq) + logo (dir) ──────────────────────
+                    col.Item().Border(0.5f).BorderColor(borderColor).Table(title =>
+                    {
+                        title.ColumnsDefinition(c =>
+                        {
+                            c.RelativeColumn(5);  // texto
+                            c.RelativeColumn(1);  // logo
+                        });
 
-                    // Bloco de informações: FORNECEDOR | PESO TOTAL | VALOR TOTAL | DATA
+                        // Esquerda: nome empresa + dados + título pesagem
+                        title.Cell().Border(0.5f).BorderColor(borderColor)
+                             .PaddingVertical(6).PaddingHorizontal(8).Column(left =>
+                             {
+                                 left.Item().AlignCenter()
+                                     .Text("LFB RECICLAGEM ELETRONICA")
+                                     .Bold().FontSize(11);
+                                 left.Item().PaddingTop(2).AlignCenter()
+                                     .Text("CNPJ: 243.250.67/0001-64  |  I.E: 096/4003708")
+                                     .FontSize(7);
+                                 left.Item().AlignCenter()
+                                     .Text("End: Rua Sergio Jungblut Dieterich, 1011, Letra B Galpao5")
+                                     .FontSize(7);
+                                 left.Item().PaddingTop(4).AlignCenter()
+                                     .Text("RESULTADO DA PESAGEM E TRIAGEM LFB")
+                                     .Bold().FontSize(8);
+                             });
+
+                        // Direita: logo
+                        title.Cell().Border(0.5f).BorderColor(borderColor)
+                             .Background("#4CAF50").AlignCenter().AlignMiddle().Padding(4)
+                             .Column(logo =>
+                             {
+                                 if (File.Exists(logoPath))
+                                     logo.Item().AlignCenter().Width(55).Image(logoPath);
+                                 else
+                                     logo.Item().AlignCenter().Text("LFB").Bold()
+                                         .FontColor(Colors.White).FontSize(14);
+                             });
+                    });
+
+                    // ── GRADE INFO: FORNECEDOR / PESO / VALOR / DATA ───────────────────
                     col.Item().Table(info =>
                     {
                         info.ColumnsDefinition(c =>
@@ -352,70 +331,72 @@ public class MainWindowViewModel : ViewModelBase
 
                         info.Cell().Element(InfoLabelCell).Text("PESO TOTAL").Bold().FontSize(7);
                         info.Cell().Element(InfoCell)
-                            .Text(pesoTotalSnapshot > 0 ? $"{pesoTotalSnapshot:N3} kg" : string.Empty)
-                            .FontSize(7);
+                            .Text($"{pesoTotalSnapshot:N3} kg").FontSize(7);
 
                         info.Cell().Element(InfoLabelCell).Text("VALOR TOTAL").Bold().FontSize(7);
                         info.Cell().Element(InfoCell)
-                            .Text(totalGeralSnapshot > 0 ? totalGeralSnapshot.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : string.Empty)
-                            .FontSize(7);
+                            .Text(totalGeralSnapshot.ToString("C", ptBR)).FontSize(7);
 
                         info.Cell().Element(InfoLabelCell).Text("DATA").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell).Text($"{dataGeracao:dd/MM/yyyy}").FontSize(7);
+                        info.Cell().Element(InfoCell)
+                            .Text($"{dataGeracao:dd/MM/yyyy}").FontSize(7);
                     });
 
-                    // Espaçamento
-                    col.Item().Height(4);
+                    // Espaço entre header e tabela
+                    col.Item().Height(5);
 
-                    // Tabela de itens
+                    // ── TABELA DE ITENS ────────────────────────────────────────────────
                     col.Item().Table(table =>
                     {
                         table.ColumnsDefinition(c =>
                         {
-                            c.RelativeColumn(4);  // Material
+                            c.RelativeColumn(4);    // Material
                             c.RelativeColumn(1.2f); // KG
                             c.RelativeColumn(1.5f); // VALOR
                             c.RelativeColumn(1.5f); // TOTAL
                         });
 
-                        // Cabeçalho da tabela
                         table.Header(header =>
                         {
-                            static IContainer HeaderCell(IContainer c) =>
+                            static IContainer HCell(IContainer c) =>
                                 c.Background(Colors.Grey.Lighten3)
                                  .Border(0.5f).BorderColor(Colors.Grey.Darken2)
                                  .PaddingVertical(3).PaddingHorizontal(4);
 
-                            header.Cell().Element(HeaderCell).Text(string.Empty);
-                            header.Cell().Element(HeaderCell).AlignCenter().Text("KG").Bold().FontSize(headerFontSize);
-                            header.Cell().Element(HeaderCell).AlignCenter().Text("VALOR").Bold().FontSize(headerFontSize);
-                            header.Cell().Element(HeaderCell).AlignCenter().Text("TOTAL").Bold().FontSize(headerFontSize);
+                            header.Cell().Element(HCell).Text(string.Empty);
+                            header.Cell().Element(HCell).AlignCenter()
+                                  .Text("KG").Bold().FontSize(headerFontSize);
+                            header.Cell().Element(HCell).AlignCenter()
+                                  .Text("VALOR").Bold().FontSize(headerFontSize);
+                            header.Cell().Element(HCell).AlignCenter()
+                                  .Text("TOTAL").Bold().FontSize(headerFontSize);
                         });
 
-                        // Linhas de itens
                         foreach (var it in itensSnapshot)
                         {
-                            static IContainer BodyCell(IContainer c) =>
+                            static IContainer BCell(IContainer c) =>
                                 c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
                                  .PaddingVertical(2).PaddingHorizontal(4);
 
-                            static IContainer BodyCellRight(IContainer c) =>
-                                c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
-                                 .PaddingVertical(2).PaddingHorizontal(4);
+                            bool temPeso = it.PesoAtual > 0;
 
-                            table.Cell().Element(BodyCell)
+                            table.Cell().Element(BCell)
                                  .Text(it.Nome ?? string.Empty).FontSize(cellFontSize);
 
-                            table.Cell().Element(BodyCellRight).AlignRight()
-                                 .Text(it.PesoAtual > 0 ? it.PesoAtual.ToString("N3") : string.Empty)
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(temPeso ? it.PesoAtual.ToString("N3") : string.Empty)
                                  .FontSize(cellFontSize);
 
-                            table.Cell().Element(BodyCellRight).AlignRight()
-                                 .Text(it.PrecoPorKg > 0 ? it.PrecoPorKg.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : string.Empty)
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(it.PrecoPorKg > 0
+                                     ? it.PrecoPorKg.ToString("C", ptBR)
+                                     : string.Empty)
                                  .FontSize(cellFontSize);
 
-                            table.Cell().Element(BodyCellRight).AlignRight()
-                                 .Text(it.Total > 0 ? it.Total.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : string.Empty)
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(it.Total > 0
+                                     ? it.Total.ToString("C", ptBR)
+                                     : string.Empty)
                                  .FontSize(cellFontSize);
                         }
                     });

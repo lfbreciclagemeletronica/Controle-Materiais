@@ -90,15 +90,24 @@ O sistema exibe uma lista de **52 categorias de materiais** (placas, metais, cab
 
 ### Windows
 
-#### Opção A — Online (recomendado, baixa automaticamente do GitHub)
+#### Opção A — Executável portátil (recomendado, sem instalação)
 
-Abra o PowerShell e execute:
+Gere o `.exe` com o script de publish e execute diretamente — sem instalar, sem permissão de administrador:
+
+```powershell
+# Na raiz do repositório
+.\publish.ps1 -Target win
+```
+
+O executável gerado em `release\win-x64\ControleMateriais.Desktop.exe` pode ser copiado para qualquer lugar do computador e executado diretamente.
+
+#### Opção B — Instalador online (baixa automaticamente do GitHub)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File install-windows.ps1 -Online
 ```
 
-#### Opção B — Local (após clonar o repositório e publicar)
+#### Opção C — Instalador local (após publicar)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File install-windows.ps1
@@ -198,9 +207,10 @@ Clique no botão **"Tabela de Preços"** no canto superior esquerdo da tela prin
 3. Selecione o arquivo PDF com a lista de preços LFB
 4. O sistema extrai automaticamente os preços e preenche os campos
 
-> **Dica:** Os arquivos de tabela ficam salvos em  
-> `%USERPROFILE%\Downloads\Controle-Materiais-Registros\` (Windows)  
-> `~/Downloads/Controle-Materiais-Registros/` (Linux)
+> **Dica:** Os arquivos ficam salvos em:
+> - Tabelas de preços (JSON): `~/Downloads/ControleMateriaisLFB/TabelaPrecos/`
+> - Recibos exportados (PDF): `~/Downloads/ControleMateriaisLFB/Recibos/`
+> - Exportações da tabela (PDF): `~/Downloads/ControleMateriaisLFB/TabelaPrecos/`
 
 ---
 
@@ -242,27 +252,29 @@ powershell -ExecutionPolicy Bypass -File install-windows.ps1 -Uninstall
 Para gerar os binários de distribuição (requer .NET SDK instalado):
 
 ```powershell
-# Publica Windows x64 + Linux x64 e empacota em .zip
+# Publica Windows x64 + Linux x64 (ambos)
 .\publish.ps1
 
-# Apenas Windows
+# Apenas Windows x64
 .\publish.ps1 -Target win
 
-# Apenas Linux
+# Apenas Linux x64
 .\publish.ps1 -Target linux
 
-# Sem empacotar em ZIP
-.\publish.ps1 -SkipZip
+# Pasta de saída personalizada
+.\publish.ps1 -OutDir minha-pasta
 ```
 
 Os arquivos são gerados em:
 ```
 release/
-  win-x64/                            <- binários Windows
-  linux-x64/                          <- binários Linux
-  ControleMateriais-win-x64.zip       <- para upload no GitHub Releases
-  ControleMateriais-linux-x64.zip     <- para upload no GitHub Releases
+  win-x64/
+    ControleMateriais.Desktop.exe     <- executável portátil Windows (copie e rode)
+  linux-x64/
+    ControleMateriais.Desktop         <- executável portátil Linux   (copie e rode)
 ```
+
+Os executáveis são **self-contained** — não requerem .NET instalado nem permissão de administrador.
 
 ---
 

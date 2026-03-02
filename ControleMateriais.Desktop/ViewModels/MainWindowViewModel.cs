@@ -23,6 +23,13 @@ namespace ControleMateriais.Desktop.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
+    private static string RootDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                     "Downloads", "ControleMateriaisLFB");
+
+    private static string TabelaPrecosDir => Path.Combine(RootDir, "TabelaPrecos");
+    private static string RecibosDir      => Path.Combine(RootDir, "Recibos");
+
     public ObservableCollection<MaterialItem> Itens { get; } = new();
     public ObservableCollection<PesoWrapper> ItensEditaveis { get; } = new();
     private decimal _totalGeral;
@@ -213,6 +220,7 @@ public class MainWindowViewModel : ViewModelBase
         var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
             .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
 
+        Directory.CreateDirectory(RecibosDir);
         var sfd = new SaveFileDialog
         {
             Title = "Salvar recibo em PDF",
@@ -220,7 +228,8 @@ public class MainWindowViewModel : ViewModelBase
             {
                 new FileDialogFilter() { Name = "PDF", Extensions = { "pdf" } }
             },
-            InitialFileName = nomeArquivo
+            InitialFileName = nomeArquivo,
+            Directory = RecibosDir
         };
 
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
@@ -423,10 +432,7 @@ public class MainWindowViewModel : ViewModelBase
     {
         var competencia = new DateTimeOffset(DateTime.Now.Year, DateTime.Now.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
-        var baseDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Downloads", "Controle-Materiais-Registros");
-
+        var baseDir = TabelaPrecosDir;
         Directory.CreateDirectory(baseDir);
 
         var competenciaStr = competencia.ToString("yyyy-MM");

@@ -27,10 +27,12 @@ namespace ControleMateriais.Desktop.ViewModels
     {
         private readonly ObservableCollection<MaterialItem> _itensMain;
 
-        // ── Diretório de persistência ──────────────────────────────────────────
-        private static string BaseDir =>
+        // ── Diretórios de persistência ─────────────────────────────────────────
+        private static string RootDir =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                         "Downloads", "TabelaPrecosControleMateriais");
+                         "Downloads", "ControleMateriaisLFB");
+
+        private static string BaseDir => Path.Combine(RootDir, "TabelaPrecos");
 
         // ── Lista de tabelas salvas ────────────────────────────────────────────
         public ObservableCollection<TabelaPrecoInfo> Tabelas { get; } = new();
@@ -556,11 +558,13 @@ namespace ControleMateriais.Desktop.ViewModels
 
             var byName = ItensEdicao.ToDictionary(w => w.Nome, w => w.PrecoDecimal);
 
+            Directory.CreateDirectory(BaseDir);
             var sfd = new SaveFileDialog
             {
                 Title = "Salvar lista de preços em PDF",
                 Filters = { new FileDialogFilter() { Name = "PDF", Extensions = { "pdf" } } },
-                InitialFileName = $"Lista_Precos_{_tabelaSelecionada.Nome}.pdf"
+                InitialFileName = $"Lista_Precos_{_tabelaSelecionada.Nome}.pdf",
+                Directory = BaseDir
             };
 
             var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as

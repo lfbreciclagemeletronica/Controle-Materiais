@@ -1,11 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <PublishAot>true</PublishAot>
-    <OptimizationPreference>speed</OptimizationPreference>
-    <StackTraceSupport>false</StackTraceSupport>
-    <InvariantGlobalization>false</InvariantGlobalization>
-    <TrimMode>link</TrimMode>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -38,5 +33,6 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
+    <PackageReference Include="supabase-csharp" Version="0.16.2" />
   </ItemGroup>
 </Project>

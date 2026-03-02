@@ -49,6 +49,7 @@ namespace ControleMateriais.Desktop.ViewModels
                     _tabelaSelecionada = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(TemTabelaSelecionada));
+                    OnPropertyChanged(nameof(MostrarEdicao));
                     (SalvarTabelaCommand as DelegateCommand)?.RaiseCanExecuteChanged();
                     (AtivarTabelaCommand as DelegateCommand)?.RaiseCanExecuteChanged();
                     (DeletarTabelaCommand as DelegateCommand)?.RaiseCanExecuteChanged();
@@ -61,6 +62,8 @@ namespace ControleMateriais.Desktop.ViewModels
         }
 
         public bool TemTabelaSelecionada => _tabelaSelecionada != null;
+
+        public bool MostrarEdicao => CriandoNova || TemTabelaSelecionada;
 
         // ── Loading de importação ─────────────────────────────────────────────
         private bool _isImportando;
@@ -75,7 +78,15 @@ namespace ControleMateriais.Desktop.ViewModels
         public bool CriandoNova
         {
             get => _criandoNova;
-            set { if (value != _criandoNova) { _criandoNova = value; OnPropertyChanged(); } }
+            set
+            {
+                if (value != _criandoNova)
+                {
+                    _criandoNova = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(MostrarEdicao));
+                }
+            }
         }
 
         private string _novoNome = string.Empty;
@@ -580,76 +591,94 @@ namespace ControleMateriais.Desktop.ViewModels
         {
             var ptBR = CultureInfo.GetCultureInfo("pt-BR");
             var borderColor = Colors.Grey.Darken2;
-            var headerBg    = Colors.Grey.Lighten2;
-            var sectionBg   = Colors.Grey.Lighten3;
-
-            static IContainer SectionCell(IContainer c) =>
-                c.Background(Colors.Grey.Lighten2)
-                 .PaddingVertical(3).PaddingHorizontal(6);
+            var logoPath    = Path.Combine(AppContext.BaseDirectory, "Assets", "lfb-logo.png");
 
             static IContainer ItemCell(IContainer c) =>
-                c.BorderBottom(0.3f).BorderColor(Colors.Grey.Lighten2)
-                 .PaddingVertical(2).PaddingHorizontal(6);
+                c.BorderBottom(0.15f).BorderColor(Colors.Grey.Lighten2)
+                 .PaddingVertical(0.7f).PaddingHorizontal(2.5f);
 
             Document.Create(container =>
             {
                 container.Page(page =>
                 {
                     page.Size(PageSizes.A4);
-                    page.MarginTop(1.2f, Unit.Centimetre);
-                    page.MarginBottom(1.2f, Unit.Centimetre);
-                    page.MarginHorizontal(1.5f, Unit.Centimetre);
+                    page.MarginTop(0.6f, Unit.Centimetre);
+                    page.MarginBottom(0.6f, Unit.Centimetre);
+                    page.MarginHorizontal(0.8f, Unit.Centimetre);
                     page.PageColor(Colors.White);
-                    page.DefaultTextStyle(x => x.FontSize(8).FontFamily("Arial"));
+                    page.DefaultTextStyle(x => x.FontSize(7.8f).FontFamily("Arial"));
 
                     page.Content().Column(col =>
                     {
                         col.Spacing(0);
 
                         // Cabeçalho
-                        col.Item().Border(0.5f).BorderColor(borderColor)
+                        col.Item().Border(0.35f).BorderColor(borderColor)
                            .Background(Colors.White)
-                           .Padding(6)
+                           .Padding(4.5f)
                            .Row(row =>
                            {
-                               row.RelativeItem().AlignLeft().AlignMiddle()
+                                row.RelativeItem().AlignCenter().AlignMiddle()
                                   .Text("LISTA DE PREÇOS LFB RECICLAGEM ELETRÔNICA")
-                                  .Bold().FontSize(10);
-                               row.ConstantItem(60).AlignRight().AlignMiddle()
-                                  .Text(nomeTabela).FontSize(7).Italic();
+                                  .Bold().FontSize(10.5f);
+
+                                row.ConstantItem(70).AlignCenter().AlignMiddle()
+                                   .Column(c =>
+                                   {
+                                       if (File.Exists(logoPath))
+                                           c.Item().AlignCenter().Width(60).Image(logoPath);
+                                       else
+                                           c.Item().AlignCenter().Text("LFB").Bold();
+                                   });
                            });
 
-                        col.Item().Height(4);
+                        // Subtítulo centralizado (nome da tabela)
+                        col.Item().PaddingBottom(4)
+                           .Text(string.IsNullOrWhiteSpace(nomeTabela) ? string.Empty : nomeTabela)
+                           .AlignCenter()
+                           .FontSize(8.2f)
+                           .Italic();
 
-                        // Tabela com seções
+                        col.Item().Height(2);
+
+                        // Tabela (sem títulos de seção) compactada
                         col.Item().Table(table =>
                         {
                             table.ColumnsDefinition(c =>
                             {
-                                c.RelativeColumn(3);
-                                c.RelativeColumn(1);
+                                c.RelativeColumn();
+                                c.ConstantColumn(52);
                             });
 
-                            foreach (var section in ItemCatalog.Sections)
+                            // Cabeçalho
+                            table.Header(header =>
                             {
-                                // Linha de seção (header cinza, colspan via spanning)
-                                table.Cell().ColumnSpan(2).Element(SectionCell)
-                                     .AlignCenter()
-                                     .Text(section.Titulo).Bold().FontSize(8);
+                                static IContainer HCell(IContainer c) =>
+                                    c.Background(Colors.Grey.Lighten3)
+                                     .BorderBottom(0.25f).BorderColor(Colors.Grey.Darken2)
+                                     .PaddingVertical(1.0f).PaddingHorizontal(3f);
 
-                                foreach (var nome in section.Itens)
-                                {
-                                    precos.TryGetValue(nome, out var valor);
+                                header.Cell().Element(HCell)
+                                      .Text("Material")
+                                      .Bold().FontSize(8.2f);
+                                header.Cell().Element(HCell)
+                                      .AlignRight()
+                                      .Text("Preço")
+                                      .Bold().FontSize(8.2f);
+                            });
 
-                                    table.Cell().Element(ItemCell)
-                                         .Text(nome).FontSize(8);
+                            foreach (var nome in ItemCatalog.OrderedItems)
+                            {
+                                precos.TryGetValue(nome, out var valor);
 
-                                    table.Cell().Element(ItemCell).AlignRight()
-                                         .Text(valor > 0
-                                             ? valor.ToString("C", ptBR)
-                                             : string.Empty)
-                                         .FontSize(8);
-                                }
+                                table.Cell().Element(ItemCell)
+                                     .Text(nome)
+                                     .FontSize(8.2f);
+
+                                table.Cell().Element(ItemCell)
+                                     .AlignRight()
+                                     .Text(valor.ToString("C", ptBR))
+                                     .FontSize(8.2f);
                             }
                         });
                     });

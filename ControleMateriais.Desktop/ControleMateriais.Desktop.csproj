@@ -9,6 +9,10 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <Content Include="Assets\lfb-logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Assets\lfb-logo.png</TargetPath>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

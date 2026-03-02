@@ -116,6 +116,8 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        EnsureDirectories();
+
         foreach (var nome in ItemCatalog.OrderedItems)
             Itens.Add(new MaterialItem { Nome = nome, PesoAtual = 0m, PrecoPorKg = 0m });
 
@@ -153,6 +155,13 @@ public class MainWindowViewModel : ViewModelBase
 
 
 
+    }
+
+    private static void EnsureDirectories()
+    {
+        Directory.CreateDirectory(RootDir);
+        Directory.CreateDirectory(TabelaPrecosDir);
+        Directory.CreateDirectory(RecibosDir);
     }
 
     private void OnItensCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

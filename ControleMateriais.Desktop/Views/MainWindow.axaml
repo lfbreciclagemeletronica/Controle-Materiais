@@ -253,7 +253,9 @@
                 <Border Grid.Column="1"
                         Background="{DynamicResource Brush.Surface}"
                         BorderBrush="{DynamicResource Brush.Border}"
-                        BorderThickness="1" CornerRadius="6" Padding="8">
+                        BorderThickness="1" CornerRadius="6" Padding="8"
+                        IsVisible="{Binding TabelaVM.MostrarEdicao}">
+
                   <Grid RowDefinitions="Auto,Auto,*">
 
                     <!-- Nome da tabela -->
@@ -272,7 +274,7 @@
                       <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
                                  Foreground="{DynamicResource Brush.TextPrimary}"/>
                       <TextBlock Grid.Column="1" Text="Preço por kg" FontWeight="Bold"
-                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                 Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
                     </Grid>
 
                     <!-- Lista de preços editável -->
@@ -311,7 +313,9 @@
 
               <!-- Ações -->
               <StackPanel Grid.Row="2" Orientation="Horizontal"
-                          HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
+                          HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0"
+                          IsVisible="{Binding TabelaVM.MostrarEdicao}">
+
                 <Button Content="Fechar"
                         Command="{Binding TabelaVM.FecharCommand}"/>
                 <Button Content="Importar PDF"

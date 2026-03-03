@@ -1,7 +1,7 @@
 <div align="center">
 
 <!-- Logo -->
-<img src="ControleMateriais.Desktop/Assets/lfb-logo.png" alt="LFB Reciclagem Eletrônica" width="120"/>
+<img src="images/Banner.png" alt="LFB Reciclagem Eletrônica" width="350" height="400"/>
 
 # Controle de Materiais — LFB Reciclagem Eletrônica
 

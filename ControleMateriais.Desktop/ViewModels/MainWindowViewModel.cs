@@ -267,10 +267,9 @@ public class MainWindowViewModel : ViewModelBase
         var ptBR = CultureInfo.GetCultureInfo("pt-BR");
 
         var borderColor = Colors.Grey.Darken2;
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "lfb-logo.png");
         var cellFontSize = 7f;
         var headerFontSize = 7f;
-
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "lfb-logo.png");
 
         static IContainer InfoLabelCell(IContainer c) =>
             c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
@@ -301,8 +300,8 @@ public class MainWindowViewModel : ViewModelBase
                     {
                         title.ColumnsDefinition(c =>
                         {
-                            c.RelativeColumn(5);  // texto
-                            c.RelativeColumn(1);  // logo
+                            c.RelativeColumn(5);   // texto
+                            c.RelativeColumn(0.9f); // logo (reduzido)
                         });
 
                         // Esquerda: nome empresa + dados + título pesagem
@@ -325,11 +324,11 @@ public class MainWindowViewModel : ViewModelBase
 
                         // Direita: logo
                         title.Cell().Border(0.5f).BorderColor(borderColor)
-                             .Background("#4CAF50").AlignCenter().AlignMiddle().Padding(4)
+                             .Background("#4CAF50").AlignCenter().AlignMiddle().Padding(3)
                              .Column(logo =>
                              {
                                  if (File.Exists(logoPath))
-                                     logo.Item().AlignCenter().Width(55).Image(logoPath);
+                                     logo.Item().AlignCenter().Width(45).Image(logoPath);
                                  else
                                      logo.Item().AlignCenter().Text("LFB").Bold()
                                          .FontColor(Colors.White).FontSize(14);

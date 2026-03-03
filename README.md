@@ -22,14 +22,10 @@ Gera recibos em PDF, gerencia tabelas de preços e importa listas de preços aut
 - [Sobre o Projeto](#sobre-o-projeto)
 - [Funcionalidades](#funcionalidades)
 - [Screenshots](#screenshots)
-- [Instalação](#instalação)
-  - [Windows](#windows)
-  - [Linux](#linux)
 - [Como Usar](#como-usar)
   - [Registrar Pesagem](#1-registrar-pesagem)
   - [Gerenciar Tabelas de Preços](#2-gerenciar-tabelas-de-preços)
   - [Exportar Recibo PDF](#3-exportar-recibo-em-pdf)
-- [Desinstalação](#desinstalação)
 - [Publicar / Build](#publicar--build)
 - [Tecnologias](#tecnologias)
 
@@ -83,83 +79,6 @@ O sistema exibe uma lista de **52 categorias de materiais** (placas, metais, cab
 **Exemplo de Recibo PDF Gerado**
 
 </div>
-
----
-
-## Instalação
-
-### Windows
-
-#### Opção A — Executável portátil (recomendado, sem instalação)
-
-Gere o `.exe` com o script de publish e execute diretamente — sem instalar, sem permissão de administrador:
-
-```powershell
-# Na raiz do repositório
-.\publish.ps1 -Target win
-```
-
-O executável gerado em `release\win-x64\ControleMateriais.Desktop.exe` pode ser copiado para qualquer lugar do computador e executado diretamente.
-
-#### Opção B — Instalador online (baixa automaticamente do GitHub)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install-windows.ps1 -Online
-```
-
-#### Opção C — Instalador local (após publicar)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install-windows.ps1
-```
-
-O instalador irá:
-1. Verificar se já existe uma versão instalada (e oferecer substituição)
-2. Verificar se o Git está instalado (e oferecer instalação automática)
-3. Baixar ou copiar os arquivos para `%LOCALAPPDATA%\ControleMateriais.LFB\`
-4. Criar atalho na **Área de Trabalho** (opcional)
-5. Criar atalho no **Menu Iniciar** automaticamente
-
-**Parâmetros disponíveis:**
-
-| Parâmetro | Descrição |
-|---|---|
-| `-Online` | Força download da release mais recente do GitHub |
-| `-InstallDir <caminho>` | Define pasta de instalação personalizada |
-| `-NoShortcut` | Pula criação de atalho na Área de Trabalho |
-| `-Uninstall` | Remove a instalação existente |
-
----
-
-### Linux
-
-#### Opção A — Online
-
-```bash
-chmod +x install-linux.sh && ./install-linux.sh --online
-```
-
-#### Opção B — Local (após publicar)
-
-```bash
-chmod +x install-linux.sh && ./install-linux.sh
-```
-
-O instalador irá:
-1. Verificar instalação existente (e oferecer remoção)
-2. Instalar Git via `apt` / `dnf` / `pacman` / `zypper` se ausente
-3. Copiar arquivos para `~/.local/share/ControleMateriais.LFB/`
-4. Criar symlink em `/usr/local/bin/controle-materiais-lfb` (opcional, requer `sudo`)
-5. Criar atalho `.desktop` na Área de Trabalho e no menu de aplicações (opcional)
-
-**Flags disponíveis:**
-
-| Flag | Descrição |
-|---|---|
-| `--online` | Força download da release mais recente do GitHub |
-| `--install-dir <caminho>` | Define pasta de instalação personalizada |
-| `--no-shortcut` | Pula criação de atalho sem perguntar |
-| `--uninstall` | Remove a instalação existente |
 
 ---
 
@@ -233,20 +152,6 @@ Clique no botão **"Tabela de Preços"** no canto superior esquerdo da tela prin
 
 ---
 
-## Desinstalação
-
-**Windows:**
-```powershell
-powershell -ExecutionPolicy Bypass -File install-windows.ps1 -Uninstall
-```
-
-**Linux:**
-```bash
-./install-linux.sh --uninstall
-```
-
----
-
 ## Publicar / Build
 
 Para gerar os binários de distribuição (requer .NET SDK instalado):
@@ -275,6 +180,14 @@ release/
 ```
 
 Os executáveis são **self-contained** — não requerem .NET instalado nem permissão de administrador.
+
+### Utilitário de ícone
+
+Para gerar/atualizar o ícone do aplicativo a partir do logo (`Assets/lfb-logo.png`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File generate-icon.ps1
+```
 
 ---
 

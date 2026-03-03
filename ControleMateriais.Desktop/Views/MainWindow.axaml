@@ -10,7 +10,7 @@
     MinWidth="700" MinHeight="500"
     CanResize="True"
     Title="Controle de Materiais"
-    Icon="avares://ControleMateriais.Desktop/Assets/avalonia-logo.ico">
+    Icon="avares://ControleMateriais.Desktop/Assets/icon.ico">
 
     <Window.Resources>
         <conv:BooleanNegationConverter x:Key="BoolNot"/>

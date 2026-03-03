@@ -62,7 +62,7 @@ Fluxo completo — abrir, ativar tabela, lançar pesos, exportar recibo e lista 
 ### 1. Abrindo o app
 
 <div align="center">
-<img src="images/1Opening.png" width="650"/>
+<img src="images/1Opening.png" width="300"/>
 </div>
 
 > Ao iniciar o programa, ele carrega a tabela de preços ativa do mês atual automaticamente e prepara a tela para registro de pesagem.

@@ -1,4 +1,5 @@
 ﻿using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Serialization;
 using ControleMateriais.Models;
 using QuestPDF.Fluent;
@@ -230,22 +231,24 @@ public class MainWindowViewModel : ViewModelBase
             .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
 
         Directory.CreateDirectory(RecibosDir);
-        var sfd = new SaveFileDialog
-        {
-            Title = "Salvar recibo em PDF",
-            Filters =
-            {
-                new FileDialogFilter() { Name = "PDF", Extensions = { "pdf" } }
-            },
-            InitialFileName = nomeArquivo,
-            Directory = RecibosDir
-        };
-
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
                         .MainWindow;
+        if (topLevel is null) return;
 
-        var filePath = await sfd.ShowAsync(topLevel);
+        var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(RecibosDir));
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(
+            new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = "Salvar recibo em PDF",
+                SuggestedFileName = nomeArquivo,
+                SuggestedStartLocation = suggestedFolder,
+                FileTypeChoices = new[]
+                {
+                    new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } }
+                }
+            });
+        var filePath = file?.TryGetLocalPath();
         if (string.IsNullOrWhiteSpace(filePath))
             return;
 
@@ -267,8 +270,17 @@ public class MainWindowViewModel : ViewModelBase
         var ptBR = CultureInfo.GetCultureInfo("pt-BR");
 
         var borderColor = Colors.Grey.Darken2;
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "lfb-logo.png");
         var cellFontSize = 7f;
+        byte[]? logoBytes = null;
+        try
+        {
+            var uri = new Uri("avares://ControleMateriais.Desktop/Assets/lfb-logo.png");
+            using var logoStream = Avalonia.Platform.AssetLoader.Open(uri);
+            using var logoMs = new MemoryStream();
+            logoStream.CopyTo(logoMs);
+            logoBytes = logoMs.ToArray();
+        }
+        catch { }
         var headerFontSize = 7f;
 
         static IContainer InfoLabelCell(IContainer c) =>
@@ -327,8 +339,8 @@ public class MainWindowViewModel : ViewModelBase
                              .Background("#4CAF50").AlignCenter().AlignMiddle().Padding(3)
                              .Column(logo =>
                              {
-                                 if (File.Exists(logoPath))
-                                     logo.Item().AlignCenter().Width(45).Image(logoPath);
+                                 if (logoBytes != null)
+                                     logo.Item().AlignCenter().Width(45).Image(logoBytes);
                                  else
                                      logo.Item().AlignCenter().Text("LFB").Bold()
                                          .FontColor(Colors.White).FontSize(14);

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Serialization;
 using ControleMateriais.Models;
 using QuestPDF.Fluent;
@@ -343,19 +344,23 @@ namespace ControleMateriais.Desktop.ViewModels
         // ── Importar preços de um PDF ─────────────────────────────────────────
         private async Task ImportarDePdfAsync()
         {
-            var ofd = new OpenFileDialog
-            {
-                Title = "Selecionar PDF com lista de preços",
-                Filters = { new FileDialogFilter { Name = "PDF", Extensions = { "pdf" } } },
-                AllowMultiple = false
-            };
-
             var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                             IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-            var files = await ofd.ShowAsync(topLevel!);
-            if (files is null || files.Length == 0) return;
+            if (topLevel is null) return;
 
-            var path = files[0];
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(
+                new Avalonia.Platform.Storage.FilePickerOpenOptions
+                {
+                    Title = "Selecionar PDF com lista de preços",
+                    AllowMultiple = false,
+                    FileTypeFilter = new[]
+                    {
+                        new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } }
+                    }
+                });
+            if (files is null || files.Count == 0) return;
+
+            var path = files[0].TryGetLocalPath() ?? files[0].Path.LocalPath;
             if (!File.Exists(path)) return;
 
             IsImportando = true;
@@ -570,28 +575,47 @@ namespace ControleMateriais.Desktop.ViewModels
             var byName = ItensEdicao.ToDictionary(w => w.Nome, w => w.PrecoDecimal);
 
             Directory.CreateDirectory(BaseDir);
-            var sfd = new SaveFileDialog
-            {
-                Title = "Salvar lista de preços em PDF",
-                Filters = { new FileDialogFilter() { Name = "PDF", Extensions = { "pdf" } } },
-                InitialFileName = $"Lista_Precos_{_tabelaSelecionada.Nome}.pdf",
-                Directory = BaseDir
-            };
-
             var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                             IClassicDesktopStyleApplicationLifetime)?.MainWindow;
-            var path = await sfd.ShowAsync(topLevel!);
+            if (topLevel is null) return;
+
+            var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(BaseDir));
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(
+                new Avalonia.Platform.Storage.FilePickerSaveOptions
+                {
+                    Title = "Salvar lista de preços em PDF",
+                    SuggestedFileName = $"Lista_Precos_{_tabelaSelecionada.Nome}.pdf",
+                    SuggestedStartLocation = suggestedFolder,
+                    FileTypeChoices = new[]
+                    {
+                        new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } }
+                    }
+                });
+            var path = file?.TryGetLocalPath();
             if (string.IsNullOrWhiteSpace(path)) return;
 
             GerarListaPrecosPdf(path, byName, _tabelaSelecionada.Nome);
             TabelaSalvaRequested?.Invoke(this, $"PDF exportado: {System.IO.Path.GetFileName(path)}");
         }
 
+        private static byte[]? CarregarLogoBytes()
+        {
+            try
+            {
+                var uri = new Uri("avares://ControleMateriais.Desktop/Assets/lfb-logo.png");
+                using var stream = Avalonia.Platform.AssetLoader.Open(uri);
+                using var ms = new System.IO.MemoryStream();
+                stream.CopyTo(ms);
+                return ms.ToArray();
+            }
+            catch { return null; }
+        }
+
         private static void GerarListaPrecosPdf(string filePath, Dictionary<string, decimal> precos, string nomeTabela)
         {
             var ptBR = CultureInfo.GetCultureInfo("pt-BR");
             var borderColor = Colors.Grey.Darken2;
-            var logoPath    = Path.Combine(AppContext.BaseDirectory, "Assets", "lfb-logo.png");
+            var logoBytes = CarregarLogoBytes();
 
             static IContainer ItemCell(IContainer c) =>
                 c.BorderBottom(0.15f).BorderColor(Colors.Grey.Lighten2)
@@ -625,8 +649,8 @@ namespace ControleMateriais.Desktop.ViewModels
                                 row.ConstantItem(70).AlignCenter().AlignMiddle()
                                    .Column(c =>
                                    {
-                                       if (File.Exists(logoPath))
-                                           c.Item().AlignCenter().Width(60).Image(logoPath);
+                                       if (logoBytes != null)
+                                           c.Item().AlignCenter().Width(60).Image(logoBytes);
                                        else
                                            c.Item().AlignCenter().Text("LFB").Bold();
                                    });

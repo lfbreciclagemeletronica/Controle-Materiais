@@ -81,5 +81,5 @@ foreach ($r in $results) {
 }
 Write-Host ""
 Write-Host "  Windows : copie o .exe para qualquer lugar e execute." -ForegroundColor Yellow
-Write-Host "  Linux   : copie o binario, dê chmod +x e execute; ou use install-linux.sh." -ForegroundColor Yellow
+Write-Host "  Linux   : copie o binario, use chmod +x e execute; ou use install-linux.sh." -ForegroundColor Yellow
 Write-Host ""

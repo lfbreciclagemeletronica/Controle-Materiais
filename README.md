@@ -53,32 +53,129 @@ O sistema exibe uma lista de **52 categorias de materiais** (placas, metais, cab
 
 ---
 
-## Screenshots
+## Passo a passo (com imagens)
 
-> Adicione as imagens abaixo substituindo os comentários pelos caminhos corretos.
+Fluxo completo — abrir, ativar tabela, lançar pesos, exportar recibo e lista de preços.
+
+---
+
+### 1. Abrindo o app
 
 <div align="center">
-
-<!-- Tela principal com lista de materiais -->
-<!-- <img src="docs/screenshots/tela-principal.png" alt="Tela Principal" width="800"/> -->
-
-**Tela Principal — Lista de Materiais**
-
----
-
-<!-- Gerenciador de tabelas de preços -->
-<!-- <img src="docs/screenshots/tabela-precos.png" alt="Tabela de Preços" width="800"/> -->
-
-**Gerenciador de Tabelas de Preços**
-
----
-
-<!-- Exemplo de recibo PDF gerado -->
-<!-- <img src="docs/screenshots/recibo-pdf.png" alt="Recibo PDF" width="600"/> -->
-
-**Exemplo de Recibo PDF Gerado**
-
+<img src="images/1Opening.png" width="650"/>
 </div>
+
+> Ao iniciar o programa, ele carrega a tabela de preços ativa do mês atual automaticamente e prepara a tela para registro de pesagem.
+
+---
+
+### 2. Tela inicial
+
+<div align="center">
+<img src="images/2Primeira-Pagina.png" width="650"/>
+</div>
+
+> Tela principal com a lista completa de 52 materiais. Informe o **nome do fornecedor** no campo superior e preencha os campos de **Peso (kg)** de cada material recebido.
+
+---
+
+### 3. Página de tabelas de preço
+
+<div align="center">
+<img src="images/3Pagina-Lista-Precos-vazia.png" width="650"/>
+</div>
+
+> Acesse as tabelas de preço clicando em **"Tabela de Preços"**. Aqui você pode criar novas tabelas, importar preços de um PDF ou ativar uma tabela existente.
+
+---
+
+### 4. Selecionando uma tabela
+
+<div align="center">
+<img src="images/4Pagina-Lista-Precos-selecionado.png" width="650"/>
+</div>
+
+> Clique sobre uma tabela na lista para selecioná-la. O editor de preços será exibido à direita, permitindo visualizar e editar os valores de cada material.
+
+---
+
+### 5. Tabela ativada
+
+<div align="center">
+<img src="images/5Ativado-Lista.png" width="650"/>
+</div>
+
+> Ao clicar em **"Ativar"**, a tabela selecionada passa a ser a tabela vigente. Os preços por kg são aplicados automaticamente na tela de pesagem.
+
+---
+
+### 6. Registrando pesos e calculando totais
+
+<div align="center">
+<img src="images/6Adicionando-Pesos-calculo.png" width="650"/>
+</div>
+
+> Digite o peso (kg) em cada linha de material. O sistema calcula automaticamente o **valor por item** (kg × preço/kg) e o **valor total geral** em tempo real.
+
+---
+
+### 7. Exportando o recibo
+
+<div align="center">
+<img src="images/7exportando-recibo.png" width="650"/>
+</div>
+
+> Clique em **"Exportar"** para gerar o recibo em PDF. Uma janela de salvamento será aberta, já direcionada para a pasta `Downloads/ControleMateriaisLFB/Recibos/`.
+
+---
+
+### 8. Exportação concluída
+
+<div align="center">
+<img src="images/8exportado-com-sucesso.png" width="650"/>
+</div>
+
+> Uma notificação confirma que o PDF foi salvo com sucesso. O recibo fica disponível na pasta de recibos para impressão ou envio ao fornecedor.
+
+---
+
+### 9. Exemplo de recibo em PDF
+
+<div align="center">
+<img src="images/9exemplo-recibo-pdf.png" width="650"/>
+</div>
+
+> O recibo gerado contém: cabeçalho com logo LFB, CNPJ e endereço; dados do fornecedor, peso total, valor total e data; e tabela completa de itens com KG, Preço/kg e Total.
+
+---
+
+### 10. Exportando a lista de preços
+
+<div align="center">
+<img src="images/10exportar-lista-precos.png" width="650"/>
+</div>
+
+> Na tela de tabelas, clique em **"Exportar PDF"** para gerar a lista de preços da tabela selecionada. O arquivo é salvo em `Downloads/ControleMateriaisLFB/TabelaPrecos/`.
+
+---
+
+### 11. Lista exportada
+
+<div align="center">
+<img src="images/11-lista-exportada.png" width="650"/>
+</div>
+
+> Confirmação de que a lista de preços foi exportada com sucesso. O arquivo fica disponível para impressão ou compartilhamento com fornecedores.
+
+---
+
+### 12. Exemplo de lista de preços em PDF
+
+<div align="center">
+<img src="images/12-exemplo-lista-pdf.png" width="650"/>
+</div>
+
+> A lista gerada é compacta (uma página), com logo LFB no cabeçalho, título centralizado, nome da tabela como subtítulo e todos os materiais com seus respectivos preços por kg.
 
 ---
 

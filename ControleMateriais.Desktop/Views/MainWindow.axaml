@@ -3,13 +3,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:ControleMateriais.Models"
     xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+    xmlns:views="using:ControleMateriais.Desktop.Views"
     x:Class="ControleMateriais.Desktop.Views.MainWindow"
     xmlns:conv="using:ControleMateriais.Desktop.Converters"
     x:DataType="vm:MainWindowViewModel"
     Width="900" Height="680"
     MinWidth="700" MinHeight="500"
     CanResize="True"
-    Title="LFB Sistema de Recibos"
+    Title="LFB Reciclagem Eletrônica"
     Icon="avares://ControleMateriais.Desktop/Assets/icon.ico">
 
     <Window.Resources>
@@ -76,21 +77,35 @@
 
       <!-- CONTAINER PRINCIPAL -->
       <Grid Grid.Row="1" Margin="10">
-        <!-- Painel INICIAL -->
-        <Grid IsVisible="{Binding IsGerindoTabela, Converter={StaticResource BoolNot}}">
+
+        <!-- Painel HOME -->
+        <views:HomeView IsVisible="{Binding IsHomePage}"
+                        DataContext="{Binding}"/>
+
+        <!-- Painel CALCULADORA DE PESOS -->
+        <views:WeightCalculatorView IsVisible="{Binding $parent[Window].DataContext.IsCalculadoraPage}"
+                                    DataContext="{Binding CalculadoraVM}"/>
+
+        <!-- Painel RECIBOS (página principal) -->
+        <Grid IsVisible="{Binding IsRecibosPage}">
           <Border Background="{DynamicResource Brush.SurfaceAlt}"
                   BorderBrush="{DynamicResource Brush.Border}"
                   BorderThickness="1" CornerRadius="10" Padding="16">
             <Grid RowDefinitions="Auto,*">
               <!-- Cabeçalho -->
               <StackPanel Margin="0,0,0,12" Spacing="6">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                   <Button Grid.Column="0"
+                          Content="← Início"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,8,0"
+                          Command="{Binding IrParaHomeCommand}"/>
+                  <Button Grid.Column="1"
                           Content="Tabela de Preços"
                           HorizontalAlignment="Left"
                           Command="{Binding AbrirTabelaPrecosCommand}"/>
 
-                  <StackPanel Grid.Column="1"
+                  <StackPanel Grid.Column="2"
                               HorizontalAlignment="Center"
                               Spacing="0">
                     <TextBlock Text="Valor Total"
@@ -106,7 +121,7 @@
                                Text="{Binding PesoTotal, StringFormat={}Peso total: {0:N3} kg}"/>
                   </StackPanel>
 
-                  <Button Grid.Column="2"
+                  <Button Grid.Column="3"
                           Classes="primary"
                           Content="Exportar"
                           HorizontalAlignment="Right"

@@ -105,14 +105,39 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand ExportarCommand { get; }
     public ICommand AbrirTabelaPrecosCommand { get; }
     public ICommand SelecionarItemCommand { get; }
+    public ICommand IrParaHomeCommand { get; }
+    public ICommand IrParaCalculadoraPesosCommand { get; }
+    public ICommand IrParaRecibosCommand { get; }
 
     public PriceTableManagerViewModel TabelaVM { get; }
+    public WeightCalculatorViewModel CalculadoraVM { get; }
+
     private bool _isGerindoTabela;
     public bool IsGerindoTabela
     {
         get => _isGerindoTabela;
         set { if (value != _isGerindoTabela) { _isGerindoTabela = value; OnPropertyChanged(); } }
     }
+
+    private AppPage _currentPage = AppPage.Home;
+    public AppPage CurrentPage
+    {
+        get => _currentPage;
+        set
+        {
+            if (value != _currentPage)
+            {
+                _currentPage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsHomePage));
+                OnPropertyChanged(nameof(IsRecibosPage));
+                OnPropertyChanged(nameof(IsCalculadoraPage));
+            }
+        }
+    }
+    public bool IsHomePage       => _currentPage == AppPage.Home;
+    public bool IsRecibosPage    => _currentPage == AppPage.Recibos;
+    public bool IsCalculadoraPage => _currentPage == AppPage.Calculadora;
 
     public decimal TotalGeral
     {
@@ -164,6 +189,10 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        IrParaHomeCommand            = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Home; });
+        IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Recibos; });
+        IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
+
         EnsureDirectories();
 
         foreach (var nome in ItemCatalog.OrderedItems)
@@ -209,10 +238,9 @@ public class MainWindowViewModel : ViewModelBase
             IsGerindoTabela = true;
         });
 
+        CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home);
+
         _ = CarregarPrecosNaInicializacaoAsync();
-
-
-
     }
 
     private static void EnsureDirectories()
@@ -901,5 +929,12 @@ public sealed class DelegateCommand<T> : ICommand
     public void Execute(object? parameter) => _execute(parameter is T t ? t : default);
 
     public event EventHandler? CanExecuteChanged { add { } remove { } }
+}
+
+public enum AppPage
+{
+    Home,
+    Recibos,
+    Calculadora
 }
 

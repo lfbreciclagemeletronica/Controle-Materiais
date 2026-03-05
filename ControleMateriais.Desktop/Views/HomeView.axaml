@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+             x:Class="ControleMateriais.Desktop.Views.HomeView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <Grid RowDefinitions="*,Auto,*">
+
+    <!-- Conteúdo central -->
+    <StackPanel Grid.Row="1"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="0">
+
+      <!-- Logo -->
+      <Image Source="avares://ControleMateriais.Desktop/Assets/lfb-logo.png"
+             Width="200" Height="200"
+             HorizontalAlignment="Center"
+             Margin="0,0,0,24"/>
+
+      <!-- Título principal -->
+      <TextBlock Text="LFB RECICLAGEM ELETRÔNICA"
+                 FontSize="26" FontWeight="Bold"
+                 HorizontalAlignment="Center"
+                 Foreground="{DynamicResource Brush.Primary}"
+                 LetterSpacing="1"
+                 Margin="0,0,0,44"/>
+
+      <!-- Botões de navegação -->
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Center"
+                  Spacing="28">
+
+        <!-- Sistema de Recibos -->
+        <Button Command="{Binding IrParaRecibosCommand}"
+                Width="260" Height="155"
+                Padding="0"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center">
+          <Button.Template>
+            <ControlTemplate>
+              <Border Background="{DynamicResource Brush.Primary}"
+                      CornerRadius="16"
+                      Padding="24,20">
+                <Border.Styles>
+                  <Style Selector="Border:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource Brush.PrimaryHover}"/>
+                  </Style>
+                </Border.Styles>
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                  <TextBlock Text="🧾"
+                             FontSize="42"
+                             HorizontalAlignment="Center"/>
+                  <TextBlock Text="Sistema de Recibos"
+                             FontSize="15" FontWeight="Bold"
+                             Foreground="White"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                  <TextBlock Text="Pesagem, tabela de preços e Recibos"
+                             FontSize="11"
+                             Foreground="#CCffffff"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                </StackPanel>
+              </Border>
+            </ControlTemplate>
+          </Button.Template>
+        </Button>
+
+        <!-- Calculadora de Pesos -->
+        <Button Command="{Binding IrParaCalculadoraPesosCommand}"
+                Width="260" Height="155"
+                Padding="0"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center">
+          <Button.Template>
+            <ControlTemplate>
+              <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="{DynamicResource Brush.Primary}"
+                      BorderThickness="2"
+                      CornerRadius="16"
+                      Padding="24,20">
+                <Border.Styles>
+                  <Style Selector="Border:pointerover">
+                    <Setter Property="Background" Value="#1A3B82F6"/>
+                  </Style>
+                </Border.Styles>
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                  <TextBlock Text="⚖️"
+                             FontSize="42"
+                             HorizontalAlignment="Center"/>
+                  <TextBlock Text="Sistema de Pesos"
+                             FontSize="15" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                  <TextBlock Text="Cálculo de kg por material"
+                             FontSize="11"
+                             Foreground="White"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                </StackPanel>
+              </Border>
+            </ControlTemplate>
+          </Button.Template>
+        </Button>
+
+      </StackPanel>
+    </StackPanel>
+
+  </Grid>
+
+</UserControl>

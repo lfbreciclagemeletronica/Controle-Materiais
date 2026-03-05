@@ -89,4 +89,56 @@ public partial class MainWindow : Window
             wrapper.ConfirmarEdicao();
         }
     }
+
+    private void CustomPesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            wrapper.IniciarEdicaoPeso();
+            tb.SelectAll();
+        }
+    }
+
+    private void CustomPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicaoPeso();
+            e.Handled = true;
+        }
+    }
+
+    private void CustomPesoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicaoPeso();
+        }
+    }
+
+    private void CustomPrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            wrapper.IniciarEdicaoPreco();
+            tb.SelectAll();
+        }
+    }
+
+    private void CustomPrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicaoPreco();
+            e.Handled = true;
+        }
+    }
+
+    private void CustomPrecoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            wrapper.ConfirmarEdicaoPreco();
+        }
+    }
 }

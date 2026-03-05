@@ -33,6 +33,7 @@ public class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<MaterialItem> Itens { get; } = new();
     public ObservableCollection<PesoWrapper> ItensEditaveis { get; } = new();
+    public ObservableCollection<CustomItemWrapper> ItensPersonalizados { get; } = new();
     private decimal _totalGeral;
     private decimal _pesoTotal;
 
@@ -130,6 +131,14 @@ public class MainWindowViewModel : ViewModelBase
             SubscribeItem(it);
             ItensEditaveis.Add(new PesoWrapper(it));
         }
+
+        for (int i = 0; i < 4; i++)
+        {
+            var custom = new CustomItemWrapper();
+            custom.TotalChanged += (_, __) => RecalcularTotalGeral();
+            ItensPersonalizados.Add(custom);
+        }
+
         RecalcularTotalGeral();
 
         ExportarCommand = new DelegateCommand(async () => await ExportarAsync());
@@ -212,6 +221,11 @@ public class MainWindowViewModel : ViewModelBase
             soma += it.Total;
             peso += it.PesoAtual;
         }
+        foreach (var c in ItensPersonalizados)
+        {
+            soma += c.Total;
+            peso += c.PesoAtual;
+        }
         TotalGeral = soma;
         PesoTotal = peso;
     }
@@ -262,9 +276,12 @@ public class MainWindowViewModel : ViewModelBase
 
     private void GerarReciboPdf(string filePath)
     {
-        var itensSnapshot = Itens.ToList();
-        var pesoTotalSnapshot = itensSnapshot.Sum(i => i.PesoAtual);
-        var totalGeralSnapshot = itensSnapshot.Sum(i => i.Total);
+        var itensSnapshot = Itens.Where(i => i.PesoAtual > 0).ToList();
+        var customSnapshot = ItensPersonalizados
+            .Where(c => c.PesoAtual > 0 && !string.IsNullOrWhiteSpace(c.Nome))
+            .ToList();
+        var pesoTotalSnapshot = itensSnapshot.Sum(i => i.PesoAtual) + customSnapshot.Sum(c => c.PesoAtual);
+        var totalGeralSnapshot = itensSnapshot.Sum(i => i.Total) + customSnapshot.Sum(c => c.Total);
         var nomeClienteSnapshot = NomeCliente;
         var dataGeracao = DateTime.Now;
         var ptBR = CultureInfo.GetCultureInfo("pt-BR");
@@ -402,19 +419,17 @@ public class MainWindowViewModel : ViewModelBase
                                   .Text("TOTAL").Bold().FontSize(headerFontSize);
                         });
 
+                        static IContainer BCell(IContainer c) =>
+                            c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
+                             .PaddingVertical(2).PaddingHorizontal(4);
+
                         foreach (var it in itensSnapshot)
                         {
-                            static IContainer BCell(IContainer c) =>
-                                c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
-                                 .PaddingVertical(2).PaddingHorizontal(4);
-
-                            bool temPeso = it.PesoAtual > 0;
-
                             table.Cell().Element(BCell)
                                  .Text(it.Nome ?? string.Empty).FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
-                                 .Text(temPeso ? it.PesoAtual.ToString("N3") : string.Empty)
+                                 .Text(it.PesoAtual.ToString("N3"))
                                  .FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
@@ -426,6 +441,28 @@ public class MainWindowViewModel : ViewModelBase
                             table.Cell().Element(BCell).AlignCenter()
                                  .Text(it.Total > 0
                                      ? it.Total.ToString("C", ptBR)
+                                     : string.Empty)
+                                 .FontSize(cellFontSize);
+                        }
+
+                        foreach (var c in customSnapshot)
+                        {
+                            table.Cell().Element(BCell)
+                                 .Text(c.Nome).FontSize(cellFontSize);
+
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(c.PesoAtual.ToString("N3"))
+                                 .FontSize(cellFontSize);
+
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(c.PrecoPorKg > 0
+                                     ? c.PrecoPorKg.ToString("C", ptBR)
+                                     : string.Empty)
+                                 .FontSize(cellFontSize);
+
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(c.Total > 0
+                                     ? c.Total.ToString("C", ptBR)
                                      : string.Empty)
                                  .FontSize(cellFontSize);
                         }
@@ -623,6 +660,98 @@ public class PesoWrapper : ViewModelBase
     {
         _editandoPreco = false;
         PrecoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
+    }
+}
+
+public class CustomItemWrapper : ViewModelBase
+{
+    private static readonly CultureInfo PtBR = CultureInfo.GetCultureInfo("pt-BR");
+
+    public event EventHandler? TotalChanged;
+
+    private string _nome = string.Empty;
+    public string Nome
+    {
+        get => _nome;
+        set { if (value != _nome) { _nome = value; OnPropertyChanged(); } }
+    }
+
+    private string _pesoTexto = "0,000";
+    public string PesoTexto
+    {
+        get => _pesoTexto;
+        set { if (value != _pesoTexto) { _pesoTexto = value; OnPropertyChanged(); } }
+    }
+
+    private string _precoTexto = "R$ 0,00";
+    public string PrecoTexto
+    {
+        get => _precoTexto;
+        set { if (value != _precoTexto) { _precoTexto = value; OnPropertyChanged(); } }
+    }
+
+    private decimal _pesoAtual;
+    public decimal PesoAtual
+    {
+        get => _pesoAtual;
+        private set { if (value != _pesoAtual) { _pesoAtual = value; OnPropertyChanged(); RecalcularTotal(); } }
+    }
+
+    private decimal _precoPorKg;
+    public decimal PrecoPorKg
+    {
+        get => _precoPorKg;
+        private set { if (value != _precoPorKg) { _precoPorKg = value; OnPropertyChanged(); RecalcularTotal(); } }
+    }
+
+    private decimal _total;
+    public decimal Total
+    {
+        get => _total;
+        private set { if (value != _total) { _total = value; OnPropertyChanged(); TotalChanged?.Invoke(this, EventArgs.Empty); } }
+    }
+
+    private bool _editandoPeso;
+    private bool _editandoPreco;
+
+    private void RecalcularTotal() => Total = PesoAtual * PrecoPorKg;
+
+    private static decimal ParseDecimal(string raw, decimal fallback)
+    {
+        raw = raw.Trim().Replace("R$", "").Replace(" ", "").Trim();
+        if (raw.Contains(',') && raw.Contains('.'))
+            raw = raw.Replace(".", "").Replace(",", ".");
+        else
+            raw = raw.Replace(",", ".");
+        return decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : fallback;
+    }
+
+    public void IniciarEdicaoPeso()
+    {
+        _editandoPeso = true;
+        PesoTexto = string.Empty;
+    }
+
+    public void ConfirmarEdicaoPeso()
+    {
+        if (!_editandoPeso) return;
+        _editandoPeso = false;
+        PesoAtual = ParseDecimal(PesoTexto, PesoAtual);
+        PesoTexto = PesoAtual.ToString("N3", PtBR);
+    }
+
+    public void IniciarEdicaoPreco()
+    {
+        _editandoPreco = true;
+        PrecoTexto = string.Empty;
+    }
+
+    public void ConfirmarEdicaoPreco()
+    {
+        if (!_editandoPreco) return;
+        _editandoPreco = false;
+        PrecoPorKg = ParseDecimal(PrecoTexto, PrecoPorKg);
+        PrecoTexto = PrecoPorKg.ToString("C", PtBR);
     }
 }
 

@@ -37,6 +37,43 @@ public class MainWindowViewModel : ViewModelBase
     private decimal _totalGeral;
     private decimal _pesoTotal;
 
+    private decimal _impurezasPesoAtual;
+    public decimal ImpurezasPesoAtual
+    {
+        get => _impurezasPesoAtual;
+        private set { if (value != _impurezasPesoAtual) { _impurezasPesoAtual = value; OnPropertyChanged(); RecalcularTotalGeral(); } }
+    }
+
+    private string _impurezasPesoTexto = "0,000";
+    public string ImpurezasPesoTexto
+    {
+        get => _impurezasPesoTexto;
+        set { if (value != _impurezasPesoTexto) { _impurezasPesoTexto = value; OnPropertyChanged(); } }
+    }
+
+    private bool _impurezasEditando;
+
+    public void IniciarEdicaoImpurezas()
+    {
+        _impurezasEditando = true;
+        ImpurezasPesoTexto = string.Empty;
+    }
+
+    public void ConfirmarEdicaoImpurezas()
+    {
+        if (!_impurezasEditando) return;
+        _impurezasEditando = false;
+        var raw = ImpurezasPesoTexto.Trim().Replace(" ", "");
+        if (raw.Contains(',') && raw.Contains('.'))
+            raw = raw.Replace(".", "").Replace(",", ".");
+        else
+            raw = raw.Replace(",", ".");
+        if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            parsed = _impurezasPesoAtual;
+        ImpurezasPesoAtual = parsed;
+        ImpurezasPesoTexto = parsed.ToString("N3", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+    }
+
     public decimal PesoTotal
     {
         get => _pesoTotal;
@@ -56,11 +93,11 @@ public class MainWindowViewModel : ViewModelBase
         get => _nomeCliente;
         set { if (value != _nomeCliente) { _nomeCliente = value; OnPropertyChanged(); } }
     }
-    public DelegateCommand ExportarCommand { get; }
+    public ICommand ExportarCommand { get; }
+    public ICommand AbrirTabelaPrecosCommand { get; }
+    public ICommand SelecionarItemCommand { get; }
 
     public PriceTableManagerViewModel TabelaVM { get; }
-    public ICommand AbrirTabelaPrecosCommand { get; }
-
     private bool _isGerindoTabela;
     public bool IsGerindoTabela
     {
@@ -138,6 +175,8 @@ public class MainWindowViewModel : ViewModelBase
             custom.TotalChanged += (_, __) => RecalcularTotalGeral();
             ItensPersonalizados.Add(custom);
         }
+
+        SelecionarItemCommand = new DelegateCommand<object>(SelecionarItem);
 
         RecalcularTotalGeral();
 
@@ -226,6 +265,7 @@ public class MainWindowViewModel : ViewModelBase
             soma += c.Total;
             peso += c.PesoAtual;
         }
+        peso += _impurezasPesoAtual;
         TotalGeral = soma;
         PesoTotal = peso;
     }
@@ -280,7 +320,8 @@ public class MainWindowViewModel : ViewModelBase
         var customSnapshot = ItensPersonalizados
             .Where(c => c.PesoAtual > 0 && !string.IsNullOrWhiteSpace(c.Nome))
             .ToList();
-        var pesoTotalSnapshot = itensSnapshot.Sum(i => i.PesoAtual) + customSnapshot.Sum(c => c.PesoAtual);
+        var impurezasPeso = ImpurezasPesoAtual;
+        var pesoTotalSnapshot = itensSnapshot.Sum(i => i.PesoAtual) + customSnapshot.Sum(c => c.PesoAtual) + impurezasPeso;
         var totalGeralSnapshot = itensSnapshot.Sum(i => i.Total) + customSnapshot.Sum(c => c.Total);
         var nomeClienteSnapshot = NomeCliente;
         var dataGeracao = DateTime.Now;
@@ -466,6 +507,16 @@ public class MainWindowViewModel : ViewModelBase
                                      : string.Empty)
                                  .FontSize(cellFontSize);
                         }
+
+                        if (impurezasPeso > 0)
+                        {
+                            table.Cell().Element(BCell)
+                                 .Text("Impurezas").FontSize(cellFontSize);
+                            table.Cell().Element(BCell).AlignCenter()
+                                 .Text(impurezasPeso.ToString("N3")).FontSize(cellFontSize);
+                            table.Cell().Element(BCell).Text(string.Empty);
+                            table.Cell().Element(BCell).Text(string.Empty);
+                        }
                     });
                 });
             });
@@ -525,10 +576,24 @@ public class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public void SelecionarItem(object? item)
+    {
+        foreach (var w in ItensEditaveis)
+            w.IsSelected = ReferenceEquals(w, item);
+        foreach (var c in ItensPersonalizados)
+            c.IsSelected = ReferenceEquals(c, item);
+    }
 
 }
 public class PesoWrapper : ViewModelBase
 {
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set { if (value != _isSelected) { _isSelected = value; OnPropertyChanged(); } }
+    }
+
     private readonly MaterialItem _item;
     private string _pesoTexto;
     private bool _editando;
@@ -667,6 +732,14 @@ public class CustomItemWrapper : ViewModelBase
 {
     private static readonly CultureInfo PtBR = CultureInfo.GetCultureInfo("pt-BR");
 
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set { if (value != _isSelected) { _isSelected = value; OnPropertyChanged(); } }
+    }
+
+
     public event EventHandler? TotalChanged;
 
     private string _nome = string.Empty;
@@ -771,5 +844,17 @@ public sealed class DelegateCommand : ICommand
 
     public event EventHandler? CanExecuteChanged;
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
+
+public sealed class DelegateCommand<T> : ICommand
+{
+    private readonly Action<T?> _execute;
+
+    public DelegateCommand(Action<T?> execute) => _execute = execute;
+
+    public bool CanExecute(object? parameter) => true;
+    public void Execute(object? parameter) => _execute(parameter is T t ? t : default);
+
+    public event EventHandler? CanExecuteChanged;
 }
 

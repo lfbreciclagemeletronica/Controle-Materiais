@@ -141,4 +141,49 @@ public partial class MainWindow : Window
             wrapper.ConfirmarEdicaoPreco();
         }
     }
+
+    private void ImpurezasPesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && DataContext is MainWindowViewModel vm)
+        {
+            vm.IniciarEdicaoImpurezas();
+            tb.SelectAll();
+        }
+    }
+
+    private void ImpurezasPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DataContext is MainWindowViewModel vm)
+        {
+            vm.ConfirmarEdicaoImpurezas();
+            e.Handled = true;
+        }
+    }
+
+    private void ImpurezasPesoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.ConfirmarEdicaoImpurezas();
+        }
+    }
+
+    private void ItemRow_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (sender is Avalonia.Controls.Border border
+            && DataContext is MainWindowViewModel vm)
+        {
+            vm.SelecionarItem(border.DataContext);
+        }
+    }
+
+    private void TabelaItemRow_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (sender is Avalonia.Controls.Border border
+            && border.DataContext is ItemPrecoWrapper item
+            && DataContext is MainWindowViewModel vm)
+        {
+            vm.TabelaVM.SelecionarItemCommand.Execute(item);
+        }
+    }
 }

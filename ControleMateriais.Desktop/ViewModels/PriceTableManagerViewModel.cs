@@ -134,6 +134,7 @@ namespace ControleMateriais.Desktop.ViewModels
         public ICommand DeletarTabelaCommand { get; }
         public ICommand ExportarTabelaPdfCommand { get; }
         public ICommand ImportarDePdfCommand { get; }
+        public ICommand SelecionarItemCommand { get; }
 
         public PriceTableManagerViewModel(ObservableCollection<MaterialItem> itensMain)
         {
@@ -156,6 +157,11 @@ namespace ControleMateriais.Desktop.ViewModels
                                                       () => TemTabelaSelecionada);
             DeletarTabelaCommand = new DelegateCommand(async () => await DeletarTabelaSelecionadaAsync(),
                                                        () => TemTabelaSelecionada);
+            SelecionarItemCommand = new DelegateCommand<object>(item =>
+            {
+                foreach (var w in ItensEdicao)
+                    w.IsSelected = ReferenceEquals(w, item);
+            });
         }
 
         // ── Inicialização: carrega lista de tabelas ───────────────────────────
@@ -757,6 +763,13 @@ namespace ControleMateriais.Desktop.ViewModels
         private string _precoTexto;
         private bool _editando;
         private decimal _precoDecimal;
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (value != _isSelected) { _isSelected = value; OnPropertyChanged(); } }
+        }
 
         public string Nome { get; }
 

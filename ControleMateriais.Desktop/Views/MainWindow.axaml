@@ -14,6 +14,9 @@
 
     <Window.Resources>
         <conv:BooleanNegationConverter x:Key="BoolNot"/>
+        <conv:BoolToBrushConverter x:Key="SelectedRowBrush"
+                                   TrueBrush="#2A4FC3F7"
+                                   FalseBrush="Transparent"/>
     </Window.Resources>
 
   <Grid Background="{DynamicResource Brush.Surface}">
@@ -148,10 +151,14 @@
                           <DataTemplate x:DataType="vm:PesoWrapper">
                             <Border BorderBrush="{DynamicResource Brush.Border}"
                                     BorderThickness="0,0,0,1"
-                                    Padding="0,1">
+                                    Padding="0,1"
+                                    PointerPressed="ItemRow_PointerPressed">
+                              <Border.Background>
+                                <Binding Path="IsSelected" Converter="{StaticResource SelectedRowBrush}"/>
+                              </Border.Background>
                               <Border.Styles>
                                 <Style Selector="Border:focus-within">
-                                  <Setter Property="Background" Value="#1A4FC3F7"/>
+                                  <Setter Property="Background" Value="#2A4FC3F7"/>
                                 </Style>
                               </Border.Styles>
                               <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
@@ -195,15 +202,46 @@
                                    Margin="0,0,0,4"/>
                       </Border>
 
+                      <!-- Linha Impurezas -->
+                      <Border BorderBrush="{DynamicResource Brush.Border}"
+                              BorderThickness="0,1,0,0"
+                              Margin="0,4,0,0" Padding="4,4,4,0">
+                        <Grid ColumnDefinitions="*,120,130,100" Margin="0,2">
+                          <TextBlock Grid.Column="0" Text="Impurezas"
+                                     FontWeight="SemiBold"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
+                          <TextBox Grid.Column="1"
+                                   Text="{Binding ImpurezasPesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                   HorizontalAlignment="Left"
+                                   Width="110"
+                                   HorizontalContentAlignment="Center"
+                                   GotFocus="ImpurezasPesoTextBox_GotFocus"
+                                   KeyDown="ImpurezasPesoTextBox_KeyDown"
+                                   LostFocus="ImpurezasPesoTextBox_LostFocus"/>
+                          <TextBox Grid.Column="2"
+                                   HorizontalAlignment="Left"
+                                   Width="120"
+                                   IsEnabled="False"
+                                   Text="—"/>
+                          <TextBlock Grid.Column="3"
+                                     Text="—"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource Brush.TextSecondary}"/>
+                        </Grid>
+                      </Border>
+
                       <ItemsControl ItemsSource="{Binding ItensPersonalizados}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:CustomItemWrapper">
                             <Border BorderBrush="{DynamicResource Brush.Border}"
                                     BorderThickness="0,0,0,1"
-                                    Padding="0,1">
+                                    Padding="0,1"
+                                    Background="{Binding IsSelected, Converter={StaticResource SelectedRowBrush}}"
+                                    PointerPressed="ItemRow_PointerPressed">
                               <Border.Styles>
                                 <Style Selector="Border:focus-within">
-                                  <Setter Property="Background" Value="#1A4FC3F7"/>
+                                  <Setter Property="Background" Value="#2A4FC3F7"/>
                                 </Style>
                               </Border.Styles>
                               <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
@@ -339,10 +377,12 @@
                           <DataTemplate x:DataType="vm:ItemPrecoWrapper">
                             <Border BorderBrush="{DynamicResource Brush.Border}"
                                     BorderThickness="0,0,0,1"
-                                    Padding="0,1">
+                                    Padding="0,1"
+                                    Background="{Binding IsSelected, Converter={StaticResource SelectedRowBrush}}"
+                                    PointerPressed="TabelaItemRow_PointerPressed">
                               <Border.Styles>
                                 <Style Selector="Border:focus-within">
-                                  <Setter Property="Background" Value="#1A4FC3F7"/>
+                                  <Setter Property="Background" Value="#2A4FC3F7"/>
                                 </Style>
                               </Border.Styles>
                               <Grid ColumnDefinitions="*,150" Margin="4,2">

@@ -52,11 +52,20 @@ public class MainWindowViewModel : ViewModelBase
     }
 
     private bool _impurezasEditando;
+    private string _impurezasPesoTextoAnterior = string.Empty;
 
     public void IniciarEdicaoImpurezas()
     {
+        _impurezasPesoTextoAnterior = _impurezasPesoTexto;
         _impurezasEditando = true;
         ImpurezasPesoTexto = string.Empty;
+    }
+
+    public void CancelarEdicaoImpurezas()
+    {
+        if (!_impurezasEditando) return;
+        _impurezasEditando = false;
+        ImpurezasPesoTexto = _impurezasPesoTextoAnterior;
     }
 
     public void ConfirmarEdicaoImpurezas()
@@ -597,8 +606,10 @@ public class PesoWrapper : ViewModelBase
     private readonly MaterialItem _item;
     private string _pesoTexto;
     private bool _editando;
+    private string _pesoTextoAnterior = string.Empty;
     private string _precoTexto;
     private bool _editandoPreco;
+    private string _precoTextoAnterior = string.Empty;
 
     public string Nome => _item.Nome;
 
@@ -662,8 +673,16 @@ public class PesoWrapper : ViewModelBase
 
     public void IniciarEdicao()
     {
+        _pesoTextoAnterior = _pesoTexto;
         _editando = true;
         PesoTexto = string.Empty;
+    }
+
+    public void CancelarEdicao()
+    {
+        if (!_editando) return;
+        _editando = false;
+        PesoTexto = _pesoTextoAnterior;
     }
 
     public void ConfirmarEdicao()
@@ -691,8 +710,16 @@ public class PesoWrapper : ViewModelBase
 
     public void IniciarEdicaoPreco()
     {
+        _precoTextoAnterior = _precoTexto;
         _editandoPreco = true;
         PrecoTexto = string.Empty;
+    }
+
+    public void CancelarEdicaoPreco()
+    {
+        if (!_editandoPreco) return;
+        _editandoPreco = false;
+        PrecoTexto = _precoTextoAnterior;
     }
 
     public void ConfirmarEdicaoPreco()
@@ -785,7 +812,9 @@ public class CustomItemWrapper : ViewModelBase
     }
 
     private bool _editandoPeso;
+    private string _pesoTextoAnterior = string.Empty;
     private bool _editandoPreco;
+    private string _precoTextoAnterior = string.Empty;
 
     private void RecalcularTotal() => Total = PesoAtual * PrecoPorKg;
 
@@ -801,8 +830,16 @@ public class CustomItemWrapper : ViewModelBase
 
     public void IniciarEdicaoPeso()
     {
+        _pesoTextoAnterior = _pesoTexto;
         _editandoPeso = true;
         PesoTexto = string.Empty;
+    }
+
+    public void CancelarEdicaoPeso()
+    {
+        if (!_editandoPeso) return;
+        _editandoPeso = false;
+        PesoTexto = _pesoTextoAnterior;
     }
 
     public void ConfirmarEdicaoPeso()
@@ -815,8 +852,16 @@ public class CustomItemWrapper : ViewModelBase
 
     public void IniciarEdicaoPreco()
     {
+        _precoTextoAnterior = _precoTexto;
         _editandoPreco = true;
         PrecoTexto = string.Empty;
+    }
+
+    public void CancelarEdicaoPreco()
+    {
+        if (!_editandoPreco) return;
+        _editandoPreco = false;
+        PrecoTexto = _precoTextoAnterior;
     }
 
     public void ConfirmarEdicaoPreco()

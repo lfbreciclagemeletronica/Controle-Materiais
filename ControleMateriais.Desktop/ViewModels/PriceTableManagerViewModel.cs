@@ -762,6 +762,7 @@ namespace ControleMateriais.Desktop.ViewModels
     {
         private string _precoTexto;
         private bool _editando;
+        private string _precoTextoAnterior = string.Empty;
         private decimal _precoDecimal;
 
         private bool _isSelected;
@@ -798,8 +799,16 @@ namespace ControleMateriais.Desktop.ViewModels
 
         public void IniciarEdicao()
         {
+            _precoTextoAnterior = _precoTexto;
             _editando = true;
             PrecoTexto = string.Empty;
+        }
+
+        public void CancelarEdicao()
+        {
+            if (!_editando) return;
+            _editando = false;
+            PrecoTexto = _precoTextoAnterior;
         }
 
         public void ConfirmarEdicao()

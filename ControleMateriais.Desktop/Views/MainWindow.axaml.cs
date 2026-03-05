@@ -23,10 +23,10 @@ public partial class MainWindow : Window
 
     private void PrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
         {
-            wrapper.ConfirmarEdicaoPreco();
-            e.Handled = true;
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicaoPreco(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicaoPreco(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
         }
     }
 
@@ -49,10 +49,10 @@ public partial class MainWindow : Window
 
     private void TabelaPrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
         {
-            wrapper.ConfirmarEdicao();
-            e.Handled = true;
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicao(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicao(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
         }
     }
 
@@ -75,10 +75,10 @@ public partial class MainWindow : Window
 
     private void PesoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
         {
-            wrapper.ConfirmarEdicao();
-            e.Handled = true;
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicao(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicao(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
         }
     }
 
@@ -101,10 +101,10 @@ public partial class MainWindow : Window
 
     private void CustomPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
         {
-            wrapper.ConfirmarEdicaoPeso();
-            e.Handled = true;
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicaoPeso(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicaoPeso(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
         }
     }
 
@@ -127,10 +127,10 @@ public partial class MainWindow : Window
 
     private void CustomPrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
         {
-            wrapper.ConfirmarEdicaoPreco();
-            e.Handled = true;
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicaoPreco(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicaoPreco(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
         }
     }
 
@@ -153,10 +153,10 @@ public partial class MainWindow : Window
 
     private void ImpurezasPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && DataContext is MainWindowViewModel vm)
+        if (DataContext is MainWindowViewModel vm)
         {
-            vm.ConfirmarEdicaoImpurezas();
-            e.Handled = true;
+            if (e.Key == Key.Enter) { vm.ConfirmarEdicaoImpurezas(); e.Handled = true; }
+            else if (e.Key == Key.Escape && sender is TextBox tb) { vm.CancelarEdicaoImpurezas(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
         }
     }
 

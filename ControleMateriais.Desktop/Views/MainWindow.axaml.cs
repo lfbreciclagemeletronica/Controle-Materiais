@@ -14,8 +14,10 @@ public partial class MainWindow : Window
 
     private void PrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
         {
+            vm.SelecionarItem(wrapper);
             wrapper.IniciarEdicaoPreco();
             tb.SelectAll();
         }
@@ -40,8 +42,10 @@ public partial class MainWindow : Window
 
     private void TabelaPrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is ItemPrecoWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
         {
+            vm.TabelaVM.SelecionarItemCommand.Execute(wrapper);
             wrapper.IniciarEdicao();
             tb.SelectAll();
         }
@@ -66,8 +70,10 @@ public partial class MainWindow : Window
 
     private void PesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
         {
+            vm.SelecionarItem(wrapper);
             wrapper.IniciarEdicao();
             tb.SelectAll();
         }
@@ -92,8 +98,10 @@ public partial class MainWindow : Window
 
     private void CustomPesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
         {
+            vm.SelecionarItem(wrapper);
             wrapper.IniciarEdicaoPeso();
             tb.SelectAll();
         }
@@ -118,8 +126,10 @@ public partial class MainWindow : Window
 
     private void CustomPrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
         {
+            vm.SelecionarItem(wrapper);
             wrapper.IniciarEdicaoPreco();
             tb.SelectAll();
         }

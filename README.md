@@ -3,7 +3,7 @@
 <!-- Logo -->
 <img src="images/Banner.png" alt="LFB Reciclagem Eletrônica" width="350" height="400"/>
 
-# Controle de Materiais — LFB Reciclagem Eletrônica
+# LFB Sistema de Recibos — LFB Reciclagem Eletrônica
 
 **Sistema desktop para controle de pesagem e triagem de materiais recicláveis.**  
 Gera recibos em PDF, gerencia tabelas de preços e importa listas de preços automaticamente.
@@ -21,13 +21,15 @@ Gera recibos em PDF, gerencia tabelas de preços e importa listas de preços aut
 
 - [Sobre o Projeto](#sobre-o-projeto)
 - [Funcionalidades](#funcionalidades)
-- [Screenshots](#screenshots)
+- [Passo a passo (com imagens)](#passo-a-passo-com-imagens)
 - [Como Usar](#como-usar)
   - [Registrar Pesagem](#1-registrar-pesagem)
-  - [Gerenciar Tabelas de Preços](#2-gerenciar-tabelas-de-preços)
-  - [Exportar Recibo PDF](#3-exportar-recibo-em-pdf)
+  - [Itens Personalizados e Impurezas](#2-itens-personalizados-e-impurezas)
+  - [Gerenciar Tabelas de Preços](#3-gerenciar-tabelas-de-preços)
+  - [Exportar Recibo PDF](#4-exportar-recibo-em-pdf)
 - [Publicar / Build](#publicar--build)
 - [Tecnologias](#tecnologias)
+- [Tutorial completo com imagens](TUTORIAL.md)
 
 ---
 
@@ -42,13 +44,18 @@ O sistema exibe uma lista de **52 categorias de materiais** (placas, metais, cab
 ## Funcionalidades
 
 - **Registro de pesagem** — lista completa de 52 materiais com campos de peso (kg) e preço por kg
-- **Calculo automatico** — total por item e valor geral calculados em tempo real
-- **Tabelas de precos** — crie, edite, ative e delete multiplas tabelas de precos (formato JSON)
-- **Importacao de PDF** — importa lista de precos diretamente de um PDF da LFB via iText7
-- **Exportacao de PDF da tabela** — gera PDF formatado da lista de precos ativa
+- **Itens personalizados** — 4 linhas livres com nome editável para materiais fora do catálogo
+- **Campo Impurezas** — registra peso de impurezas (sem valor monetário) incluso no recibo
+- **Seleção de linha** — clique em qualquer parte de uma linha para selecioná-la (destaque azul)
+- **Cancelar edição com Esc** — restaura o valor anterior e remove o foco do campo
+- **Cálculo automático** — total por item e valor geral calculados em tempo real
+- **Tabelas de preços** — crie, edite, ative e delete múltiplas tabelas de preços (formato JSON)
+- **Importação de PDF** — importa lista de preços diretamente de um PDF da LFB via iText7
+- **Exportação de PDF da tabela** — gera PDF formatado e centralizado da lista de preços ativa
 - **Recibo em PDF** — gera recibo oficial com logo, dados da empresa, fornecedor e tabela de itens
-- **Persistencia automatica** — precos do mes atual sao carregados automaticamente na inicializacao
-- **Interface dark moderna** — UI Avalonia com tema escuro, notificacoes toast e scroll fluido
+- **Filtro inteligente** — itens com peso zero são omitidos automaticamente do recibo
+- **Persistência automática** — preços do mês atual são carregados automaticamente na inicialização
+- **Interface dark moderna** — UI Avalonia com tema escuro, notificações toast e scroll fluido
 - **Multiplataforma** — roda em Windows e Linux sem necessidade de .NET instalado
 
 ---
@@ -75,7 +82,7 @@ Fluxo completo — abrir, ativar tabela, lançar pesos, exportar recibo e lista 
 <img src="images/2Primeira-Pagina.png" width="650"/>
 </div>
 
-> Tela principal com a lista completa de 52 materiais. Informe o **nome do fornecedor** no campo superior e preencha os campos de **Peso (kg)** de cada material recebido.
+> Tela principal com a lista completa de 52 materiais. Informe o **nome do fornecedor** no campo superior e preencha os campos de **Peso (kg)** de cada material recebido. Abaixo da lista principal há 4 **itens personalizados** e o campo **Impurezas** para materiais adicionais.
 
 ---
 
@@ -115,7 +122,7 @@ Fluxo completo — abrir, ativar tabela, lançar pesos, exportar recibo e lista 
 <img src="images/6Adicionando-Pesos-calculo.png" width="650"/>
 </div>
 
-> Digite o peso (kg) em cada linha de material. O sistema calcula automaticamente o **valor por item** (kg × preço/kg) e o **valor total geral** em tempo real.
+> Digite o peso (kg) em cada linha de material. O sistema calcula automaticamente o **valor por item** (kg × preço/kg) e o **valor total geral** em tempo real. Clique em qualquer parte da linha para **selecioná-la** (destaque azul). Pressione **Esc** para cancelar a edição e restaurar o valor anterior.
 
 ---
 
@@ -183,21 +190,24 @@ Fluxo completo — abrir, ativar tabela, lançar pesos, exportar recibo e lista 
 
 ### 1. Registrar Pesagem
 
-<div align="center">
-
-<!-- <img src="docs/screenshots/pesagem.png" alt="Registro de Pesagem" width="750"/> -->
-
-</div>
-
 1. Informe o **nome do fornecedor** no campo "Nome" no topo da tela
 2. Clique em qualquer campo de **Peso atual (kg)** na linha do material desejado
-3. Digite o peso recebido e pressione **Enter** ou clique fora do campo
-4. O **Total** de cada item e o **Valor Total** geral são atualizados automaticamente
-5. Itens com peso zero são omitidos do recibo PDF
+3. Digite o peso recebido e pressione **Enter** ou clique fora do campo para confirmar
+4. Pressione **Esc** para cancelar e restaurar o valor anterior sem salvar
+5. O **Total** de cada item e o **Valor Total** geral são atualizados automaticamente
+6. Clique em qualquer parte de uma linha para **selecioná-la** com destaque visual
+7. Itens com peso zero são omitidos do recibo PDF
 
 ---
 
-### 2. Gerenciar Tabelas de Preços
+### 2. Itens Personalizados e Impurezas
+
+- **Itens personalizados** — abaixo da lista principal há 4 linhas livres. Preencha o nome do material, o peso e o preço por kg. Itens com nome e peso preenchidos aparecem no recibo PDF.
+- **Impurezas** — campo de peso exclusivo logo abaixo dos itens personalizados. O peso é somado ao Peso Total e incluído no final do recibo, mas não entra no cálculo do valor monetário.
+
+---
+
+### 3. Gerenciar Tabelas de Preços
 
 <div align="center">
 
@@ -223,6 +233,9 @@ Clique no botão **"Tabela de Preços"** no canto superior esquerdo da tela prin
 3. Selecione o arquivo PDF com a lista de preços LFB
 4. O sistema extrai automaticamente os preços e preenche os campos
 
+#### Fechar a tela de tabelas
+- Clique em **"Fechar"** no canto superior direito — disponível sempre, mesmo sem tabela selecionada.
+
 > **Dica:** Os arquivos ficam salvos em:
 > - Tabelas de preços (JSON): `~/Downloads/ControleMateriaisLFB/TabelaPrecos/`
 > - Recibos exportados (PDF): `~/Downloads/ControleMateriaisLFB/Recibos/`
@@ -230,7 +243,7 @@ Clique no botão **"Tabela de Preços"** no canto superior esquerdo da tela prin
 
 ---
 
-### 3. Exportar Recibo em PDF
+### 4. Exportar Recibo em PDF
 
 <div align="center">
 

@@ -624,8 +624,8 @@ namespace ControleMateriais.Desktop.ViewModels
             var logoBytes = CarregarLogoBytes();
 
             static IContainer ItemCell(IContainer c) =>
-                c.BorderBottom(0.15f).BorderColor(Colors.Grey.Lighten2)
-                 .PaddingVertical(0.7f).PaddingHorizontal(2.5f);
+                c.Border(0.15f).BorderColor(Colors.Grey.Darken1)
+                 .PaddingVertical(1.2f).PaddingHorizontal(3f);
 
             Document.Create(container =>
             {
@@ -671,13 +671,13 @@ namespace ControleMateriais.Desktop.ViewModels
 
                         col.Item().Height(2);
 
-                        // Tabela (sem títulos de seção) compactada
-                        col.Item().Table(table =>
+                        // Tabela centralizada com larguras fixas
+                        col.Item().AlignCenter().Table(table =>
                         {
                             table.ColumnsDefinition(c =>
                             {
-                                c.RelativeColumn();
-                                c.ConstantColumn(52);
+                                c.ConstantColumn(180);
+                                c.ConstantColumn(78);
                             });
 
                             // Cabeçalho

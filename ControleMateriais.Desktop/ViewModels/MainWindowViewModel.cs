@@ -900,6 +900,6 @@ public sealed class DelegateCommand<T> : ICommand
     public bool CanExecute(object? parameter) => true;
     public void Execute(object? parameter) => _execute(parameter is T t ? t : default);
 
-    public event EventHandler? CanExecuteChanged;
+    public event EventHandler? CanExecuteChanged { add { } remove { } }
 }
 

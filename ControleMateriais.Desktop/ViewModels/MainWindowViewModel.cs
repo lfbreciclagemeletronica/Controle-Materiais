@@ -365,7 +365,7 @@ public class MainWindowViewModel : ViewModelBase
         var ptBR = CultureInfo.GetCultureInfo("pt-BR");
 
         var borderColor = Colors.Grey.Darken2;
-        var cellFontSize = 7f;
+        var cellFontSize = 10f;
         byte[]? logoBytes = null;
         try
         {
@@ -376,25 +376,25 @@ public class MainWindowViewModel : ViewModelBase
             logoBytes = logoMs.ToArray();
         }
         catch { }
-        var headerFontSize = 7f;
+        var headerFontSize = 10f;
 
         static IContainer InfoLabelCell(IContainer c) =>
             c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
              .Background(Colors.Grey.Lighten3)
-             .PaddingVertical(3).PaddingHorizontal(5);
+             .PaddingVertical(5).PaddingHorizontal(4);
 
         static IContainer InfoCell(IContainer c) =>
             c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
-             .PaddingVertical(3).PaddingHorizontal(5);
+             .PaddingVertical(5).PaddingHorizontal(4);
 
         Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.MarginTop(1.2f, Unit.Centimetre);
-                page.MarginBottom(1.2f, Unit.Centimetre);
-                page.MarginHorizontal(1.5f, Unit.Centimetre);
+                page.MarginTop(0.8f, Unit.Centimetre);
+                page.MarginBottom(0.8f, Unit.Centimetre);
+                page.MarginHorizontal(0.8f, Unit.Centimetre);
                 page.PageColor(Colors.White);
                 page.DefaultTextStyle(x => x.FontSize(cellFontSize).FontFamily("Arial"));
 
@@ -402,83 +402,83 @@ public class MainWindowViewModel : ViewModelBase
                 {
                     col.Spacing(0);
 
-                    // ── TÍTULO: texto empresa (esq) + logo (dir) ──────────────────────
-                    col.Item().Border(0.5f).BorderColor(borderColor).Table(title =>
-                    {
-                        title.ColumnsDefinition(c =>
-                        {
-                            c.RelativeColumn(5);   // texto
-                            c.RelativeColumn(0.9f); // logo (reduzido)
-                        });
+                    // ── CABEÇALHO COMPACTO: logo + empresa centralizados ───────────────
+                    col.Item().Border(0.5f).BorderColor(borderColor)
+                       .PaddingVertical(6).PaddingHorizontal(8).Column(hdr =>
+                       {
+                           hdr.Item().Row(row =>
+                           {
+                               // Logo à esquerda
+                               row.ConstantItem(42).AlignMiddle().AlignCenter()
+                                  .Background("#4CAF50").Padding(2)
+                                  .Column(logo =>
+                                  {
+                                      if (logoBytes != null)
+                                          logo.Item().AlignCenter().Width(38).Image(logoBytes);
+                                      else
+                                          logo.Item().AlignCenter().Text("LFB").Bold()
+                                              .FontColor(Colors.White).FontSize(12);
+                                  });
 
-                        // Esquerda: nome empresa + dados + título pesagem
-                        title.Cell().Border(0.5f).BorderColor(borderColor)
-                             .PaddingVertical(6).PaddingHorizontal(8).Column(left =>
-                             {
-                                 left.Item().AlignCenter()
-                                     .Text("LFB RECICLAGEM ELETRONICA")
-                                     .Bold().FontSize(11);
-                                 left.Item().PaddingTop(2).AlignCenter()
-                                     .Text("CNPJ: 243.250.67/0001-64  |  I.E: 096/4003708")
-                                     .FontSize(7);
-                                 left.Item().AlignCenter()
-                                     .Text("End: Rua Sergio Jungblut Dieterich, 1011, Letra B Galpao5")
-                                     .FontSize(7);
-                                 left.Item().PaddingTop(4).AlignCenter()
-                                     .Text("RESULTADO DA PESAGEM E TRIAGEM LFB")
-                                     .Bold().FontSize(8);
-                             });
+                               // Dados da empresa centralizados
+                               row.RelativeItem().PaddingLeft(8).AlignMiddle().Column(left =>
+                               {
+                                   left.Item().AlignCenter()
+                                       .Text("LFB RECICLAGEM ELETRONICA")
+                                       .Bold().FontSize(13);
+                                   left.Item().PaddingTop(2).AlignCenter()
+                                       .Text("CNPJ: 243.250.67/0001-64  |  I.E: 096/4003708  |  End: Rua Sergio Jungblut Dieterich, 1011-B")
+                                       .FontSize(7.5f);
+                                   left.Item().PaddingTop(4).AlignCenter()
+                                       .Text("RESULTADO DA PESAGEM E TRIAGEM LFB")
+                                       .Bold().FontSize(9.5f);
+                               });
+                           });
+                       });
 
-                        // Direita: logo
-                        title.Cell().Border(0.5f).BorderColor(borderColor)
-                             .Background("#4CAF50").AlignCenter().AlignMiddle().Padding(3)
-                             .Column(logo =>
-                             {
-                                 if (logoBytes != null)
-                                     logo.Item().AlignCenter().Width(45).Image(logoBytes);
-                                 else
-                                     logo.Item().AlignCenter().Text("LFB").Bold()
-                                         .FontColor(Colors.White).FontSize(14);
-                             });
-                    });
-
-                    // ── GRADE INFO: FORNECEDOR / PESO / VALOR / DATA ───────────────────
+                    // ── GRADE INFO HORIZONTAL: FORNECEDOR | PESO | VALOR | DATA ────────
                     col.Item().Table(info =>
                     {
                         info.ColumnsDefinition(c =>
                         {
-                            c.RelativeColumn(1);  // label
-                            c.RelativeColumn(3);  // value
+                            c.RelativeColumn(1.4f); // FORNECEDOR label
+                            c.RelativeColumn(2.2f); // FORNECEDOR value
+                            c.RelativeColumn(0.8f); // PESO label
+                            c.RelativeColumn(0.9f); // PESO value
+                            c.RelativeColumn(0.9f); // VALOR label
+                            c.RelativeColumn(1.1f); // VALOR value
+                            c.RelativeColumn(0.6f); // DATA label
+                            c.RelativeColumn(1.2f); // DATA value
                         });
 
-                        info.Cell().Element(InfoLabelCell).Text("FORNECEDOR").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell).Text(nomeClienteSnapshot).FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("FORNECEDOR").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter().Text(nomeClienteSnapshot).FontSize(9f);
 
-                        info.Cell().Element(InfoLabelCell).Text("PESO TOTAL").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell)
-                            .Text($"{pesoTotalSnapshot:N3} kg").FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("PESO").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter()
+                            .Text($"{pesoTotalSnapshot:N3} kg").Bold().FontSize(9f);
 
-                        info.Cell().Element(InfoLabelCell).Text("VALOR TOTAL").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell)
-                            .Text(totalGeralSnapshot.ToString("C", ptBR)).FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("VALOR").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter()
+                            .Text(totalGeralSnapshot.ToString("C", ptBR)).Bold().FontSize(9f);
 
-                        info.Cell().Element(InfoLabelCell).Text("DATA").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell)
-                            .Text($"{dataGeracao:dd/MM/yyyy}").FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("DATA").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter()
+                            .Text($"{dataGeracao:dd/MM/yyyy}").FontSize(9f);
                     });
 
                     // Espaço entre header e tabela
-                    col.Item().Height(5);
+                    col.Item().Height(6);
 
                     // ── TABELA DE ITENS ────────────────────────────────────────────────
                     col.Item().Table(table =>
                     {
                         table.ColumnsDefinition(c =>
                         {
-                            c.RelativeColumn(4);    // Material
-                            c.RelativeColumn(1.2f); // KG
-                            c.RelativeColumn(1.5f); // VALOR
-                            c.RelativeColumn(1.5f); // TOTAL
+                            c.RelativeColumn(3.5f); // Material
+                            c.RelativeColumn(1.3f); // KG
+                            c.RelativeColumn(1.6f); // VALOR
+                            c.RelativeColumn(1.6f); // TOTAL
                         });
 
                         table.Header(header =>
@@ -486,24 +486,25 @@ public class MainWindowViewModel : ViewModelBase
                             static IContainer HCell(IContainer c) =>
                                 c.Background(Colors.Grey.Lighten3)
                                  .Border(0.5f).BorderColor(Colors.Grey.Darken2)
-                                 .PaddingVertical(3).PaddingHorizontal(4);
+                                 .PaddingVertical(5).PaddingHorizontal(4);
 
-                            header.Cell().Element(HCell).Text(string.Empty);
+                            header.Cell().Element(HCell).AlignCenter()
+                                  .Text("MATERIAL").Bold().FontSize(headerFontSize);
                             header.Cell().Element(HCell).AlignCenter()
                                   .Text("KG").Bold().FontSize(headerFontSize);
                             header.Cell().Element(HCell).AlignCenter()
-                                  .Text("VALOR").Bold().FontSize(headerFontSize);
+                                  .Text("VALOR/KG").Bold().FontSize(headerFontSize);
                             header.Cell().Element(HCell).AlignCenter()
                                   .Text("TOTAL").Bold().FontSize(headerFontSize);
                         });
 
                         static IContainer BCell(IContainer c) =>
                             c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
-                             .PaddingVertical(2).PaddingHorizontal(4);
+                             .PaddingVertical(4).PaddingHorizontal(5);
 
                         foreach (var it in itensSnapshot)
                         {
-                            table.Cell().Element(BCell)
+                            table.Cell().Element(BCell).AlignCenter()
                                  .Text(it.Nome ?? string.Empty).FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
@@ -525,7 +526,7 @@ public class MainWindowViewModel : ViewModelBase
 
                         foreach (var c in customSnapshot)
                         {
-                            table.Cell().Element(BCell)
+                            table.Cell().Element(BCell).AlignCenter()
                                  .Text(c.Nome).FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
@@ -547,7 +548,7 @@ public class MainWindowViewModel : ViewModelBase
 
                         if (impurezasPeso > 0)
                         {
-                            table.Cell().Element(BCell)
+                            table.Cell().Element(BCell).AlignCenter()
                                  .Text("Impurezas").FontSize(cellFontSize);
                             table.Cell().Element(BCell).AlignCenter()
                                  .Text(impurezasPeso.ToString("N3")).FontSize(cellFontSize);

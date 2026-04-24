@@ -9,15 +9,18 @@
     <conv:BoolToBrushConverter x:Key="SelectedRowBrush"
                                TrueBrush="#2A4FC3F7"
                                FalseBrush="Transparent"/>
+    <conv:BoolToBrushConverter x:Key="StatusBrush"
+                               TrueBrush="#4CAF50"
+                               FalseBrush="#F44336"/>
   </UserControl.Resources>
 
   <Border Background="{DynamicResource Brush.SurfaceAlt}"
           BorderBrush="{DynamicResource Brush.Border}"
           BorderThickness="1" CornerRadius="10" Padding="16">
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
 
       <!-- Cabeçalho -->
-      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,12">
 
         <!-- Botão Voltar -->
         <Button Grid.Column="0"
@@ -25,7 +28,7 @@
                 HorizontalAlignment="Left"
                 Command="{Binding VoltarCommand}"/>
 
-        <!-- Totais centralizados -->
+        <!-- Totais centralizados + status -->
         <StackPanel Grid.Column="1"
                     HorizontalAlignment="Center"
                     Spacing="0">
@@ -36,17 +39,42 @@
           <TextBlock Classes="h1"
                      HorizontalAlignment="Center"
                      Text="{Binding PesoTotal, StringFormat={}{0:N3} kg}"/>
+          <TextBlock Text="{Binding Status}"
+                     IsVisible="{Binding StatusVisivel}"
+                     HorizontalAlignment="Center"
+                     FontSize="11"
+                     Margin="0,2,0,0"
+                     Foreground="{Binding StatusOk, Converter={StaticResource StatusBrush}}"/>
         </StackPanel>
 
-        <!-- Botão Limpar -->
+        <!-- Botão Salvar/Enviar -->
         <Button Grid.Column="2"
+                Content="⬆ Salvar"
+                HorizontalAlignment="Right"
+                Margin="0,0,8,0"
+                Command="{Binding SalvarEnviarCommand}"
+                ToolTip.Tip="Salvar localmente e enviar ao GitHub"/>
+
+        <!-- Botão Limpar -->
+        <Button Grid.Column="3"
                 Content="Limpar"
                 HorizontalAlignment="Right"
                 Command="{Binding LimparCommand}"/>
       </Grid>
 
+      <!-- Campo NomeCliente -->
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+        <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
+          <Run Text="Nome: "/><Run Text="*" Foreground="#FF4444" FontWeight="Bold"/>
+        </TextBlock>
+        <TextBox Grid.Column="1"
+                 Text="{Binding NomeCliente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 Watermark="Nome do cliente / responsável (obrigatório)"
+                 HorizontalAlignment="Stretch"/>
+      </Grid>
+
       <!-- Tabela de itens -->
-      <Border Grid.Row="1"
+      <Border Grid.Row="2"
               Background="{DynamicResource Brush.SurfaceAlt}"
               BorderBrush="{DynamicResource Brush.Border}"
               BorderThickness="1" CornerRadius="8" Padding="8">

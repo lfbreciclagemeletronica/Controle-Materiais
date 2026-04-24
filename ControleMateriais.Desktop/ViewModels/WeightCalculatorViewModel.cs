@@ -1,7 +1,12 @@
+using ControleMateriais.Desktop.Services;
 using ControleMateriais.Models;
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace ControleMateriais.Desktop.ViewModels;
@@ -21,16 +26,129 @@ public class WeightCalculatorViewModel : ViewModelBase
 
     public ICommand VoltarCommand { get; }
     public ICommand LimparCommand { get; }
+    public ICommand SalvarEnviarCommand { get; }
 
-    public WeightCalculatorViewModel(Action voltarCallback)
+    public string RootDir { get; }
+
+    private string _nomeCliente = string.Empty;
+    public string NomeCliente
     {
+        get => _nomeCliente;
+        set { if (value != _nomeCliente) { _nomeCliente = value; OnPropertyChanged(); } }
+    }
+
+    private string _status = string.Empty;
+    public string Status
+    {
+        get => _status;
+        private set { if (value != _status) { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusVisivel)); } }
+    }
+    public bool StatusVisivel => !string.IsNullOrEmpty(_status);
+
+    private bool _statusOk;
+    public bool StatusOk
+    {
+        get => _statusOk;
+        private set { if (value != _statusOk) { _statusOk = value; OnPropertyChanged(); } }
+    }
+
+    public Func<Task>? SolicitarConfiguracaoGitHubCallback { get; set; }
+    public Func<string, Task>? MostrarSucessoCallback { get; set; }
+
+    public WeightCalculatorViewModel(Action voltarCallback, string rootDir)
+    {
+        RootDir = rootDir;
+
         foreach (var nome in ItemCatalog.OrderedItems)
             Itens.Add(new WeightItemWrapper(nome, RecalcularTotal));
 
         VoltarCommand = new DelegateCommand(voltarCallback);
         LimparCommand = new DelegateCommand(Limpar);
+        SalvarEnviarCommand = new DelegateCommand(() => _ = SalvarEnviarAsync());
 
         RecalcularTotal();
+    }
+
+    private async Task SalvarEnviarAsync()
+    {
+        var itens = Itens.Where(w => w.PesoAtual > 0).ToList();
+        if (!itens.Any())
+        {
+            MostrarStatus("Nenhum peso para salvar.", ok: false);
+            return;
+        }
+
+        var agora = DateTime.Now;
+        var cliente = string.IsNullOrWhiteSpace(NomeCliente) ? "SemNome" : NomeCliente;
+        var nomeSeguro = string.Concat(cliente.Split(Path.GetInvalidFileNameChars()));
+        var nomeArquivo = $"{nomeSeguro}_{agora:dd-MM-yyyy}.json";
+        var mensagemCommit = $"{cliente} - {agora:dd/MM/yyyy}";
+
+        var payload = new
+        {
+            Cliente = cliente,
+            Horario = agora.ToString("yyyy-MM-ddTHH:mm:ss"),
+            Itens = itens.Select(w => new { w.Nome, Peso = w.PesoAtual }),
+            StatusPesagem = "pendente"
+        };
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+
+        // 1. Verificar credenciais GitHub
+        if (!GitHubService.CredenciaisExistem(RootDir))
+        {
+            Status = "Abrindo configuração do GitHub...";
+            StatusOk = true;
+            if (SolicitarConfiguracaoGitHubCallback is not null)
+                await SolicitarConfiguracaoGitHubCallback();
+
+            if (!GitHubService.CredenciaisExistem(RootDir))
+            {
+                MostrarStatus("Salvo localmente. Configuração GitHub cancelada.", ok: true);
+                return;
+            }
+        }
+
+        // 3. Verificar/instalar git
+        Status = "Verificando Git...";
+        StatusOk = true;
+        if (!await GitHubService.GitDisponivel())
+        {
+            try
+            {
+                await GitHubService.InstalarGitAsync(msg => { Status = msg; StatusOk = true; });
+            }
+            catch (Exception ex)
+            {
+                MostrarStatus($"Erro ao instalar Git: {ex.Message}", ok: false);
+                return;
+            }
+        }
+
+        // 4. Enviar ao GitHub via git
+        try
+        {
+            await GitHubService.EnviarArquivoAsync(
+                RootDir, json, nomeArquivo, mensagemCommit,
+                msg => { Status = msg; StatusOk = true; });
+            Status = string.Empty;
+            if (MostrarSucessoCallback is not null)
+                await MostrarSucessoCallback(nomeArquivo);
+        }
+        catch (Exception ex)
+        {
+            MostrarStatus($"Erro GitHub: {ex.Message}", ok: false);
+        }
+    }
+
+    private void MostrarStatus(string mensagem, bool ok)
+    {
+        Status = mensagem;
+        StatusOk = ok;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(7000);
+            Status = string.Empty;
+        });
     }
 
     public void SelecionarItem(object? item)

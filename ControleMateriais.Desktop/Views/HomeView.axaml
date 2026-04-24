@@ -39,12 +39,14 @@
                 VerticalContentAlignment="Center">
           <Button.Template>
             <ControlTemplate>
-              <Border Background="{DynamicResource Brush.Primary}"
+              <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="#4CAF50"
+                      BorderThickness="2"
                       CornerRadius="16"
                       Padding="24,20">
                 <Border.Styles>
                   <Style Selector="Border:pointerover">
-                    <Setter Property="Background" Value="{DynamicResource Brush.PrimaryHover}"/>
+                    <Setter Property="Background" Value="#1A4CAF50"/>
                   </Style>
                 </Border.Styles>
                 <StackPanel Spacing="10" HorizontalAlignment="Center">
@@ -53,12 +55,12 @@
                              HorizontalAlignment="Center"/>
                   <TextBlock Text="Sistema de Recibos"
                              FontSize="15" FontWeight="Bold"
-                             Foreground="White"
+                             Foreground="{DynamicResource Brush.TextPrimary}"
                              HorizontalAlignment="Center"
                              TextAlignment="Center"/>
-                  <TextBlock Text="Pesagem, tabela de preços e Recibos"
+                  <TextBlock Text="Tabela de preços e geração de recibos"
                              FontSize="11"
-                             Foreground="#CCffffff"
+                             Foreground="White"
                              HorizontalAlignment="Center"
                              TextAlignment="Center"/>
                 </StackPanel>
@@ -67,7 +69,7 @@
           </Button.Template>
         </Button>
 
-        <!-- Calculadora de Pesos -->
+        <!-- Sistema de Pesos -->
         <Button Command="{Binding IrParaCalculadoraPesosCommand}"
                 Width="260" Height="155"
                 Padding="0"
@@ -94,7 +96,7 @@
                              Foreground="{DynamicResource Brush.TextPrimary}"
                              HorizontalAlignment="Center"
                              TextAlignment="Center"/>
-                  <TextBlock Text="Cálculo de kg por material"
+                  <TextBlock Text="Somente para pesagem de materiais"
                              FontSize="11"
                              Foreground="White"
                              HorizontalAlignment="Center"

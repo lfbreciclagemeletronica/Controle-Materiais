@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+        x:Class="ControleMateriais.Desktop.Views.GitHubConfigDialog"
+        x:DataType="vm:GitHubConfigViewModel"
+        Title="Configuração de envio ao GitHub"
+        Width="480" Height="390"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="28" Background="{DynamicResource Brush.Surface}">
+    <StackPanel Spacing="16">
+
+      <!-- Título + botão ajuda -->
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0" Spacing="4">
+          <TextBlock Text="Configuração de envio ao GitHub"
+                     FontSize="15" FontWeight="Bold"
+                     Foreground="{DynamicResource Brush.TextPrimary}"/>
+          <TextBlock TextWrapping="Wrap" FontSize="11"
+                     Foreground="{DynamicResource Brush.TextSecondary}"
+                     Text="Informe o Personal Access Token e seus dados de identidade para commits no GitHub."/>
+        </StackPanel>
+        <Button Grid.Column="1"
+                Content="?"
+                Width="32" Height="32"
+                VerticalAlignment="Top"
+                FontWeight="Bold"
+                Click="Ajuda_Click"
+                ToolTip.Tip="Como obter essas informações"/>
+      </Grid>
+
+      <!-- Token -->
+      <StackPanel Spacing="4">
+        <TextBlock Text="Personal Access Token" FontSize="12" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+        <TextBox Text="{Binding Token, Mode=TwoWay}"
+                 PasswordChar="●"
+                 Watermark="ghp_xxxxxxxxxxxxxxxxxxxx"
+                 FontSize="12"/>
+      </StackPanel>
+
+      <!-- Usuário git -->
+      <StackPanel Spacing="4">
+        <TextBlock Text="Usuário (nome para commits)" FontSize="12" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+        <TextBox Text="{Binding GitUsuario, Mode=TwoWay}"
+                 Watermark="Ex: João Silva"
+                 FontSize="12"/>
+      </StackPanel>
+
+      <!-- Email git -->
+      <StackPanel Spacing="4">
+        <TextBlock Text="E-mail (associado ao GitHub)" FontSize="12" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+        <TextBox Text="{Binding GitEmail, Mode=TwoWay}"
+                 Watermark="Ex: joao@empresa.com"
+                 FontSize="12"/>
+      </StackPanel>
+
+      <!-- Botões -->
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,6,0,0">
+        <Button Content="Cancelar" Click="Cancelar_Click" Width="90"/>
+        <Button Content="Salvar"
+                Click="Salvar_Click"
+                IsEnabled="{Binding PodeSalvar}"
+                Classes="accent"
+                Width="90"/>
+      </StackPanel>
+
+    </StackPanel>
+  </Border>
+
+</Window>

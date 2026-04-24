@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.GitHubAjudaDialog"
+        Title="Como configurar o GitHub"
+        Width="520" Height="480"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="28" Background="{DynamicResource Brush.Surface}">
+    <StackPanel Spacing="14">
+
+      <TextBlock Text="Como configurar o envio ao GitHub"
+                 FontSize="15" FontWeight="Bold"
+                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+
+      <TextBlock TextWrapping="Wrap" FontSize="12"
+                 Foreground="{DynamicResource Brush.TextSecondary}"
+                 Text="Siga os passos abaixo para obter as informações necessárias:"/>
+
+      <!-- Passo 1 -->
+      <Border Background="{DynamicResource Brush.SurfaceAlt}"
+              CornerRadius="8" Padding="12,10">
+        <StackPanel Spacing="4">
+          <TextBlock Text="1. Personal Access Token (Token)" FontWeight="Bold" FontSize="12"
+                     Foreground="{DynamicResource Brush.TextPrimary}"/>
+          <TextBlock TextWrapping="Wrap" FontSize="11"
+                     Foreground="{DynamicResource Brush.TextSecondary}"
+                     Text="• Acesse github.com → Foto de perfil → Settings&#10;• No menu lateral: Developer settings → Personal access tokens → Tokens (classic)&#10;• Clique em Generate new token (classic)&#10;• Marque a permissão: repo (acesso completo)&#10;• Clique em Generate token e copie o valor gerado (começa com ghp_...)"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Passo 2 -->
+      <Border Background="{DynamicResource Brush.SurfaceAlt}"
+              CornerRadius="8" Padding="12,10">
+        <StackPanel Spacing="4">
+          <TextBlock Text="2. Owner (Proprietário do repositório)" FontWeight="Bold" FontSize="12"
+                     Foreground="{DynamicResource Brush.TextPrimary}"/>
+          <TextBlock TextWrapping="Wrap" FontSize="11"
+                     Foreground="{DynamicResource Brush.TextSecondary}"
+                     Text="• É o nome de usuário ou organização dona do repositório no GitHub&#10;• Exemplo: lfbreciclagemeletronica&#10;• Visível na URL: github.com/[owner]/[repo]"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Passo 3 -->
+      <Border Background="{DynamicResource Brush.SurfaceAlt}"
+              CornerRadius="8" Padding="12,10">
+        <StackPanel Spacing="4">
+          <TextBlock Text="3. Repositório (Repo)" FontWeight="Bold" FontSize="12"
+                     Foreground="{DynamicResource Brush.TextPrimary}"/>
+          <TextBlock TextWrapping="Wrap" FontSize="11"
+                     Foreground="{DynamicResource Brush.TextSecondary}"
+                     Text="• Nome do repositório onde os JSONs serão salvos&#10;• Exemplo: Pesagens&#10;• O repositório já deve existir no GitHub (pode ser privado)&#10;• Acesse github.com/new para criar se ainda não existir"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Fechar -->
+      <Button Content="Entendido"
+              HorizontalAlignment="Right"
+              Width="100"
+              Click="Fechar_Click"
+              Margin="0,6,0,0"/>
+
+    </StackPanel>
+  </Border>
+
+</Window>

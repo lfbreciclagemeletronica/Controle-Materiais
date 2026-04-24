@@ -100,7 +100,16 @@ public class MainWindowViewModel : ViewModelBase
     public string NomeCliente
     {
         get => _nomeCliente;
-        set { if (value != _nomeCliente) { _nomeCliente = value; OnPropertyChanged(); } }
+        set
+        {
+            if (value != _nomeCliente)
+            {
+                _nomeCliente = value;
+                OnPropertyChanged();
+                if (CalculadoraVM is not null)
+                    CalculadoraVM.NomeCliente = value;
+            }
+        }
     }
     public ICommand ExportarCommand { get; }
     public ICommand AbrirTabelaPrecosCommand { get; }
@@ -238,7 +247,7 @@ public class MainWindowViewModel : ViewModelBase
             IsGerindoTabela = true;
         });
 
-        CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home);
+        CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
 
         _ = CarregarPrecosNaInicializacaoAsync();
     }

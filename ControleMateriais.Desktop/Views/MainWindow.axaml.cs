@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using ControleMateriais.Desktop.Services;
 using ControleMateriais.Desktop.ViewModels;
+using System.Threading.Tasks;
 
 namespace ControleMateriais.Desktop.Views;
 
@@ -9,7 +11,35 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainWindowViewModel();
+        var vm = new MainWindowViewModel();
+        vm.AbrirDialogoGitHubCallback = AbrirDialogoGitHubAsync;
+        DataContext = vm;
+        Opened += async (_, _) => await VerificarInicializacaoAsync(vm);
+    }
+
+    private async Task VerificarInicializacaoAsync(MainWindowViewModel vm)
+    {
+        if (!GitHubService.CredenciaisExistem(MainWindowViewModel.RootDirPublic))
+        {
+            await AbrirDialogoGitHubAsync();
+            vm.GitConfigurado = GitHubService.CredenciaisExistem(MainWindowViewModel.RootDirPublic);
+        }
+    }
+
+    private async Task AbrirDialogoGitHubAsync()
+    {
+        var credExistentes = GitHubService.CarregarCredenciais(MainWindowViewModel.RootDirPublic);
+        var dialog = new GitHubConfigDialog(credExistentes);
+        await dialog.ShowDialog(this);
+        var config = (GitHubConfigViewModel)dialog.DataContext!;
+        if (config.Confirmado)
+        {
+            GitHubService.SalvarCredenciais(
+                MainWindowViewModel.RootDirPublic,
+                config.Token, config.GitUsuario, config.GitEmail);
+            if (DataContext is MainWindowViewModel vm)
+                vm.GitConfigurado = true;
+        }
     }
 
     private void PrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)

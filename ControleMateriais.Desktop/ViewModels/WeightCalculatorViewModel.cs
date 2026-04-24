@@ -130,6 +130,10 @@ public class WeightCalculatorViewModel : ViewModelBase
             await GitHubService.EnviarArquivoAsync(
                 RootDir, json, nomeArquivo, mensagemCommit,
                 msg => { Status = msg; StatusOk = true; });
+            foreach (var w in Itens)
+                w.Resetar();
+            NomeCliente = string.Empty;
+            RecalcularTotal();
             Status = string.Empty;
             if (MostrarSucessoCallback is not null)
                 await MostrarSucessoCallback(nomeArquivo);
@@ -169,6 +173,7 @@ public class WeightCalculatorViewModel : ViewModelBase
     {
         foreach (var w in Itens)
             w.Resetar();
+        NomeCliente = string.Empty;
         RecalcularTotal();
     }
 }

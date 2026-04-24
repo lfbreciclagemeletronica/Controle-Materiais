@@ -1,15 +1,22 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using ControleMateriais.Desktop.Services;
 using ControleMateriais.Desktop.ViewModels;
 
 namespace ControleMateriais.Desktop.Views;
 
 public partial class GitHubConfigDialog : Window
 {
-    public GitHubConfigDialog()
+    public GitHubConfigDialog(GitHubCredenciais? credenciaisExistentes = null)
     {
         InitializeComponent();
         var vm = new GitHubConfigViewModel();
+        if (credenciaisExistentes is not null)
+        {
+            vm.Token      = credenciaisExistentes.Token;
+            vm.GitUsuario = credenciaisExistentes.GitUsuario;
+            vm.GitEmail   = credenciaisExistentes.GitEmail;
+        }
         vm.FecharDialog = Close;
         vm.AbrirAjuda = AbrirAjuda;
         DataContext = vm;

@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ControleMateriais.Desktop.Views.SplashWindow"
-        Width="440" Height="540"
+        Width="560" Height="620"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         SystemDecorations="None"
@@ -9,41 +9,46 @@
         Background="Transparent"
         Icon="avares://ControleMateriais.Desktop/Assets/avalonia-logo.ico">
 
-    <!-- Rounded rectangle card -->
-    <Border Background="#4CAF50"
-            CornerRadius="32"
-            Padding="32,40,32,40"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Stretch">
+    <!-- Fundo escuro da janela -->
+    <Border Background="#1A1A2E"
+            CornerRadius="0">
 
-        <Grid RowDefinitions="*,Auto,Auto,Auto,*">
+        <!-- Card centralizado com borda roxa -->
+        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Border Background="#1E1E2E"
+                    BorderBrush="#7C3AED"
+                    BorderThickness="2"
+                    CornerRadius="20"
+                    Padding="48,44"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="420">
 
-            <!-- Logo (imagem real do LFB) -->
-            <Image Grid.Row="1"
-                   Source="avares://ControleMateriais.Desktop/Assets/lfb-logo.png"
-                   Width="260" Height="260"
-                   Stretch="Uniform"
-                   HorizontalAlignment="Center"/>
+                <StackPanel Spacing="0" HorizontalAlignment="Center">
 
-            <!-- Bem-vindo -->
-            <TextBlock Grid.Row="2"
-                       Text="Bem-vindo!"
-                       FontFamily="avares://Avalonia.Fonts.Inter#Inter"
-                       FontSize="30"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       HorizontalAlignment="Center"
-                       Margin="0,12,0,4"/>
+                    <!-- Logo -->
+                    <Image Source="avares://ControleMateriais.Desktop/Assets/lfb-logo.png"
+                           Width="200" Height="200"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,28"/>
 
-            <!-- Subtítulo -->
-            <TextBlock Grid.Row="3"
-                       Text="LFB Reciclagem Eletrônica"
-                       FontFamily="avares://Avalonia.Fonts.Inter#Inter"
-                       FontSize="15"
-                       Foreground="White"
-                       Opacity="0.88"
-                       HorizontalAlignment="Center"/>
+                    <!-- Bem-vindo -->
+                    <TextBlock Text="Bem-vindo!"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,8"/>
 
+                    <!-- Subtítulo -->
+                    <TextBlock Text="LFB Reciclagem Eletrônica"
+                               FontSize="14"
+                               Foreground="#A0A0C0"
+                               HorizontalAlignment="Center"/>
+
+                </StackPanel>
+            </Border>
         </Grid>
     </Border>
 </Window>

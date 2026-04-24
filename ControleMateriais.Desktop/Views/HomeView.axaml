@@ -6,6 +6,59 @@
 
   <Grid RowDefinitions="*,Auto,*">
 
+    <!-- Botão de configuração GitHub (canto superior direito) -->
+    <StackPanel Grid.Row="0"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,12,12,0"
+                Spacing="8">
+
+      <!-- Badge: GitHub não configurado -->
+      <Border IsVisible="{Binding GitNaoConfigurado}"
+              Background="#33F44336"
+              BorderBrush="#F44336"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="10,6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="⚠"
+                     Foreground="#F44336"
+                     FontSize="13"
+                     VerticalAlignment="Center"/>
+          <TextBlock Text="GitHub não configurado"
+                     Foreground="#F44336"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Badge: GitHub configurado -->
+      <Border IsVisible="{Binding GitConfigurado}"
+              Background="#334CAF50"
+              BorderBrush="#4CAF50"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="10,6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="✔"
+                     Foreground="#4CAF50"
+                     FontSize="13"
+                     VerticalAlignment="Center"/>
+          <TextBlock Text="GitHub configurado"
+                     Foreground="#4CAF50"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <Button Content="⚙ Configurar GitHub"
+              Click="ConfigurarGitHub_Click"
+              ToolTip.Tip="Configurar credenciais de acesso ao GitHub"/>
+    </StackPanel>
+
     <!-- Conteúdo central -->
     <StackPanel Grid.Row="1"
                 HorizontalAlignment="Center"

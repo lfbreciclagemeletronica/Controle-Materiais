@@ -1,0 +1,238 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+             xmlns:conv="using:ControleMateriais.Desktop.Converters"
+             x:Class="ControleMateriais.Desktop.Views.ReciboView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <UserControl.Resources>
+    <conv:BooleanNegationConverter x:Key="BoolNot"/>
+    <conv:BoolToBrushConverter x:Key="SelectedRowBrush"
+                               TrueBrush="#2A4FC3F7"
+                               FalseBrush="Transparent"/>
+  </UserControl.Resources>
+
+  <Border Background="{DynamicResource Brush.SurfaceAlt}"
+          BorderBrush="{DynamicResource Brush.Border}"
+          BorderThickness="1" CornerRadius="10" Padding="16">
+    <Grid RowDefinitions="Auto,*">
+
+      <!-- Cabeçalho -->
+      <StackPanel Margin="0,0,0,12" Spacing="6">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+
+          <!-- Botão voltar pesagens -->
+          <Button Grid.Column="0"
+                  Content="← Pesagens"
+                  HorizontalAlignment="Left"
+                  Command="{Binding VoltarParaPesagensCommand}"/>
+
+          <!-- Valor Total / Peso total centralizados -->
+          <StackPanel Grid.Column="1"
+                      HorizontalAlignment="Center"
+                      Spacing="0">
+            <TextBlock Text="Valor Total"
+                       Classes="muted"
+                       HorizontalAlignment="Center"
+                       FontSize="11"/>
+            <TextBlock Classes="h1"
+                       HorizontalAlignment="Center"
+                       Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
+            <TextBlock HorizontalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource Brush.TextPrimary}"
+                       Text="{Binding PesoTotal, StringFormat={}Peso total: {0:N3} kg}"/>
+          </StackPanel>
+
+          <!-- Botões direita -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="Tabela de Preços"
+                    HorizontalAlignment="Right"
+                    Command="{Binding AbrirTabelaPrecosCommand}"/>
+            <Button Classes="primary"
+                    Content="Exportar"
+                    HorizontalAlignment="Right"
+                    Command="{Binding ExportarCommand}"/>
+          </StackPanel>
+
+        </Grid>
+
+        <!-- Campo NomeCliente -->
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Grid.Column="0"
+                     VerticalAlignment="Center"
+                     Margin="0,0,8,0"
+                     Foreground="{DynamicResource Brush.TextPrimary}">
+            <Run Text="Nome: "/><Run Text="*" Foreground="#FF4444" FontWeight="Bold"/>
+          </TextBlock>
+          <TextBox Grid.Column="1"
+                   Text="{Binding NomeCliente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   Watermark="Nome do cliente / responsável (obrigatório)"
+                   HorizontalAlignment="Stretch"/>
+        </Grid>
+      </StackPanel>
+
+      <!-- Tabela principal de itens -->
+      <Border Grid.Row="1"
+              Background="{DynamicResource Brush.SurfaceAlt}"
+              BorderBrush="{DynamicResource Brush.Border}"
+              BorderThickness="1" CornerRadius="8" Padding="8">
+        <Grid RowDefinitions="Auto,*">
+
+          <!-- Cabeçalho fixo -->
+          <Grid ColumnDefinitions="*,120,130,100" Margin="4,0,12,6">
+            <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+            <TextBlock Grid.Column="1" Text="Peso atual (kg)" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="2" Text="Preço por kg" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="3" Text="Total" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
+          </Grid>
+
+          <!-- Linhas com scroll -->
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+              <!-- Itens do catálogo -->
+              <ItemsControl ItemsSource="{Binding ItensEditaveis}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PesoWrapper">
+                    <Border BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="0,0,0,1"
+                            Padding="0,1"
+                            PointerPressed="ItemRow_PointerPressed">
+                      <Border.Background>
+                        <Binding Path="IsSelected" Converter="{StaticResource SelectedRowBrush}"/>
+                      </Border.Background>
+                      <Border.Styles>
+                        <Style Selector="Border:focus-within">
+                          <Setter Property="Background" Value="#2A4FC3F7"/>
+                        </Style>
+                      </Border.Styles>
+                      <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
+                        <TextBlock Grid.Column="0" Text="{Binding Nome}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left"
+                                 Width="110"
+                                 HorizontalContentAlignment="Center"
+                                 GotFocus="PesoTextBox_GotFocus"
+                                 KeyDown="PesoTextBox_KeyDown"
+                                 LostFocus="PesoTextBox_LostFocus"/>
+                        <TextBox Grid.Column="2"
+                                 Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left"
+                                 Width="120"
+                                 HorizontalContentAlignment="Right"
+                                 GotFocus="PrecoTextBox_GotFocus"
+                                 KeyDown="PrecoTextBox_KeyDown"
+                                 LostFocus="PrecoTextBox_LostFocus"/>
+                        <TextBlock Grid.Column="3"
+                                   Text="{Binding Total, StringFormat={}{0:C}}"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Left"
+                                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <!-- Separador itens personalizados -->
+              <Border BorderBrush="{DynamicResource Brush.Border}"
+                      BorderThickness="0,1,0,0"
+                      Margin="0,4,0,0" Padding="4,4,4,0">
+                <TextBlock Text="Itens Personalizados"
+                           FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.TextSecondary}"
+                           Margin="0,0,0,4"/>
+              </Border>
+
+              <!-- Linha Impurezas -->
+              <Border BorderBrush="{DynamicResource Brush.Border}"
+                      BorderThickness="0,1,0,0"
+                      Margin="0,4,0,0" Padding="4,4,4,0">
+                <Grid ColumnDefinitions="*,120,130,100" Margin="0,2">
+                  <TextBlock Grid.Column="0" Text="Impurezas"
+                             FontWeight="SemiBold"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource Brush.TextPrimary}"/>
+                  <TextBox Grid.Column="1"
+                           Text="{Binding ImpurezasPesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           HorizontalAlignment="Left"
+                           Width="110"
+                           HorizontalContentAlignment="Center"
+                           GotFocus="ImpurezasPesoTextBox_GotFocus"
+                           KeyDown="ImpurezasPesoTextBox_KeyDown"
+                           LostFocus="ImpurezasPesoTextBox_LostFocus"/>
+                  <TextBox Grid.Column="2"
+                           HorizontalAlignment="Left"
+                           Width="120"
+                           IsEnabled="False"
+                           Text="—"/>
+                  <TextBlock Grid.Column="3"
+                             Text="—"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource Brush.TextSecondary}"/>
+                </Grid>
+              </Border>
+
+              <!-- Itens personalizados -->
+              <ItemsControl ItemsSource="{Binding ItensPersonalizados}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CustomItemWrapper">
+                    <Border BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="0,0,0,1"
+                            Padding="0,1"
+                            Background="{Binding IsSelected, Converter={StaticResource SelectedRowBrush}}"
+                            PointerPressed="ItemRow_PointerPressed">
+                      <Border.Styles>
+                        <Style Selector="Border:focus-within">
+                          <Setter Property="Background" Value="#2A4FC3F7"/>
+                        </Style>
+                      </Border.Styles>
+                      <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Watermark="Nome do item..."
+                                 VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left"
+                                 Width="110"
+                                 HorizontalContentAlignment="Center"
+                                 GotFocus="CustomPesoTextBox_GotFocus"
+                                 KeyDown="CustomPesoTextBox_KeyDown"
+                                 LostFocus="CustomPesoTextBox_LostFocus"/>
+                        <TextBox Grid.Column="2"
+                                 Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 HorizontalAlignment="Left"
+                                 Width="120"
+                                 HorizontalContentAlignment="Right"
+                                 GotFocus="CustomPrecoTextBox_GotFocus"
+                                 KeyDown="CustomPrecoTextBox_KeyDown"
+                                 LostFocus="CustomPrecoTextBox_LostFocus"/>
+                        <TextBlock Grid.Column="3"
+                                   Text="{Binding Total, StringFormat={}{0:C}}"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Left"
+                                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+
+    </Grid>
+  </Border>
+
+</UserControl>

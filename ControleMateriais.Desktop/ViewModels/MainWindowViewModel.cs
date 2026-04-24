@@ -1,6 +1,7 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Serialization;
+using ControleMateriais.Desktop.Services;
 using ControleMateriais.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -24,9 +25,11 @@ namespace ControleMateriais.Desktop.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
-    private static string RootDir =>
+    public static string RootDirPublic =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                      "Downloads", "ControleMateriaisLFB");
+
+    private static string RootDir => RootDirPublic;
 
     private static string TabelaPrecosDir => Path.Combine(RootDir, "TabelaPrecos");
     private static string RecibosDir      => Path.Combine(RootDir, "Recibos");
@@ -117,9 +120,41 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand IrParaHomeCommand { get; }
     public ICommand IrParaCalculadoraPesosCommand { get; }
     public ICommand IrParaRecibosCommand { get; }
+    public ICommand VoltarParaPesagensCommand { get; }
+    public ICommand ConfigurarGitHubCommand { get; }
+    public ICommand SincronizarRecibosCommand { get; }
+
+    private bool _sincronizandoRecibos;
+    public bool SincronizandoRecibos
+    {
+        get => _sincronizandoRecibos;
+        private set { if (value != _sincronizandoRecibos) { _sincronizandoRecibos = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusRecibos = string.Empty;
+    public string StatusRecibos
+    {
+        get => _statusRecibos;
+        private set { if (value != _statusRecibos) { _statusRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusRecibosVisivel)); } }
+    }
+    public bool StatusRecibosVisivel => !string.IsNullOrEmpty(_statusRecibos);
+
+    private bool _gitConfigurado;
+    public bool GitConfigurado
+    {
+        get => _gitConfigurado;
+        set { if (value != _gitConfigurado) { _gitConfigurado = value; OnPropertyChanged(); OnPropertyChanged(nameof(GitNaoConfigurado)); } }
+    }
+    public bool GitNaoConfigurado => !_gitConfigurado;
+
+    public Func<Task>? AbrirDialogoGitHubCallback { get; set; }
 
     public PriceTableManagerViewModel TabelaVM { get; }
     public WeightCalculatorViewModel CalculadoraVM { get; }
+    public PesagensViewModel PesagensVM { get; }
+
+    private PesagemItem? _pesagemAtiva;
+
 
     private bool _isGerindoTabela;
     public bool IsGerindoTabela
@@ -139,14 +174,16 @@ public class MainWindowViewModel : ViewModelBase
                 _currentPage = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsHomePage));
+                OnPropertyChanged(nameof(IsPesagensPage));
                 OnPropertyChanged(nameof(IsRecibosPage));
                 OnPropertyChanged(nameof(IsCalculadoraPage));
             }
         }
     }
-    public bool IsHomePage       => _currentPage == AppPage.Home;
-    public bool IsRecibosPage    => _currentPage == AppPage.Recibos;
-    public bool IsCalculadoraPage => _currentPage == AppPage.Calculadora;
+    public bool IsHomePage          => _currentPage == AppPage.Home;
+    public bool IsPesagensPage       => _currentPage == AppPage.Pesagens;
+    public bool IsRecibosPage        => _currentPage == AppPage.Recibos;
+    public bool IsCalculadoraPage    => _currentPage == AppPage.Calculadora;
 
     public decimal TotalGeral
     {
@@ -199,10 +236,14 @@ public class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         IrParaHomeCommand            = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Home; });
-        IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Recibos; });
+        IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Pesagens; });
         IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
+        VoltarParaPesagensCommand    = new DelegateCommand(VoltarParaPesagens);
+        ConfigurarGitHubCommand      = new DelegateCommand(async () => await AbrirConfigGitHubAsync());
+        SincronizarRecibosCommand    = new DelegateCommand(async () => await SincronizarRecibosAsync());
 
         EnsureDirectories();
+        _gitConfigurado = GitHubService.CredenciaisExistem(RootDir);
 
         foreach (var nome in ItemCatalog.OrderedItems)
             Itens.Add(new MaterialItem { Nome = nome, PesoAtual = 0m, PrecoPorKg = 0m });
@@ -248,15 +289,108 @@ public class MainWindowViewModel : ViewModelBase
         });
 
         CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        PesagensVM    = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        PesagensVM.AbrirReciboCallback      = AbrirReciboDetalhe;
+        PesagensVM.CriarNovoReciboCallback  = CriarNovoRecibo;
 
         _ = CarregarPrecosNaInicializacaoAsync();
+    }
+
+    private void AbrirReciboDetalhe(PesagemItem pesagem)
+    {
+        _pesagemAtiva = pesagem;
+
+        // Preenche nome do cliente
+        NomeCliente = pesagem.Cliente;
+
+        // Zera todos os itens e preenche os que vieram da pesagem
+        foreach (var it in Itens)
+            it.PesoAtual = 0m;
+        foreach (var c in ItensPersonalizados)
+            c.Zerar();
+        ImpurezasPesoAtual = 0m;
+        ImpurezasPesoTexto = "0,000";
+
+        var dictPesos = pesagem.Itens
+            .ToDictionary(p => p.Nome, p => p.Peso, StringComparer.OrdinalIgnoreCase);
+        foreach (var it in Itens)
+        {
+            if (dictPesos.TryGetValue(it.Nome ?? string.Empty, out var peso))
+                it.PesoAtual = peso;
+        }
+        foreach (var w in ItensEditaveis)
+            w.AtualizarExibicaoPeso();
+
+        RecalcularTotalGeral();
+        CurrentPage = AppPage.Recibos;
+    }
+
+    public async Task AbrirConfigGitHubAsync()
+    {
+        if (AbrirDialogoGitHubCallback is not null)
+            await AbrirDialogoGitHubCallback();
+        GitConfigurado = GitHubService.CredenciaisExistem(RootDir);
+    }
+
+    private async Task SincronizarRecibosAsync()
+    {
+        if (SincronizandoRecibos) return;
+        SincronizandoRecibos = true;
+        try
+        {
+            await GitHubService.SincronizarRecibosAsync(RootDir, msg =>
+            {
+                StatusRecibos = msg;
+            });
+            StatusRecibos = "Recibos sincronizados com sucesso.";
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(4000);
+                StatusRecibos = string.Empty;
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusRecibos = $"Erro: {ex.Message}";
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(6000);
+                StatusRecibos = string.Empty;
+            });
+        }
+        finally
+        {
+            SincronizandoRecibos = false;
+        }
+    }
+
+    public void VoltarParaPesagens()
+    {
+        _pesagemAtiva = null;
+        PesagensVM.CarregarPesagens();
+        CurrentPage = AppPage.Pesagens;
+    }
+
+    private void CriarNovoRecibo()
+    {
+        _pesagemAtiva = null;
+        NomeCliente = string.Empty;
+        foreach (var it in Itens)
+            it.PesoAtual = 0m;
+        foreach (var c in ItensPersonalizados)
+            c.Zerar();
+        ImpurezasPesoAtual = 0m;
+        ImpurezasPesoTexto = "0,000";
+        foreach (var w in ItensEditaveis)
+            w.AtualizarExibicaoPeso();
+        RecalcularTotalGeral();
+        CurrentPage = AppPage.Recibos;
     }
 
     private static void EnsureDirectories()
     {
         Directory.CreateDirectory(RootDir);
         Directory.CreateDirectory(TabelaPrecosDir);
-        Directory.CreateDirectory(RecibosDir);
     }
 
     private void OnItensCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -326,17 +460,35 @@ public class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        if (!GitHubService.CredenciaisExistem(RootDir))
+        {
+            ShowToast("Configure as credenciais do GitHub na tela inicial antes de exportar.", isError: true);
+            return;
+        }
+
         var data = DateTime.Now;
-        var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
+        var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy_HH-mm}.pdf"
             .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
 
-        Directory.CreateDirectory(RecibosDir);
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
                         .MainWindow;
         if (topLevel is null) return;
 
-        var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(RecibosDir));
+        // Garante que o repo Recibos está clonado (com migração se necessário)
+        try
+        {
+            ShowToast("Preparando repositório de Recibos...");
+            await GitHubService.GarantirRecibosRepoAsync(RootDir, msg => ShowToast(msg));
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Erro ao preparar repositório de Recibos: {ex.Message}", isError: true);
+            return;
+        }
+
+        var recibosDir = GitHubService.RecibosRepoDir(RootDir);
+        var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(recibosDir));
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(
             new Avalonia.Platform.Storage.FilePickerSaveOptions
             {
@@ -354,7 +506,55 @@ public class MainWindowViewModel : ViewModelBase
 
         GerarReciboPdf(filePath);
 
-        ShowToast($"PDF exportado com sucesso: {Path.GetFileName(filePath)}", isError: false);
+        if (_pesagemAtiva is not null)
+        {
+            await MarcarPesagemConcluidaAsync(_pesagemAtiva, filePath, data);
+            _pesagemAtiva = null;
+        }
+
+        // Publica o PDF no repo Recibos do GitHub
+        try
+        {
+            await GitHubService.PublicarReciboAsync(
+                RootDir, filePath,
+                $"Recibo {NomeCliente} - {data:dd/MM/yyyy}");
+        }
+        catch { }
+
+        ShowToast($"PDF exportado com sucesso: {Path.GetFileName(filePath)}", isSuccess: true);
+    }
+
+    private async Task MarcarPesagemConcluidaAsync(PesagemItem pesagem, string filePath, DateTime dataConclusao)
+    {
+        var repoDir     = GitHubService.RepoDir(RootDir);
+        var arquivoJson = Path.Combine(repoDir, pesagem.NomeArquivo);
+        if (!File.Exists(arquivoJson)) return;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(arquivoJson);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json) ?? new();
+
+            dict["StatusPesagem"] = JsonSerializer.SerializeToElement("concluido");
+            dict["DataConclusao"] = JsonSerializer.SerializeToElement(dataConclusao.ToString("yyyy-MM-ddTHH:mm:ss"));
+            dict["NomeRecibo"]    = JsonSerializer.SerializeToElement(Path.GetFileName(filePath));
+
+            var novoJson = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(arquivoJson, novoJson);
+
+            if (GitHubService.CredenciaisExistem(RootDir))
+            {
+                var creds     = GitHubService.CarregarCredenciais(RootDir)!;
+                var remoteUrl = $"https://{creds.Token}@github.com/lfbreciclagemeletronica/Pesagens.git";
+                await GitHubService.RunGit($"remote set-url origin {remoteUrl}", repoDir);
+                await GitHubService.RunGit($"config user.email \"{creds.GitEmail}\"", repoDir);
+                await GitHubService.RunGit($"config user.name \"{creds.GitUsuario}\"", repoDir);
+                await GitHubService.RunGit($"add \"{pesagem.NomeArquivo}\"", repoDir);
+                await GitHubService.RunGit($"commit -m \"{pesagem.Cliente} - concluido {dataConclusao:dd/MM/yyyy}\"", repoDir);
+                await GitHubService.RunGit("push origin HEAD", repoDir);
+            }
+        }
+        catch { }
     }
 
 
@@ -791,6 +991,13 @@ public class PesoWrapper : ViewModelBase
         _editandoPreco = false;
         PrecoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
     }
+
+    public void AtualizarExibicaoPeso()
+    {
+        _editando = false;
+        _pesoTexto = _item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+        OnPropertyChanged(nameof(PesoTexto));
+    }
 }
 
 public class CustomItemWrapper : ViewModelBase
@@ -909,6 +1116,17 @@ public class CustomItemWrapper : ViewModelBase
         PrecoPorKg = ParseDecimal(PrecoTexto, PrecoPorKg);
         PrecoTexto = PrecoPorKg.ToString("C", PtBR);
     }
+
+    public void Zerar()
+    {
+        _editandoPeso  = false;
+        _editandoPreco = false;
+        Nome     = string.Empty;
+        PesoAtual    = 0m;
+        PrecoPorKg   = 0m;
+        PesoTexto  = "0,000";
+        PrecoTexto = PrecoPorKg.ToString("C", PtBR);
+    }
 }
 
 public sealed class DelegateCommand : ICommand
@@ -944,6 +1162,7 @@ public sealed class DelegateCommand<T> : ICommand
 public enum AppPage
 {
     Home,
+    Pesagens,
     Recibos,
     Calculadora
 }

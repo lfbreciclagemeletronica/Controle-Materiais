@@ -3,13 +3,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:ControleMateriais.Models"
     xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+    xmlns:views="using:ControleMateriais.Desktop.Views"
     x:Class="ControleMateriais.Desktop.Views.MainWindow"
     xmlns:conv="using:ControleMateriais.Desktop.Converters"
     x:DataType="vm:MainWindowViewModel"
     Width="900" Height="680"
     MinWidth="700" MinHeight="500"
     CanResize="True"
-    Title="LFB Sistema de Recibos"
+    Title="LFB Reciclagem Eletrônica"
     Icon="avares://ControleMateriais.Desktop/Assets/icon.ico">
 
     <Window.Resources>
@@ -17,6 +18,9 @@
         <conv:BoolToBrushConverter x:Key="SelectedRowBrush"
                                    TrueBrush="#2A4FC3F7"
                                    FalseBrush="Transparent"/>
+        <conv:BoolToBrushConverter x:Key="SyncStatusBrush"
+                                   TrueBrush="#4CAF50"
+                                   FalseBrush="#F44336"/>
     </Window.Resources>
 
   <Grid Background="{DynamicResource Brush.Surface}">
@@ -76,212 +80,22 @@
 
       <!-- CONTAINER PRINCIPAL -->
       <Grid Grid.Row="1" Margin="10">
-        <!-- Painel INICIAL -->
-        <Grid IsVisible="{Binding IsGerindoTabela, Converter={StaticResource BoolNot}}">
-          <Border Background="{DynamicResource Brush.SurfaceAlt}"
-                  BorderBrush="{DynamicResource Brush.Border}"
-                  BorderThickness="1" CornerRadius="10" Padding="16">
-            <Grid RowDefinitions="Auto,*">
-              <!-- Cabeçalho -->
-              <StackPanel Margin="0,0,0,12" Spacing="6">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                  <Button Grid.Column="0"
-                          Content="Tabela de Preços"
-                          HorizontalAlignment="Left"
-                          Command="{Binding AbrirTabelaPrecosCommand}"/>
 
-                  <StackPanel Grid.Column="1"
-                              HorizontalAlignment="Center"
-                              Spacing="0">
-                    <TextBlock Text="Valor Total"
-                               Classes="muted"
-                               HorizontalAlignment="Center"
-                               FontSize="11"/>
-                    <TextBlock Classes="h1"
-                               HorizontalAlignment="Center"
-                               Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
-                    <TextBlock HorizontalAlignment="Center"
-                               FontSize="12"
-                               Foreground="{DynamicResource Brush.TextPrimary}"
-                               Text="{Binding PesoTotal, StringFormat={}Peso total: {0:N3} kg}"/>
-                  </StackPanel>
+        <!-- Painel HOME -->
+        <views:HomeView IsVisible="{Binding IsHomePage}"
+                        DataContext="{Binding}"/>
 
-                  <Button Grid.Column="2"
-                          Classes="primary"
-                          Content="Exportar"
-                          HorizontalAlignment="Right"
-                          Command="{Binding ExportarCommand}"/>
-                </Grid>
-                <Grid ColumnDefinitions="Auto,*">
-                  <TextBlock Grid.Column="0"
-                             VerticalAlignment="Center"
-                             Margin="0,0,8,0"
-                             Foreground="{DynamicResource Brush.TextPrimary}">
-                    <Run Text="Nome: "/><Run Text="*" Foreground="#FF4444" FontWeight="Bold"/>
-                  </TextBlock>
-                  <TextBox Grid.Column="1"
-                           Text="{Binding NomeCliente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                           Watermark="Nome do cliente / responsável (obrigatório)"
-                           HorizontalAlignment="Stretch"/>
-                </Grid>
-              </StackPanel>
+        <!-- Painel CALCULADORA DE PESOS -->
+        <views:WeightCalculatorView IsVisible="{Binding $parent[Window].DataContext.IsCalculadoraPage}"
+                                    DataContext="{Binding CalculadoraVM}"/>
 
-              <!-- Tabela principal de itens -->
-              <Border Grid.Row="1"
-                      Background="{DynamicResource Brush.SurfaceAlt}"
-                      BorderBrush="{DynamicResource Brush.Border}"
-                      BorderThickness="1" CornerRadius="8" Padding="8">
-                <Grid RowDefinitions="Auto,*">
-                  <!-- Cabeçalho fixo -->
-                  <Grid ColumnDefinitions="*,120,130,100" Margin="4,0,12,6">
-                    <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}"/>
-                    <TextBlock Grid.Column="1" Text="Peso atual (kg)" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
-                    <TextBlock Grid.Column="2" Text="Preço por kg" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
-                    <TextBlock Grid.Column="3" Text="Total" FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Left"/>
-                  </Grid>
-                  <!-- Linhas com scroll -->
-                  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                      <ItemsControl ItemsSource="{Binding ItensEditaveis}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:PesoWrapper">
-                            <Border BorderBrush="{DynamicResource Brush.Border}"
-                                    BorderThickness="0,0,0,1"
-                                    Padding="0,1"
-                                    PointerPressed="ItemRow_PointerPressed">
-                              <Border.Background>
-                                <Binding Path="IsSelected" Converter="{StaticResource SelectedRowBrush}"/>
-                              </Border.Background>
-                              <Border.Styles>
-                                <Style Selector="Border:focus-within">
-                                  <Setter Property="Background" Value="#2A4FC3F7"/>
-                                </Style>
-                              </Border.Styles>
-                              <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
-                                <TextBlock Grid.Column="0" Text="{Binding Nome}"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource Brush.TextPrimary}"/>
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         HorizontalAlignment="Left"
-                                         Width="110"
-                                         HorizontalContentAlignment="Center"
-                                         GotFocus="PesoTextBox_GotFocus"
-                                         KeyDown="PesoTextBox_KeyDown"
-                                         LostFocus="PesoTextBox_LostFocus"/>
-                                <TextBox Grid.Column="2"
-                                         Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         HorizontalAlignment="Left"
-                                         Width="120"
-                                         HorizontalContentAlignment="Right"
-                                         GotFocus="PrecoTextBox_GotFocus"
-                                         KeyDown="PrecoTextBox_KeyDown"
-                                         LostFocus="PrecoTextBox_LostFocus"/>
-                                <TextBlock Grid.Column="3"
-                                           Text="{Binding Total, StringFormat={}{0:C}}"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Left"
-                                           Foreground="{DynamicResource Brush.TextPrimary}"/>
-                              </Grid>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+        <!-- Painel PESAGENS (lista de pesagens pendentes) -->
+        <views:PesagensView IsVisible="{Binding $parent[Window].DataContext.IsPesagensPage}"
+                            DataContext="{Binding PesagensVM}"/>
 
-                      <!-- Separador itens personalizados -->
-                      <Border BorderBrush="{DynamicResource Brush.Border}"
-                              BorderThickness="0,1,0,0"
-                              Margin="0,4,0,0" Padding="4,4,4,0">
-                        <TextBlock Text="Itens Personalizados"
-                                   FontSize="11" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource Brush.TextSecondary}"
-                                   Margin="0,0,0,4"/>
-                      </Border>
-
-                      <!-- Linha Impurezas -->
-                      <Border BorderBrush="{DynamicResource Brush.Border}"
-                              BorderThickness="0,1,0,0"
-                              Margin="0,4,0,0" Padding="4,4,4,0">
-                        <Grid ColumnDefinitions="*,120,130,100" Margin="0,2">
-                          <TextBlock Grid.Column="0" Text="Impurezas"
-                                     FontWeight="SemiBold"
-                                     VerticalAlignment="Center"
-                                     Foreground="{DynamicResource Brush.TextPrimary}"/>
-                          <TextBox Grid.Column="1"
-                                   Text="{Binding ImpurezasPesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                   HorizontalAlignment="Left"
-                                   Width="110"
-                                   HorizontalContentAlignment="Center"
-                                   GotFocus="ImpurezasPesoTextBox_GotFocus"
-                                   KeyDown="ImpurezasPesoTextBox_KeyDown"
-                                   LostFocus="ImpurezasPesoTextBox_LostFocus"/>
-                          <TextBox Grid.Column="2"
-                                   HorizontalAlignment="Left"
-                                   Width="120"
-                                   IsEnabled="False"
-                                   Text="—"/>
-                          <TextBlock Grid.Column="3"
-                                     Text="—"
-                                     VerticalAlignment="Center"
-                                     Foreground="{DynamicResource Brush.TextSecondary}"/>
-                        </Grid>
-                      </Border>
-
-                      <ItemsControl ItemsSource="{Binding ItensPersonalizados}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:CustomItemWrapper">
-                            <Border BorderBrush="{DynamicResource Brush.Border}"
-                                    BorderThickness="0,0,0,1"
-                                    Padding="0,1"
-                                    Background="{Binding IsSelected, Converter={StaticResource SelectedRowBrush}}"
-                                    PointerPressed="ItemRow_PointerPressed">
-                              <Border.Styles>
-                                <Style Selector="Border:focus-within">
-                                  <Setter Property="Background" Value="#2A4FC3F7"/>
-                                </Style>
-                              </Border.Styles>
-                              <Grid ColumnDefinitions="*,120,130,100" Margin="4,2">
-                                <TextBox Grid.Column="0"
-                                         Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Watermark="Nome do item..."
-                                         VerticalAlignment="Center"/>
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding PesoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         HorizontalAlignment="Left"
-                                         Width="110"
-                                         HorizontalContentAlignment="Center"
-                                         GotFocus="CustomPesoTextBox_GotFocus"
-                                         KeyDown="CustomPesoTextBox_KeyDown"
-                                         LostFocus="CustomPesoTextBox_LostFocus"/>
-                                <TextBox Grid.Column="2"
-                                         Text="{Binding PrecoTexto, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         HorizontalAlignment="Left"
-                                         Width="120"
-                                         HorizontalContentAlignment="Right"
-                                         GotFocus="CustomPrecoTextBox_GotFocus"
-                                         KeyDown="CustomPrecoTextBox_KeyDown"
-                                         LostFocus="CustomPrecoTextBox_LostFocus"/>
-                                <TextBlock Grid.Column="3"
-                                           Text="{Binding Total, StringFormat={}{0:C}}"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Left"
-                                           Foreground="{DynamicResource Brush.TextPrimary}"/>
-                              </Grid>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </StackPanel>
-                  </ScrollViewer>
-                </Grid>
-              </Border>
-            </Grid>
-          </Border>
-        </Grid>
+        <!-- Painel RECIBO (criação do recibo a partir de pesagem) -->
+        <views:ReciboView IsVisible="{Binding IsRecibosPage}"
+                          DataContext="{Binding}"/>
 
         <!-- Painel TABELA DE PREÇOS -->
         <Grid IsVisible="{Binding IsGerindoTabela}"
@@ -292,20 +106,39 @@
             <Grid RowDefinitions="Auto,*,Auto">
 
               <!-- Cabeçalho -->
-              <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <TextBlock Text="Tabela de Preços"
-                             FontSize="16" FontWeight="Bold"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource Brush.TextPrimary}"/>
-                  <TextBlock Text="{Binding TabelaVM.TabelaAtivaLabel}"
-                             VerticalAlignment="Center"
-                             Classes="muted" FontSize="11"/>
+              <Grid Grid.Row="0" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="Tabela de Preços"
+                               FontSize="16" FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Text="{Binding TabelaVM.TabelaAtivaLabel}"
+                               VerticalAlignment="Center"
+                               Classes="muted" FontSize="11"/>
+                  </StackPanel>
+                  <Button Grid.Column="1"
+                          Content="⟳ Sincronizar"
+                          VerticalAlignment="Center"
+                          Margin="0,0,8,0"
+                          IsEnabled="{Binding TabelaVM.Sincronizando, Converter={StaticResource BoolNot}}"
+                          Command="{Binding TabelaVM.SincronizarCommand}"/>
+                  <Button Grid.Column="2"
+                          Content="Fechar"
+                          VerticalAlignment="Center"
+                          Command="{Binding TabelaVM.FecharCommand}"/>
+                </Grid>
+                <!-- Status de sincronização -->
+                <StackPanel Grid.Row="1" Orientation="Vertical" Spacing="2" Margin="0,4,0,0">
+                  <TextBlock Text="{Binding TabelaVM.StatusSync}"
+                             IsVisible="{Binding TabelaVM.StatusSyncVisivel}"
+                             HorizontalAlignment="Center" FontSize="12"
+                             Foreground="{Binding TabelaVM.StatusSyncOk, Converter={StaticResource SyncStatusBrush}}"/>
+                  <TextBlock Text="{Binding TabelaVM.UltimaSync}"
+                             IsVisible="{Binding TabelaVM.UltimaSyncVisivel}"
+                             HorizontalAlignment="Center" FontSize="11"
+                             Foreground="#4CAF50"/>
                 </StackPanel>
-                <Button Grid.Column="1"
-                        Content="Fechar"
-                        VerticalAlignment="Center"
-                        Command="{Binding TabelaVM.FecharCommand}"/>
               </Grid>
 
               <!-- Corpo: lista à esquerda + editor à direita -->

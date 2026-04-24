@@ -1,0 +1,168 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+             x:Class="ControleMateriais.Desktop.Views.HomeView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <Grid RowDefinitions="*,Auto,*">
+
+    <!-- Botão de configuração GitHub (canto superior direito) -->
+    <StackPanel Grid.Row="0"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,12,12,0"
+                Spacing="8">
+
+      <!-- Badge: GitHub não configurado -->
+      <Border IsVisible="{Binding GitNaoConfigurado}"
+              Background="#33F44336"
+              BorderBrush="#F44336"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="10,6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="⚠"
+                     Foreground="#F44336"
+                     FontSize="13"
+                     VerticalAlignment="Center"/>
+          <TextBlock Text="GitHub não configurado"
+                     Foreground="#F44336"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Badge: GitHub configurado -->
+      <Border IsVisible="{Binding GitConfigurado}"
+              Background="#334CAF50"
+              BorderBrush="#4CAF50"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="10,6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="✔"
+                     Foreground="#4CAF50"
+                     FontSize="13"
+                     VerticalAlignment="Center"/>
+          <TextBlock Text="GitHub configurado"
+                     Foreground="#4CAF50"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <Button Content="⚙ Configurar GitHub"
+              Click="ConfigurarGitHub_Click"
+              ToolTip.Tip="Configurar credenciais de acesso ao GitHub"/>
+    </StackPanel>
+
+    <!-- Conteúdo central -->
+    <StackPanel Grid.Row="1"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="0">
+
+      <!-- Logo -->
+      <Image Source="avares://ControleMateriais.Desktop/Assets/lfb-logo.png"
+             Width="200" Height="200"
+             HorizontalAlignment="Center"
+             Margin="0,0,0,24"/>
+
+      <!-- Título principal -->
+      <TextBlock Text="LFB RECICLAGEM ELETRÔNICA"
+                 FontSize="26" FontWeight="Bold"
+                 HorizontalAlignment="Center"
+                 Foreground="{DynamicResource Brush.Primary}"
+                 LetterSpacing="1"
+                 Margin="0,0,0,44"/>
+
+      <!-- Botões de navegação -->
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Center"
+                  Spacing="28">
+
+        <!-- Sistema de Recibos -->
+        <Button Command="{Binding IrParaRecibosCommand}"
+                Width="260" Height="155"
+                Padding="0"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center">
+          <Button.Template>
+            <ControlTemplate>
+              <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="#4CAF50"
+                      BorderThickness="2"
+                      CornerRadius="16"
+                      Padding="24,20">
+                <Border.Styles>
+                  <Style Selector="Border:pointerover">
+                    <Setter Property="Background" Value="#1A4CAF50"/>
+                  </Style>
+                </Border.Styles>
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                  <TextBlock Text="🧾"
+                             FontSize="42"
+                             HorizontalAlignment="Center"/>
+                  <TextBlock Text="Sistema de Recibos"
+                             FontSize="15" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                  <TextBlock Text="Tabela de preços e geração de recibos"
+                             FontSize="11"
+                             Foreground="White"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                </StackPanel>
+              </Border>
+            </ControlTemplate>
+          </Button.Template>
+        </Button>
+
+        <!-- Sistema de Pesos -->
+        <Button Command="{Binding IrParaCalculadoraPesosCommand}"
+                Width="260" Height="155"
+                Padding="0"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center">
+          <Button.Template>
+            <ControlTemplate>
+              <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="{DynamicResource Brush.Primary}"
+                      BorderThickness="2"
+                      CornerRadius="16"
+                      Padding="24,20">
+                <Border.Styles>
+                  <Style Selector="Border:pointerover">
+                    <Setter Property="Background" Value="#1A3B82F6"/>
+                  </Style>
+                </Border.Styles>
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                  <TextBlock Text="⚖️"
+                             FontSize="42"
+                             HorizontalAlignment="Center"/>
+                  <TextBlock Text="Sistema de Pesos"
+                             FontSize="15" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                  <TextBlock Text="Somente para pesagem de materiais"
+                             FontSize="11"
+                             Foreground="White"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                </StackPanel>
+              </Border>
+            </ControlTemplate>
+          </Button.Template>
+        </Button>
+
+      </StackPanel>
+    </StackPanel>
+
+  </Grid>
+
+</UserControl>

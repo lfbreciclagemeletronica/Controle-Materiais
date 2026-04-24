@@ -1,6 +1,7 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Serialization;
+using ControleMateriais.Desktop.Services;
 using ControleMateriais.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -24,9 +25,11 @@ namespace ControleMateriais.Desktop.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
-    private static string RootDir =>
+    public static string RootDirPublic =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                      "Downloads", "ControleMateriaisLFB");
+
+    private static string RootDir => RootDirPublic;
 
     private static string TabelaPrecosDir => Path.Combine(RootDir, "TabelaPrecos");
     private static string RecibosDir      => Path.Combine(RootDir, "Recibos");
@@ -100,19 +103,102 @@ public class MainWindowViewModel : ViewModelBase
     public string NomeCliente
     {
         get => _nomeCliente;
-        set { if (value != _nomeCliente) { _nomeCliente = value; OnPropertyChanged(); } }
+        set
+        {
+            if (value != _nomeCliente)
+            {
+                _nomeCliente = value;
+                OnPropertyChanged();
+                if (CalculadoraVM is not null)
+                    CalculadoraVM.NomeCliente = value;
+            }
+        }
     }
     public ICommand ExportarCommand { get; }
     public ICommand AbrirTabelaPrecosCommand { get; }
     public ICommand SelecionarItemCommand { get; }
+    public ICommand IrParaHomeCommand { get; }
+    public ICommand IrParaCalculadoraPesosCommand { get; }
+    public ICommand IrParaRecibosCommand { get; }
+    public ICommand VoltarParaPesagensCommand { get; }
+    public ICommand ConfigurarGitHubCommand { get; }
+    public ICommand SincronizarRecibosCommand { get; }
+
+    private bool _sincronizandoRecibos;
+    public bool SincronizandoRecibos
+    {
+        get => _sincronizandoRecibos;
+        private set { if (value != _sincronizandoRecibos) { _sincronizandoRecibos = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusRecibos = string.Empty;
+    public string StatusRecibos
+    {
+        get => _statusRecibos;
+        private set { if (value != _statusRecibos) { _statusRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusRecibosVisivel)); } }
+    }
+    public bool StatusRecibosVisivel => !string.IsNullOrEmpty(_statusRecibos);
+
+    private string _statusExportacao = string.Empty;
+    public string StatusExportacao
+    {
+        get => _statusExportacao;
+        private set { if (value != _statusExportacao) { _statusExportacao = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusExportacaoVisivel)); } }
+    }
+    public bool StatusExportacaoVisivel => !string.IsNullOrEmpty(_statusExportacao);
+
+    private bool _statusExportacaoOk = true;
+    public bool StatusExportacaoOk
+    {
+        get => _statusExportacaoOk;
+        private set { if (value != _statusExportacaoOk) { _statusExportacaoOk = value; OnPropertyChanged(); } }
+    }
+
+    private bool _gitConfigurado;
+    public bool GitConfigurado
+    {
+        get => _gitConfigurado;
+        set { if (value != _gitConfigurado) { _gitConfigurado = value; OnPropertyChanged(); OnPropertyChanged(nameof(GitNaoConfigurado)); } }
+    }
+    public bool GitNaoConfigurado => !_gitConfigurado;
+
+    public Func<Task>? AbrirDialogoGitHubCallback { get; set; }
 
     public PriceTableManagerViewModel TabelaVM { get; }
+    public WeightCalculatorViewModel CalculadoraVM { get; }
+    public PesagensViewModel PesagensVM { get; }
+
+    private PesagemItem? _pesagemAtiva;
+
+
     private bool _isGerindoTabela;
     public bool IsGerindoTabela
     {
         get => _isGerindoTabela;
         set { if (value != _isGerindoTabela) { _isGerindoTabela = value; OnPropertyChanged(); } }
     }
+
+    private AppPage _currentPage = AppPage.Home;
+    public AppPage CurrentPage
+    {
+        get => _currentPage;
+        set
+        {
+            if (value != _currentPage)
+            {
+                _currentPage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsHomePage));
+                OnPropertyChanged(nameof(IsPesagensPage));
+                OnPropertyChanged(nameof(IsRecibosPage));
+                OnPropertyChanged(nameof(IsCalculadoraPage));
+            }
+        }
+    }
+    public bool IsHomePage          => _currentPage == AppPage.Home;
+    public bool IsPesagensPage       => _currentPage == AppPage.Pesagens;
+    public bool IsRecibosPage        => _currentPage == AppPage.Recibos;
+    public bool IsCalculadoraPage    => _currentPage == AppPage.Calculadora;
 
     public decimal TotalGeral
     {
@@ -164,7 +250,15 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        IrParaHomeCommand            = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Home; });
+        IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Pesagens; });
+        IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
+        VoltarParaPesagensCommand    = new DelegateCommand(VoltarParaPesagens);
+        ConfigurarGitHubCommand      = new DelegateCommand(async () => await AbrirConfigGitHubAsync());
+        SincronizarRecibosCommand    = new DelegateCommand(async () => await SincronizarRecibosAsync());
+
         EnsureDirectories();
+        _gitConfigurado = GitHubService.CredenciaisExistem(RootDir);
 
         foreach (var nome in ItemCatalog.OrderedItems)
             Itens.Add(new MaterialItem { Nome = nome, PesoAtual = 0m, PrecoPorKg = 0m });
@@ -209,17 +303,109 @@ public class MainWindowViewModel : ViewModelBase
             IsGerindoTabela = true;
         });
 
+        CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        PesagensVM    = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        PesagensVM.AbrirReciboCallback      = AbrirReciboDetalhe;
+        PesagensVM.CriarNovoReciboCallback  = CriarNovoRecibo;
+
         _ = CarregarPrecosNaInicializacaoAsync();
+    }
 
+    private void AbrirReciboDetalhe(PesagemItem pesagem)
+    {
+        _pesagemAtiva = pesagem;
 
+        // Preenche nome do cliente
+        NomeCliente = pesagem.Cliente;
 
+        // Zera todos os itens e preenche os que vieram da pesagem
+        foreach (var it in Itens)
+            it.PesoAtual = 0m;
+        foreach (var c in ItensPersonalizados)
+            c.Zerar();
+        ImpurezasPesoAtual = 0m;
+        ImpurezasPesoTexto = "0,000";
+
+        var dictPesos = pesagem.Itens
+            .ToDictionary(p => p.Nome, p => p.Peso, StringComparer.OrdinalIgnoreCase);
+        foreach (var it in Itens)
+        {
+            if (dictPesos.TryGetValue(it.Nome ?? string.Empty, out var peso))
+                it.PesoAtual = peso;
+        }
+        foreach (var w in ItensEditaveis)
+            w.AtualizarExibicaoPeso();
+
+        RecalcularTotalGeral();
+        CurrentPage = AppPage.Recibos;
+    }
+
+    public async Task AbrirConfigGitHubAsync()
+    {
+        if (AbrirDialogoGitHubCallback is not null)
+            await AbrirDialogoGitHubCallback();
+        GitConfigurado = GitHubService.CredenciaisExistem(RootDir);
+    }
+
+    private async Task SincronizarRecibosAsync()
+    {
+        if (SincronizandoRecibos) return;
+        SincronizandoRecibos = true;
+        try
+        {
+            await GitHubService.SincronizarRecibosAsync(RootDir, msg =>
+            {
+                StatusRecibos = msg;
+            });
+            StatusRecibos = "Recibos sincronizados com sucesso.";
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(4000);
+                StatusRecibos = string.Empty;
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusRecibos = $"Erro: {ex.Message}";
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(6000);
+                StatusRecibos = string.Empty;
+            });
+        }
+        finally
+        {
+            SincronizandoRecibos = false;
+        }
+    }
+
+    public void VoltarParaPesagens()
+    {
+        _pesagemAtiva = null;
+        PesagensVM.CarregarPesagens();
+        CurrentPage = AppPage.Pesagens;
+    }
+
+    private void CriarNovoRecibo()
+    {
+        _pesagemAtiva = null;
+        NomeCliente = string.Empty;
+        foreach (var it in Itens)
+            it.PesoAtual = 0m;
+        foreach (var c in ItensPersonalizados)
+            c.Zerar();
+        ImpurezasPesoAtual = 0m;
+        ImpurezasPesoTexto = "0,000";
+        foreach (var w in ItensEditaveis)
+            w.AtualizarExibicaoPeso();
+        RecalcularTotalGeral();
+        CurrentPage = AppPage.Recibos;
     }
 
     private static void EnsureDirectories()
     {
         Directory.CreateDirectory(RootDir);
         Directory.CreateDirectory(TabelaPrecosDir);
-        Directory.CreateDirectory(RecibosDir);
     }
 
     private void OnItensCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -289,17 +475,35 @@ public class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        if (!GitHubService.CredenciaisExistem(RootDir))
+        {
+            ShowToast("Configure as credenciais do GitHub na tela inicial antes de exportar.", isError: true);
+            return;
+        }
+
         var data = DateTime.Now;
         var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
             .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
 
-        Directory.CreateDirectory(RecibosDir);
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
                         .MainWindow;
         if (topLevel is null) return;
 
-        var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(RecibosDir));
+        // Garante que o repo Recibos está clonado (com migração se necessário)
+        try
+        {
+            ShowToast("Preparando repositório de Recibos...");
+            await GitHubService.GarantirRecibosRepoAsync(RootDir, msg => ShowToast(msg));
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Erro ao preparar repositório de Recibos: {ex.Message}", isError: true);
+            return;
+        }
+
+        var recibosDir = GitHubService.RecibosRepoDir(RootDir);
+        var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(recibosDir));
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(
             new Avalonia.Platform.Storage.FilePickerSaveOptions
             {
@@ -315,9 +519,91 @@ public class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(filePath))
             return;
 
+        void AtualizarStatusTela(string msg, bool ok = true)
+        {
+            StatusExportacaoOk = ok;
+            StatusExportacao   = msg;
+        }
+
+        AtualizarStatusTela("Gerando PDF...");
         GerarReciboPdf(filePath);
 
-        ShowToast($"PDF exportado com sucesso: {Path.GetFileName(filePath)}", isError: false);
+        if (_pesagemAtiva is not null)
+        {
+            AtualizarStatusTela("Atualizando pesagem...");
+            await MarcarPesagemConcluidaAsync(_pesagemAtiva, filePath, data);
+            _pesagemAtiva = null;
+        }
+
+        // Publica o PDF no repo Recibos do GitHub com status na tela do recibo
+        try
+        {
+            AtualizarStatusTela("Sincronizando com GitHub...");
+            await GitHubService.PublicarReciboAsync(
+                RootDir, filePath,
+                $"Recibo {NomeCliente} - {data:dd/MM/yyyy}",
+                msg => AtualizarStatusTela(msg));
+            AtualizarStatusTela("Recibo enviado ao GitHub com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            AtualizarStatusTela($"Aviso: não foi possível sincronizar — {ex.Message}", ok: false);
+        }
+
+        // Abre modal de sucesso somente após tudo concluído
+        var dialog = new Views.ReciboSucessoDialog(Path.GetFileName(filePath), filePath);
+        await dialog.ShowDialog(topLevel);
+
+        StatusExportacao = string.Empty;
+
+        // Se o usuário clicou em "+ Novo Recibo", limpa nome e pesos mas mantém preços
+        if (dialog.NovoRecibo)
+            LimparParaNovoRecibo();
+    }
+
+    private void LimparParaNovoRecibo()
+    {
+        NomeCliente = string.Empty;
+        foreach (var w in ItensEditaveis)
+            w.ResetarPeso();
+        foreach (var custom in ItensPersonalizados)
+            custom.ResetarPeso();
+        ImpurezasPesoAtual = 0m;
+        ImpurezasPesoTexto = "0,000";
+        RecalcularTotalGeral();
+    }
+
+    private async Task MarcarPesagemConcluidaAsync(PesagemItem pesagem, string filePath, DateTime dataConclusao)
+    {
+        var repoDir     = GitHubService.RepoDir(RootDir);
+        var arquivoJson = Path.Combine(repoDir, pesagem.NomeArquivo);
+        if (!File.Exists(arquivoJson)) return;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(arquivoJson);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json) ?? new();
+
+            dict["StatusPesagem"] = JsonSerializer.SerializeToElement("concluido");
+            dict["DataConclusao"] = JsonSerializer.SerializeToElement(dataConclusao.ToString("yyyy-MM-ddTHH:mm:ss"));
+            dict["NomeRecibo"]    = JsonSerializer.SerializeToElement(Path.GetFileName(filePath));
+
+            var novoJson = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(arquivoJson, novoJson);
+
+            if (GitHubService.CredenciaisExistem(RootDir))
+            {
+                var creds     = GitHubService.CarregarCredenciais(RootDir)!;
+                var remoteUrl = $"https://{creds.Token}@github.com/lfbreciclagemeletronica/Pesagens.git";
+                await GitHubService.RunGit($"remote set-url origin {remoteUrl}", repoDir);
+                await GitHubService.RunGit($"config user.email \"{creds.GitEmail}\"", repoDir);
+                await GitHubService.RunGit($"config user.name \"{creds.GitUsuario}\"", repoDir);
+                await GitHubService.RunGit($"add \"{pesagem.NomeArquivo}\"", repoDir);
+                await GitHubService.RunGit($"commit -m \"{pesagem.Cliente} - concluido {dataConclusao:dd/MM/yyyy}\"", repoDir);
+                await GitHubService.RunGit("push origin HEAD", repoDir);
+            }
+        }
+        catch { }
     }
 
 
@@ -337,7 +623,7 @@ public class MainWindowViewModel : ViewModelBase
         var ptBR = CultureInfo.GetCultureInfo("pt-BR");
 
         var borderColor = Colors.Grey.Darken2;
-        var cellFontSize = 7f;
+        var cellFontSize = 10f;
         byte[]? logoBytes = null;
         try
         {
@@ -348,25 +634,25 @@ public class MainWindowViewModel : ViewModelBase
             logoBytes = logoMs.ToArray();
         }
         catch { }
-        var headerFontSize = 7f;
+        var headerFontSize = 10f;
 
         static IContainer InfoLabelCell(IContainer c) =>
             c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
              .Background(Colors.Grey.Lighten3)
-             .PaddingVertical(3).PaddingHorizontal(5);
+             .PaddingVertical(5).PaddingHorizontal(4);
 
         static IContainer InfoCell(IContainer c) =>
             c.Border(0.5f).BorderColor(Colors.Grey.Darken2)
-             .PaddingVertical(3).PaddingHorizontal(5);
+             .PaddingVertical(5).PaddingHorizontal(4);
 
         Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.MarginTop(1.2f, Unit.Centimetre);
-                page.MarginBottom(1.2f, Unit.Centimetre);
-                page.MarginHorizontal(1.5f, Unit.Centimetre);
+                page.MarginTop(0.8f, Unit.Centimetre);
+                page.MarginBottom(0.8f, Unit.Centimetre);
+                page.MarginHorizontal(0.8f, Unit.Centimetre);
                 page.PageColor(Colors.White);
                 page.DefaultTextStyle(x => x.FontSize(cellFontSize).FontFamily("Arial"));
 
@@ -374,83 +660,83 @@ public class MainWindowViewModel : ViewModelBase
                 {
                     col.Spacing(0);
 
-                    // ── TÍTULO: texto empresa (esq) + logo (dir) ──────────────────────
-                    col.Item().Border(0.5f).BorderColor(borderColor).Table(title =>
-                    {
-                        title.ColumnsDefinition(c =>
-                        {
-                            c.RelativeColumn(5);   // texto
-                            c.RelativeColumn(0.9f); // logo (reduzido)
-                        });
+                    // ── CABEÇALHO COMPACTO: logo + empresa centralizados ───────────────
+                    col.Item().Border(0.5f).BorderColor(borderColor)
+                       .PaddingVertical(6).PaddingHorizontal(8).Column(hdr =>
+                       {
+                           hdr.Item().Row(row =>
+                           {
+                               // Logo à esquerda
+                               row.ConstantItem(42).AlignMiddle().AlignCenter()
+                                  .Background("#4CAF50").Padding(2)
+                                  .Column(logo =>
+                                  {
+                                      if (logoBytes != null)
+                                          logo.Item().AlignCenter().Width(38).Image(logoBytes);
+                                      else
+                                          logo.Item().AlignCenter().Text("LFB").Bold()
+                                              .FontColor(Colors.White).FontSize(12);
+                                  });
 
-                        // Esquerda: nome empresa + dados + título pesagem
-                        title.Cell().Border(0.5f).BorderColor(borderColor)
-                             .PaddingVertical(6).PaddingHorizontal(8).Column(left =>
-                             {
-                                 left.Item().AlignCenter()
-                                     .Text("LFB RECICLAGEM ELETRONICA")
-                                     .Bold().FontSize(11);
-                                 left.Item().PaddingTop(2).AlignCenter()
-                                     .Text("CNPJ: 243.250.67/0001-64  |  I.E: 096/4003708")
-                                     .FontSize(7);
-                                 left.Item().AlignCenter()
-                                     .Text("End: Rua Sergio Jungblut Dieterich, 1011, Letra B Galpao5")
-                                     .FontSize(7);
-                                 left.Item().PaddingTop(4).AlignCenter()
-                                     .Text("RESULTADO DA PESAGEM E TRIAGEM LFB")
-                                     .Bold().FontSize(8);
-                             });
+                               // Dados da empresa centralizados
+                               row.RelativeItem().PaddingLeft(8).AlignMiddle().Column(left =>
+                               {
+                                   left.Item().AlignCenter()
+                                       .Text("LFB RECICLAGEM ELETRONICA")
+                                       .Bold().FontSize(13);
+                                   left.Item().PaddingTop(2).AlignCenter()
+                                       .Text("CNPJ: 243.250.67/0001-64  |  I.E: 096/4003708  |  End: Rua Sergio Jungblut Dieterich, 1011-B")
+                                       .FontSize(7.5f);
+                                   left.Item().PaddingTop(4).AlignCenter()
+                                       .Text("RESULTADO DA PESAGEM E TRIAGEM LFB")
+                                       .Bold().FontSize(9.5f);
+                               });
+                           });
+                       });
 
-                        // Direita: logo
-                        title.Cell().Border(0.5f).BorderColor(borderColor)
-                             .Background("#4CAF50").AlignCenter().AlignMiddle().Padding(3)
-                             .Column(logo =>
-                             {
-                                 if (logoBytes != null)
-                                     logo.Item().AlignCenter().Width(45).Image(logoBytes);
-                                 else
-                                     logo.Item().AlignCenter().Text("LFB").Bold()
-                                         .FontColor(Colors.White).FontSize(14);
-                             });
-                    });
-
-                    // ── GRADE INFO: FORNECEDOR / PESO / VALOR / DATA ───────────────────
+                    // ── GRADE INFO HORIZONTAL: FORNECEDOR | PESO | VALOR | DATA ────────
                     col.Item().Table(info =>
                     {
                         info.ColumnsDefinition(c =>
                         {
-                            c.RelativeColumn(1);  // label
-                            c.RelativeColumn(3);  // value
+                            c.RelativeColumn(1.4f); // FORNECEDOR label
+                            c.RelativeColumn(2.2f); // FORNECEDOR value
+                            c.RelativeColumn(0.8f); // PESO label
+                            c.RelativeColumn(0.9f); // PESO value
+                            c.RelativeColumn(0.9f); // VALOR label
+                            c.RelativeColumn(1.1f); // VALOR value
+                            c.RelativeColumn(0.6f); // DATA label
+                            c.RelativeColumn(1.2f); // DATA value
                         });
 
-                        info.Cell().Element(InfoLabelCell).Text("FORNECEDOR").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell).Text(nomeClienteSnapshot).FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("FORNECEDOR").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter().Text(nomeClienteSnapshot).FontSize(9f);
 
-                        info.Cell().Element(InfoLabelCell).Text("PESO TOTAL").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell)
-                            .Text($"{pesoTotalSnapshot:N3} kg").FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("PESO").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter()
+                            .Text($"{pesoTotalSnapshot:N3} kg").Bold().FontSize(9f);
 
-                        info.Cell().Element(InfoLabelCell).Text("VALOR TOTAL").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell)
-                            .Text(totalGeralSnapshot.ToString("C", ptBR)).FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("VALOR").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter()
+                            .Text(totalGeralSnapshot.ToString("C", ptBR)).Bold().FontSize(9f);
 
-                        info.Cell().Element(InfoLabelCell).Text("DATA").Bold().FontSize(7);
-                        info.Cell().Element(InfoCell)
-                            .Text($"{dataGeracao:dd/MM/yyyy}").FontSize(7);
+                        info.Cell().Element(InfoLabelCell).AlignCenter().Text("DATA").Bold().FontSize(8f);
+                        info.Cell().Element(InfoCell).AlignCenter()
+                            .Text($"{dataGeracao:dd/MM/yyyy}").FontSize(9f);
                     });
 
                     // Espaço entre header e tabela
-                    col.Item().Height(5);
+                    col.Item().Height(6);
 
                     // ── TABELA DE ITENS ────────────────────────────────────────────────
                     col.Item().Table(table =>
                     {
                         table.ColumnsDefinition(c =>
                         {
-                            c.RelativeColumn(4);    // Material
-                            c.RelativeColumn(1.2f); // KG
-                            c.RelativeColumn(1.5f); // VALOR
-                            c.RelativeColumn(1.5f); // TOTAL
+                            c.RelativeColumn(3.5f); // Material
+                            c.RelativeColumn(1.3f); // KG
+                            c.RelativeColumn(1.6f); // VALOR
+                            c.RelativeColumn(1.6f); // TOTAL
                         });
 
                         table.Header(header =>
@@ -458,24 +744,25 @@ public class MainWindowViewModel : ViewModelBase
                             static IContainer HCell(IContainer c) =>
                                 c.Background(Colors.Grey.Lighten3)
                                  .Border(0.5f).BorderColor(Colors.Grey.Darken2)
-                                 .PaddingVertical(3).PaddingHorizontal(4);
+                                 .PaddingVertical(5).PaddingHorizontal(4);
 
-                            header.Cell().Element(HCell).Text(string.Empty);
+                            header.Cell().Element(HCell).AlignCenter()
+                                  .Text("MATERIAL").Bold().FontSize(headerFontSize);
                             header.Cell().Element(HCell).AlignCenter()
                                   .Text("KG").Bold().FontSize(headerFontSize);
                             header.Cell().Element(HCell).AlignCenter()
-                                  .Text("VALOR").Bold().FontSize(headerFontSize);
+                                  .Text("VALOR/KG").Bold().FontSize(headerFontSize);
                             header.Cell().Element(HCell).AlignCenter()
                                   .Text("TOTAL").Bold().FontSize(headerFontSize);
                         });
 
                         static IContainer BCell(IContainer c) =>
                             c.Border(0.5f).BorderColor(Colors.Grey.Lighten1)
-                             .PaddingVertical(2).PaddingHorizontal(4);
+                             .PaddingVertical(4).PaddingHorizontal(5);
 
                         foreach (var it in itensSnapshot)
                         {
-                            table.Cell().Element(BCell)
+                            table.Cell().Element(BCell).AlignCenter()
                                  .Text(it.Nome ?? string.Empty).FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
@@ -497,7 +784,7 @@ public class MainWindowViewModel : ViewModelBase
 
                         foreach (var c in customSnapshot)
                         {
-                            table.Cell().Element(BCell)
+                            table.Cell().Element(BCell).AlignCenter()
                                  .Text(c.Nome).FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
@@ -519,7 +806,7 @@ public class MainWindowViewModel : ViewModelBase
 
                         if (impurezasPeso > 0)
                         {
-                            table.Cell().Element(BCell)
+                            table.Cell().Element(BCell).AlignCenter()
                                  .Text("Impurezas").FontSize(cellFontSize);
                             table.Cell().Element(BCell).AlignCenter()
                                  .Text(impurezasPeso.ToString("N3")).FontSize(cellFontSize);
@@ -753,6 +1040,23 @@ public class PesoWrapper : ViewModelBase
         _editandoPreco = false;
         PrecoTexto = _item.PrecoPorKg.ToString("C", CultureInfo.GetCultureInfo("pt-BR"));
     }
+
+    public void AtualizarExibicaoPeso()
+    {
+        _editando = false;
+        _pesoTexto = _item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
+        OnPropertyChanged(nameof(PesoTexto));
+    }
+
+    public void ResetarPeso()
+    {
+        _editando = false;
+        _item.PesoAtual = 0m;
+        _pesoTexto = "0,000";
+        OnPropertyChanged(nameof(PesoTexto));
+    }
+
+    public decimal PesoAtual => _item.PesoAtual;
 }
 
 public class CustomItemWrapper : ViewModelBase
@@ -871,6 +1175,25 @@ public class CustomItemWrapper : ViewModelBase
         PrecoPorKg = ParseDecimal(PrecoTexto, PrecoPorKg);
         PrecoTexto = PrecoPorKg.ToString("C", PtBR);
     }
+
+    public void Zerar()
+    {
+        _editandoPeso  = false;
+        _editandoPreco = false;
+        Nome     = string.Empty;
+        PesoAtual    = 0m;
+        PrecoPorKg   = 0m;
+        PesoTexto  = "0,000";
+        PrecoTexto = PrecoPorKg.ToString("C", PtBR);
+    }
+
+    public void ResetarPeso()
+    {
+        _editandoPeso = false;
+        Nome      = string.Empty;
+        PesoAtual = 0m;
+        PesoTexto = "0,000";
+    }
 }
 
 public sealed class DelegateCommand : ICommand
@@ -901,5 +1224,13 @@ public sealed class DelegateCommand<T> : ICommand
     public void Execute(object? parameter) => _execute(parameter is T t ? t : default);
 
     public event EventHandler? CanExecuteChanged { add { } remove { } }
+}
+
+public enum AppPage
+{
+    Home,
+    Pesagens,
+    Recibos,
+    Calculadora
 }
 

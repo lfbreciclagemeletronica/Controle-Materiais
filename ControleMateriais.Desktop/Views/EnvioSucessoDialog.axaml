@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.EnvioSucessoDialog"
+        Title="Envio concluído"
+        Width="380" Height="240"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="32" Background="{DynamicResource Brush.Surface}">
+    <StackPanel Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+
+      <!-- Ícone de check -->
+      <TextBlock Text="✔"
+                 FontSize="48"
+                 FontWeight="Bold"
+                 Foreground="#4CAF50"
+                 HorizontalAlignment="Center"/>
+
+      <!-- Mensagem principal -->
+      <TextBlock Text="Pesagem enviada com sucesso!"
+                 FontSize="15"
+                 FontWeight="Bold"
+                 Foreground="#4CAF50"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"/>
+
+      <!-- Nome do arquivo -->
+      <TextBlock x:Name="NomeArquivoText"
+                 FontSize="11"
+                 Foreground="{DynamicResource Brush.TextSecondary}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"
+                 TextWrapping="Wrap"/>
+
+      <!-- Botão OK -->
+      <Button Content="OK"
+              Width="100"
+              HorizontalAlignment="Center"
+              Margin="0,8,0,0"
+              Click="Ok_Click"/>
+
+    </StackPanel>
+  </Border>
+
+</Window>

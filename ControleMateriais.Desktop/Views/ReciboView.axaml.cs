@@ -1,0 +1,148 @@
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using ControleMateriais.Desktop.ViewModels;
+
+namespace ControleMateriais.Desktop.Views;
+
+public partial class ReciboView : UserControl
+{
+    public ReciboView()
+    {
+        InitializeComponent();
+    }
+
+    private void ItemRow_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Border border && DataContext is MainWindowViewModel vm)
+            vm.SelecionarItem(border.DataContext);
+    }
+
+    private void PesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
+        {
+            vm.SelecionarItem(wrapper);
+            wrapper.IniciarEdicao();
+            tb.SelectAll();
+        }
+    }
+
+    private void PesoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+        {
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicao(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicao(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
+        }
+    }
+
+    private void PesoTextBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+            wrapper.ConfirmarEdicao();
+    }
+
+    private void PrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
+        {
+            vm.SelecionarItem(wrapper);
+            wrapper.IniciarEdicaoPreco();
+            tb.SelectAll();
+        }
+    }
+
+    private void PrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+        {
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicaoPreco(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicaoPreco(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
+        }
+    }
+
+    private void PrecoTextBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is PesoWrapper wrapper)
+            wrapper.ConfirmarEdicaoPreco();
+    }
+
+    private void CustomPesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
+        {
+            vm.SelecionarItem(wrapper);
+            wrapper.IniciarEdicaoPeso();
+            tb.SelectAll();
+        }
+    }
+
+    private void CustomPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicaoPeso(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicaoPeso(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
+        }
+    }
+
+    private void CustomPesoTextBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+            wrapper.ConfirmarEdicaoPeso();
+    }
+
+    private void CustomPrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper
+            && DataContext is MainWindowViewModel vm)
+        {
+            vm.SelecionarItem(wrapper);
+            wrapper.IniciarEdicaoPreco();
+            tb.SelectAll();
+        }
+    }
+
+    private void CustomPrecoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+        {
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicaoPreco(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicaoPreco(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
+        }
+    }
+
+    private void CustomPrecoTextBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomItemWrapper wrapper)
+            wrapper.ConfirmarEdicaoPreco();
+    }
+
+    private void ImpurezasPesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && DataContext is MainWindowViewModel vm)
+        {
+            vm.IniciarEdicaoImpurezas();
+            tb.SelectAll();
+        }
+    }
+
+    private void ImpurezasPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            if (e.Key == Key.Enter) { vm.ConfirmarEdicaoImpurezas(); e.Handled = true; }
+            else if (e.Key == Key.Escape && sender is TextBox tb) { vm.CancelarEdicaoImpurezas(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
+        }
+    }
+
+    private void ImpurezasPesoTextBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+            vm.ConfirmarEdicaoImpurezas();
+    }
+}

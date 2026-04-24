@@ -1,0 +1,138 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+             xmlns:conv="using:ControleMateriais.Desktop.Converters"
+             x:Class="ControleMateriais.Desktop.Views.ReciboFromPesagemView"
+             x:DataType="vm:ReciboFromPesagemViewModel">
+
+  <UserControl.Resources>
+    <conv:BoolToBrushConverter x:Key="StatusBrush"
+                               TrueBrush="#4CAF50"
+                               FalseBrush="#F44336"/>
+  </UserControl.Resources>
+
+  <Border Background="{DynamicResource Brush.SurfaceAlt}"
+          BorderBrush="{DynamicResource Brush.Border}"
+          BorderThickness="1" CornerRadius="10" Padding="16">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+      <!-- Cabeçalho -->
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+        <Button Grid.Column="0"
+                Content="← Pesagens"
+                HorizontalAlignment="Left"
+                Command="{Binding VoltarCommand}"/>
+
+        <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="2">
+          <TextBlock Text="{Binding NomeCliente}"
+                     Classes="h1"
+                     HorizontalAlignment="Center"/>
+          <TextBlock Text="{Binding Horario}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource Brush.TextSecondary}"/>
+        </StackPanel>
+
+        <Button Grid.Column="2"
+                Classes="primary"
+                Content="Exportar PDF"
+                HorizontalAlignment="Right"
+                Command="{Binding ExportarCommand}"/>
+      </Grid>
+
+      <!-- Status -->
+      <TextBlock Grid.Row="1"
+                 Text="{Binding Status}"
+                 IsVisible="{Binding StatusVisivel}"
+                 HorizontalAlignment="Center"
+                 FontSize="12"
+                 Margin="0,0,0,8"
+                 Foreground="{Binding StatusOk, Converter={StaticResource StatusBrush}}"/>
+
+      <!-- Seleção de tabela de preços -->
+      <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,12">
+        <TextBlock Grid.Column="0"
+                   Text="Tabela de preços:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,10,0"
+                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+        <ComboBox Grid.Column="1"
+                  ItemsSource="{Binding Tabelas}"
+                  SelectedItem="{Binding TabelaSelecionada, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"/>
+        <TextBlock Grid.Column="2"
+                   Margin="16,0,6,0"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource Brush.TextSecondary}"
+                   Text="{Binding PesoTotal, StringFormat={}Peso: {0:N3} kg}"/>
+        <TextBlock Grid.Column="3"
+                   Margin="10,0,0,0"
+                   VerticalAlignment="Center"
+                   FontWeight="Bold"
+                   FontSize="15"
+                   Foreground="{DynamicResource Brush.TextPrimary}"
+                   Text="{Binding TotalGeral, StringFormat={}{0:C}}"/>
+      </Grid>
+
+      <!-- Tabela de itens -->
+      <Border Grid.Row="3"
+              Background="{DynamicResource Brush.SurfaceAlt}"
+              BorderBrush="{DynamicResource Brush.Border}"
+              BorderThickness="1" CornerRadius="8" Padding="8">
+        <Grid RowDefinitions="Auto,*">
+
+          <!-- Cabeçalho fixo -->
+          <Grid Grid.Row="0" ColumnDefinitions="*,120,130,130" Margin="4,0,12,6">
+            <TextBlock Grid.Column="0" Text="Material" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+            <TextBlock Grid.Column="1" Text="Peso (kg)" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="2" Text="Preço/kg" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="3" Text="Total" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+          </Grid>
+
+          <!-- Linhas -->
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Itens}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ReciboItemWrapper">
+                  <Border BorderBrush="{DynamicResource Brush.Border}"
+                          BorderThickness="0,0,0,1"
+                          Padding="0,4">
+                    <Grid ColumnDefinitions="*,120,130,130" Margin="4,2">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding Nome}"
+                                 VerticalAlignment="Center"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding PesoTexto}"
+                                 VerticalAlignment="Center"
+                                 HorizontalAlignment="Center"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding PrecoTexto}"
+                                 VerticalAlignment="Center"
+                                 HorizontalAlignment="Center"
+                                 Foreground="{DynamicResource Brush.TextSecondary}"/>
+                      <TextBlock Grid.Column="3"
+                                 Text="{Binding TotalTexto}"
+                                 VerticalAlignment="Center"
+                                 HorizontalAlignment="Center"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+        </Grid>
+      </Border>
+
+    </Grid>
+  </Border>
+
+</UserControl>

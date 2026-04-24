@@ -2,6 +2,7 @@ using ControleMateriais.Desktop.Services;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -15,6 +16,14 @@ public class PesagemItemPeso
 {
     public string Nome { get; set; } = string.Empty;
     public decimal Peso { get; set; }
+}
+
+public class ReciboItem
+{
+    public string NomeArquivo  { get; set; } = string.Empty;
+    public string CaminhoCompleto { get; set; } = string.Empty;
+    public string DataCriacao  { get; set; } = string.Empty;
+    public DateTime DataCriacaoRaw { get; set; }
 }
 
 public class PesagemItem
@@ -64,16 +73,38 @@ public class PesagensViewModel : ViewModelBase
 
     public ObservableCollection<PesagemItem> PesagensFiltradas { get; } = new();
 
+    public int ContPendente  => Pesagens.Count(p => p.IsPendente);
+    public int ContConcluido => Pesagens.Count(p => p.IsConcluido);
+    public int ContFalhou    => Pesagens.Count(p => p.IsFalhou);
+
+    public string LabelPendente  => $"pendente ({ContPendente})";
+    public string LabelConcluido => $"concluido ({ContConcluido})";
+    public string LabelFalhou    => $"falhou ({ContFalhou})";
+
     private void AtualizarFiltro()
     {
         PesagensFiltradas.Clear();
         var filtro = _filtroStatus;
-        foreach (var p in Pesagens)
+
+        // Deduplicar: para cada cliente, manter só a pesagem mais recente
+        var pesagensDedup = Pesagens
+            .GroupBy(p => p.Cliente.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(p => p.HorarioRaw).First())
+            .OrderByDescending(p => p.HorarioRaw)
+            .ToList();
+
+        foreach (var p in pesagensDedup)
         {
             if (filtro == "todos" || p.StatusPesagem.Equals(filtro, StringComparison.OrdinalIgnoreCase))
                 PesagensFiltradas.Add(p);
         }
         OnPropertyChanged(nameof(ListaVazia));
+        OnPropertyChanged(nameof(ContPendente));
+        OnPropertyChanged(nameof(ContConcluido));
+        OnPropertyChanged(nameof(ContFalhou));
+        OnPropertyChanged(nameof(LabelPendente));
+        OnPropertyChanged(nameof(LabelConcluido));
+        OnPropertyChanged(nameof(LabelFalhou));
     }
 
     private string _status = string.Empty;
@@ -98,13 +129,59 @@ public class PesagensViewModel : ViewModelBase
         private set { if (value != _sincronizando) { _sincronizando = value; OnPropertyChanged(); } }
     }
 
+    // ── Recibos PDFs ──────────────────────────────────────────────
+    public ObservableCollection<ReciboItem> Recibos { get; } = new();
+
+    private bool _sincronizandoRecibos;
+    public bool SincronizandoRecibos
+    {
+        get => _sincronizandoRecibos;
+        private set { if (value != _sincronizandoRecibos) { _sincronizandoRecibos = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusRecibos = string.Empty;
+    public string StatusRecibos
+    {
+        get => _statusRecibos;
+        private set { if (value != _statusRecibos) { _statusRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusRecibosVisivel)); } }
+    }
+    public bool StatusRecibosVisivel => !string.IsNullOrEmpty(_statusRecibos);
+
+    private bool _statusRecibosOk = true;
+    public bool StatusRecibosOk
+    {
+        get => _statusRecibosOk;
+        private set { if (value != _statusRecibosOk) { _statusRecibosOk = value; OnPropertyChanged(); } }
+    }
+
+    private string _ultimaSincPesagens = string.Empty;
+    public string UltimaSincPesagens
+    {
+        get => _ultimaSincPesagens;
+        private set { if (value != _ultimaSincPesagens) { _ultimaSincPesagens = value; OnPropertyChanged(); OnPropertyChanged(nameof(UltimaSincPesagensVisivel)); } }
+    }
+    public bool UltimaSincPesagensVisivel => !string.IsNullOrEmpty(_ultimaSincPesagens);
+
+    private string _ultimaSincRecibos = string.Empty;
+    public string UltimaSincRecibos
+    {
+        get => _ultimaSincRecibos;
+        private set { if (value != _ultimaSincRecibos) { _ultimaSincRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(UltimaSincRecibosVisivel)); } }
+    }
+    public bool UltimaSincRecibosVisivel => !string.IsNullOrEmpty(_ultimaSincRecibos);
+
     public bool RepoPresenteLocal => Directory.Exists(Path.Combine(GitHubService.RepoDir(RootDir), ".git"));
     public bool ListaVazia => RepoPresenteLocal && PesagensFiltradas.Count == 0;
 
-    public ICommand VoltarCommand      { get; }
-    public ICommand SincronizarCommand { get; }
-    public ICommand AbrirReciboCommand { get; }
-    public ICommand CriarNovoCommand   { get; }
+    public bool RecibosDirPresente => Directory.Exists(Path.Combine(GitHubService.RecibosRepoDir(RootDir), ".git"));
+    public bool RecibosListaVazia  => RecibosDirPresente && Recibos.Count == 0;
+
+    public ICommand VoltarCommand          { get; }
+    public ICommand SincronizarCommand     { get; }
+    public ICommand SincronizarRecibosCommand { get; }
+    public ICommand AbrirReciboCommand     { get; }
+    public ICommand CriarNovoCommand       { get; }
+    public ICommand AbrirPdfCommand        { get; }
 
     public Func<Task>?               SolicitarConfiguracaoGitHubCallback { get; set; }
     public Action<PesagemItem>?       AbrirReciboCallback { get; set; }
@@ -113,14 +190,21 @@ public class PesagensViewModel : ViewModelBase
     public PesagensViewModel(Action voltarCallback, string rootDir)
     {
         RootDir = rootDir;
-        VoltarCommand      = new DelegateCommand(voltarCallback);
-        SincronizarCommand = new DelegateCommand(() => _ = SincronizarAsync());
-        AbrirReciboCommand = new DelegateCommand<PesagemItem>(item =>
+        VoltarCommand             = new DelegateCommand(voltarCallback);
+        SincronizarCommand        = new DelegateCommand(() => _ = SincronizarAsync());
+        SincronizarRecibosCommand = new DelegateCommand(() => _ = SincronizarRecibosAsync());
+        AbrirReciboCommand        = new DelegateCommand<PesagemItem>(item =>
         {
             if (item is not null)
                 AbrirReciboCallback?.Invoke(item);
         });
-        CriarNovoCommand   = new DelegateCommand(() => CriarNovoReciboCallback?.Invoke());
+        CriarNovoCommand  = new DelegateCommand(() => CriarNovoReciboCallback?.Invoke());
+        AbrirPdfCommand   = new DelegateCommand<ReciboItem>(item =>
+        {
+            if (item is null) return;
+            try { Process.Start(new ProcessStartInfo(item.CaminhoCompleto) { UseShellExecute = true }); }
+            catch { }
+        });
     }
 
     public void CarregarPesagens()
@@ -211,7 +295,8 @@ public class PesagensViewModel : ViewModelBase
             {
                 MostrarStatus("Atualizando repositório (pull)...", ok: true);
                 await GitHubService.RunGit($"remote set-url origin {remoteUrl}", repoDir);
-                var r = await GitHubService.RunGit("pull --rebase origin HEAD", repoDir);
+                await GitHubService.RunGit("fetch origin main", repoDir);
+                var r = await GitHubService.RunGit("rebase origin/main", repoDir);
                 if (r.exitCode != 0) throw new Exception($"Pull falhou: {r.stderr}");
             }
 
@@ -256,15 +341,15 @@ public class PesagensViewModel : ViewModelBase
                 if (commit.exitCode == 0)
                 {
                     MostrarStatus("Enviando alterações ao GitHub...", ok: true);
-                    await GitHubService.RunGit("push origin HEAD", repoDir);
+                    await GitHubService.RunGit("push origin main", repoDir);
                 }
             }
 
             OnPropertyChanged(nameof(RepoPresenteLocal));
             CarregarPesagens();
 
-            var pendentes = Pesagens.Count(p => p.IsPendente);
-            MostrarStatus($"{pendentes} pendente(s) de {Pesagens.Count} pesagem(ns) encontrada(s).", ok: true);
+            UltimaSincPesagens = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
+            MostrarStatus(string.Empty, ok: true);
         }
         catch (Exception ex)
         {
@@ -276,9 +361,109 @@ public class PesagensViewModel : ViewModelBase
         }
     }
 
+    public void CarregarRecibos()
+    {
+        Recibos.Clear();
+        var repoDir = GitHubService.RecibosRepoDir(RootDir);
+        if (!Directory.Exists(repoDir)) { OnPropertyChanged(nameof(RecibosDirPresente)); OnPropertyChanged(nameof(RecibosListaVazia)); return; }
+
+        foreach (var file in Directory.GetFiles(repoDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                                      .OrderByDescending(f => File.GetLastWriteTime(f)))
+        {
+            var semExt = Path.GetFileNameWithoutExtension(file);
+            var (nomeCliente, dataExibicao, dataRaw) = ParsearNomeArquivoRecibo(semExt, file);
+
+            Recibos.Add(new ReciboItem
+            {
+                NomeArquivo     = nomeCliente,
+                CaminhoCompleto = file,
+                DataCriacaoRaw  = dataRaw,
+                DataCriacao     = dataExibicao
+            });
+        }
+
+        OnPropertyChanged(nameof(RecibosDirPresente));
+        OnPropertyChanged(nameof(RecibosListaVazia));
+    }
+
+    // Extrai nome do cliente e data de um nome de arquivo no padrão:
+    // NomeCliente_dd-MM-yyyy_HH-mm   (underscores separam data e hora)
+    // ou NomeCliente_dd-MM-yyyy (sem hora)
+    private static (string nome, string dataExibicao, DateTime dataRaw) ParsearNomeArquivoRecibo(string semExt, string filePath)
+    {
+        // Padrão: termina com _dd-MM-yyyy_HH-mm
+        var matchComHora = System.Text.RegularExpressions.Regex.Match(
+            semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2})$");
+        if (matchComHora.Success)
+        {
+            var nomeRaw = matchComHora.Groups[1].Value;
+            var dataStr = matchComHora.Groups[2].Value; // dd-MM-yyyy_HH-mm
+            if (DateTime.TryParseExact(dataStr, "dd-MM-yyyy_HH-mm",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var dt))
+                return (nomeRaw, dt.ToString("dd/MM/yyyy"), dt);
+        }
+
+        // Padrão sem hora: termina com _dd-MM-yyyy
+        var matchSemHora = System.Text.RegularExpressions.Regex.Match(
+            semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4})$");
+        if (matchSemHora.Success)
+        {
+            var nomeRaw = matchSemHora.Groups[1].Value;
+            var dataStr = matchSemHora.Groups[2].Value;
+            if (DateTime.TryParseExact(dataStr, "dd-MM-yyyy",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var dt))
+                return (nomeRaw, dt.ToString("dd/MM/yyyy"), dt);
+        }
+
+        // Fallback: usa nome completo e data do sistema de arquivos
+        var dtFallback = File.GetLastWriteTime(filePath);
+        return (semExt, dtFallback.ToString("dd/MM/yyyy"), dtFallback);
+    }
+
+    private async Task SincronizarRecibosAsync()
+    {
+        if (SincronizandoRecibos) return;
+        SincronizandoRecibos = true;
+        MostrarStatusRecibos("Verificando Git...", ok: true);
+
+        try
+        {
+            if (!GitHubService.CredenciaisExistem(RootDir))
+            {
+                MostrarStatusRecibos("Configure as credenciais do GitHub na tela inicial.", ok: false);
+                return;
+            }
+
+            if (!await GitHubService.GitDisponivel())
+                await GitHubService.InstalarGitAsync(msg => MostrarStatusRecibos(msg, ok: true));
+
+            await GitHubService.SincronizarRecibosAsync(RootDir, msg => MostrarStatusRecibos(msg, ok: true));
+
+            CarregarRecibos();
+            UltimaSincRecibos = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
+            MostrarStatusRecibos(string.Empty, ok: true);
+        }
+        catch (Exception ex)
+        {
+            MostrarStatusRecibos($"Erro: {ex.Message}", ok: false);
+        }
+        finally
+        {
+            SincronizandoRecibos = false;
+        }
+    }
+
     private void MostrarStatus(string mensagem, bool ok)
     {
-        Status    = mensagem;
-        StatusOk  = ok;
+        Status   = mensagem;
+        StatusOk = ok;
+    }
+
+    private void MostrarStatusRecibos(string mensagem, bool ok)
+    {
+        StatusRecibos    = mensagem;
+        StatusRecibosOk  = ok;
     }
 }

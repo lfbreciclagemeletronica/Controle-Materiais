@@ -10,6 +10,9 @@
     <conv:BoolToBrushConverter x:Key="SelectedRowBrush"
                                TrueBrush="#2A4FC3F7"
                                FalseBrush="Transparent"/>
+    <conv:BoolToBrushConverter x:Key="SyncStatusBrush"
+                               TrueBrush="#4CAF50"
+                               FalseBrush="#F44336"/>
   </UserControl.Resources>
 
   <Border Background="{DynamicResource Brush.SurfaceAlt}"
@@ -70,6 +73,15 @@
                    Watermark="Nome do cliente / responsável (obrigatório)"
                    HorizontalAlignment="Stretch"/>
         </Grid>
+
+        <!-- Status de exportação em tempo real -->
+        <TextBlock Text="{Binding StatusExportacao}"
+                   IsVisible="{Binding StatusExportacaoVisivel}"
+                   HorizontalAlignment="Center"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Foreground="{Binding StatusExportacaoOk, Converter={StaticResource SyncStatusBrush}}"
+                   TextAlignment="Center"/>
       </StackPanel>
 
       <!-- Tabela principal de itens -->

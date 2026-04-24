@@ -139,6 +139,21 @@ public class MainWindowViewModel : ViewModelBase
     }
     public bool StatusRecibosVisivel => !string.IsNullOrEmpty(_statusRecibos);
 
+    private string _statusExportacao = string.Empty;
+    public string StatusExportacao
+    {
+        get => _statusExportacao;
+        private set { if (value != _statusExportacao) { _statusExportacao = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusExportacaoVisivel)); } }
+    }
+    public bool StatusExportacaoVisivel => !string.IsNullOrEmpty(_statusExportacao);
+
+    private bool _statusExportacaoOk = true;
+    public bool StatusExportacaoOk
+    {
+        get => _statusExportacaoOk;
+        private set { if (value != _statusExportacaoOk) { _statusExportacaoOk = value; OnPropertyChanged(); } }
+    }
+
     private bool _gitConfigurado;
     public bool GitConfigurado
     {
@@ -467,7 +482,7 @@ public class MainWindowViewModel : ViewModelBase
         }
 
         var data = DateTime.Now;
-        var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy_HH-mm}.pdf"
+        var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
             .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
 
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
@@ -504,24 +519,58 @@ public class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(filePath))
             return;
 
+        void AtualizarStatusTela(string msg, bool ok = true)
+        {
+            StatusExportacaoOk = ok;
+            StatusExportacao   = msg;
+        }
+
+        AtualizarStatusTela("Gerando PDF...");
         GerarReciboPdf(filePath);
 
         if (_pesagemAtiva is not null)
         {
+            AtualizarStatusTela("Atualizando pesagem...");
             await MarcarPesagemConcluidaAsync(_pesagemAtiva, filePath, data);
             _pesagemAtiva = null;
         }
 
-        // Publica o PDF no repo Recibos do GitHub
+        // Publica o PDF no repo Recibos do GitHub com status na tela do recibo
         try
         {
+            AtualizarStatusTela("Sincronizando com GitHub...");
             await GitHubService.PublicarReciboAsync(
                 RootDir, filePath,
-                $"Recibo {NomeCliente} - {data:dd/MM/yyyy}");
+                $"Recibo {NomeCliente} - {data:dd/MM/yyyy}",
+                msg => AtualizarStatusTela(msg));
+            AtualizarStatusTela("Recibo enviado ao GitHub com sucesso.");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AtualizarStatusTela($"Aviso: não foi possível sincronizar — {ex.Message}", ok: false);
+        }
 
-        ShowToast($"PDF exportado com sucesso: {Path.GetFileName(filePath)}", isSuccess: true);
+        // Abre modal de sucesso somente após tudo concluído
+        var dialog = new Views.ReciboSucessoDialog(Path.GetFileName(filePath), filePath);
+        await dialog.ShowDialog(topLevel);
+
+        StatusExportacao = string.Empty;
+
+        // Se o usuário clicou em "+ Novo Recibo", limpa nome e pesos mas mantém preços
+        if (dialog.NovoRecibo)
+            LimparParaNovoRecibo();
+    }
+
+    private void LimparParaNovoRecibo()
+    {
+        NomeCliente = string.Empty;
+        foreach (var w in ItensEditaveis)
+            w.ResetarPeso();
+        foreach (var custom in ItensPersonalizados)
+            custom.ResetarPeso();
+        ImpurezasPesoAtual = 0m;
+        ImpurezasPesoTexto = "0,000";
+        RecalcularTotalGeral();
     }
 
     private async Task MarcarPesagemConcluidaAsync(PesagemItem pesagem, string filePath, DateTime dataConclusao)
@@ -998,6 +1047,16 @@ public class PesoWrapper : ViewModelBase
         _pesoTexto = _item.PesoAtual.ToString("N3", CultureInfo.GetCultureInfo("pt-BR"));
         OnPropertyChanged(nameof(PesoTexto));
     }
+
+    public void ResetarPeso()
+    {
+        _editando = false;
+        _item.PesoAtual = 0m;
+        _pesoTexto = "0,000";
+        OnPropertyChanged(nameof(PesoTexto));
+    }
+
+    public decimal PesoAtual => _item.PesoAtual;
 }
 
 public class CustomItemWrapper : ViewModelBase
@@ -1126,6 +1185,14 @@ public class CustomItemWrapper : ViewModelBase
         PrecoPorKg   = 0m;
         PesoTexto  = "0,000";
         PrecoTexto = PrecoPorKg.ToString("C", PtBR);
+    }
+
+    public void ResetarPeso()
+    {
+        _editandoPeso = false;
+        Nome      = string.Empty;
+        PesoAtual = 0m;
+        PesoTexto = "0,000";
     }
 }
 

@@ -109,7 +109,8 @@ public static class GitHubService
             // Já clonado — apenas pull
             progresso("Atualizando repositório de Recibos...");
             await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
-            await RunAsync("git", "pull --rebase origin HEAD", repoDir);
+            await RunAsync("git", "fetch origin main", repoDir);
+            await RunAsync("git", "rebase origin/main", repoDir);
         }
     }
 
@@ -138,7 +139,8 @@ public static class GitHubService
         await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
-        var pull = await RunAsync("git", "pull --rebase origin HEAD", repoDir);
+        await RunAsync("git", "fetch origin main", repoDir);
+        var pull = await RunAsync("git", "rebase origin/main", repoDir);
         if (pull.exitCode != 0)
             throw new Exception($"Pull do repo Recibos falhou: {pull.stderr}");
 
@@ -152,7 +154,7 @@ public static class GitHubService
             var commit = await RunAsync("git", "commit -m \"Sincronização de recibos locais\"", repoDir);
             if (commit.exitCode == 0)
             {
-                var push = await RunAsync("git", "push origin HEAD", repoDir);
+                var push = await RunAsync("git", "push origin main", repoDir);
                 if (push.exitCode != 0)
                     throw new Exception($"Push do repo Recibos falhou: {push.stderr}");
             }
@@ -164,7 +166,8 @@ public static class GitHubService
     /// <summary>
     /// Faz commit e push de um arquivo PDF no repo Recibos.
     /// </summary>
-    public static async Task PublicarReciboAsync(string rootDir, string filePath, string mensagemCommit)
+    public static async Task PublicarReciboAsync(string rootDir, string filePath, string mensagemCommit,
+                                                  Action<string>? progresso = null)
     {
         if (!CredenciaisExistem(rootDir)) return;
 
@@ -173,6 +176,7 @@ public static class GitHubService
         var gitDir  = Path.Combine(repoDir, ".git");
         if (!Directory.Exists(gitDir)) return;
 
+        progresso?.Invoke("Configurando repositório...");
         var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{ReciboRepoName}.git";
         await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
@@ -182,10 +186,15 @@ public static class GitHubService
         if (!File.Exists(destino))
             File.Copy(filePath, destino);
 
+        progresso?.Invoke("Adicionando arquivo...");
         await RunAsync("git", $"add \"{Path.GetFileName(filePath)}\"", repoDir);
+        progresso?.Invoke("Commitando...");
         var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
         if (commit.exitCode == 0)
-            await RunAsync("git", "push origin HEAD", repoDir);
+        {
+            progresso?.Invoke("Enviando para o GitHub...");
+            await RunAsync("git", "push origin main", repoDir);
+        }
     }
 
     // Verifica se git está instalado
@@ -239,7 +248,8 @@ public static class GitHubService
         {
             progresso("Atualizando repositório (pull)...");
             await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
-            var r = await RunAsync("git", "pull --rebase origin HEAD", repoDir);
+            await RunAsync("git", "fetch origin main", repoDir);
+            var r = await RunAsync("git", "rebase origin/main", repoDir);
             if (r.exitCode != 0) throw new Exception($"Pull falhou: {r.stderr}");
             progresso("Repositório atualizado.");
         }
@@ -261,7 +271,7 @@ public static class GitHubService
 
         // 5. Push
         progresso("Enviando ao GitHub (push)...");
-        var push = await RunAsync("git", "push origin HEAD", repoDir);
+        var push = await RunAsync("git", "push origin main", repoDir);
         if (push.exitCode != 0) throw new Exception($"Push falhou: {push.stderr}");
     }
 

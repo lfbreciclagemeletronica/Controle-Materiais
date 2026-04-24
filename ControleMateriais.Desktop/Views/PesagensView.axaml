@@ -10,43 +10,51 @@
                                TrueBrush="#4CAF50"
                                FalseBrush="#F44336"/>
     <conv:StatusPesagemBrushConverter x:Key="StatusCorBrush"/>
+    <conv:StringEqualsConverter x:Key="StrEq"/>
   </UserControl.Resources>
 
   <UserControl.Styles>
-    <Style Selector="Button.filtro">
+    <Style Selector="ToggleButton.filtro">
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+      <Setter Property="BorderBrush" Value="#555555"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="CornerRadius" Value="6"/>
       <Setter Property="Padding" Value="14,5"/>
       <Setter Property="FontSize" Value="12"/>
-      <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="FontWeight" Value="Normal"/>
       <Setter Property="Cursor" Value="Hand"/>
     </Style>
-    <Style Selector="Button.filtro:pointerover">
+    <Style Selector="ToggleButton.filtro:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="#22FFFFFF"/>
     </Style>
-    <Style Selector="Button.filtro.ativo">
-      <Setter Property="Background" Value="#22FFFFFF"/>
-      <Setter Property="Foreground" Value="White"/>
+    <Style Selector="ToggleButton.filtro:checked /template/ ContentPresenter">
+      <Setter Property="Background" Value="#334CAF50"/>
+      <Setter Property="BorderBrush" Value="#4CAF50"/>
+    </Style>
+    <Style Selector="ToggleButton.filtro:checked">
+      <Setter Property="BorderBrush" Value="#4CAF50"/>
       <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+    <Style Selector="ToggleButton.filtro:checked:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#4A4CAF50"/>
     </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource Brush.SurfaceAlt}"
           BorderBrush="{DynamicResource Brush.Border}"
           BorderThickness="1" CornerRadius="10" Padding="16">
-    <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <Grid RowDefinitions="Auto,*">
 
-      <!-- Cabeçalho -->
-      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,10">
+      <!-- Cabeçalho global -->
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
         <Button Grid.Column="0"
                 Content="← Início"
                 HorizontalAlignment="Left"
                 Command="{Binding VoltarCommand}"/>
 
         <TextBlock Grid.Column="1"
-                   Text="Pesagens"
+                   Text="Sistema de Recibos"
                    Classes="h1"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"/>
@@ -55,144 +63,260 @@
                 Content="+ Novo"
                 Classes="primary"
                 HorizontalAlignment="Right"
-                Margin="0,0,8,0"
                 Command="{Binding CriarNovoCommand}"
                 ToolTip.Tip="Criar recibo do zero sem pesagem"/>
-
-        <Button Grid.Column="3"
-                Content="⟳ Sincronizar"
-                HorizontalAlignment="Right"
-                IsEnabled="{Binding !Sincronizando}"
-                Command="{Binding SincronizarCommand}"
-                ToolTip.Tip="Sincronizar com repositório GitHub"/>
       </Grid>
 
-      <!-- Filtros de status -->
-      <StackPanel Grid.Row="1"
-                  Orientation="Horizontal"
-                  Spacing="6"
-                  Margin="0,0,0,8">
-        <Button Classes="filtro"
-                Content="Todos"
-                Tag="todos"
-                Click="FiltroButton_Click"/>
-        <Button Classes="filtro"
-                Content="pendente"
-                Tag="pendente"
-                Foreground="#FF9800"
-                Click="FiltroButton_Click"/>
-        <Button Classes="filtro"
-                Content="concluido"
-                Tag="concluido"
-                Foreground="#4CAF50"
-                Click="FiltroButton_Click"/>
-        <Button Classes="filtro"
-                Content="falhou"
-                Tag="falhou"
-                Foreground="#F44336"
-                Click="FiltroButton_Click"/>
-      </StackPanel>
+      <!-- TabControl -->
+      <TabControl Grid.Row="1" Name="MainTabControl">
 
-      <!-- Status de sincronização -->
-      <TextBlock Grid.Row="2"
-                 Text="{Binding Status}"
-                 IsVisible="{Binding StatusVisivel}"
-                 HorizontalAlignment="Center"
-                 FontSize="12"
-                 Margin="0,0,0,8"
-                 Foreground="{Binding StatusOk, Converter={StaticResource SyncStatusBrush}}"/>
+        <!-- ══════════════════════════════════════════════════
+             ABA 1: PESAGENS
+             ══════════════════════════════════════════════════ -->
+        <TabItem Header="Pesagens">
+          <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-      <!-- Corpo -->
-      <Grid Grid.Row="3">
-
-        <!-- Sem repositório local -->
-        <StackPanel IsVisible="{Binding !RepoPresenteLocal}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="12">
-          <TextBlock Text="Repositório não sincronizado neste computador."
-                     HorizontalAlignment="Center"
-                     Foreground="{DynamicResource Brush.TextSecondary}"
-                     FontSize="13"/>
-          <Button Content="⟳ Sincronizar agora"
-                  HorizontalAlignment="Center"
-                  IsEnabled="{Binding !Sincronizando}"
-                  Command="{Binding SincronizarCommand}"/>
-        </StackPanel>
-
-        <!-- Repositório presente mas lista filtrada vazia -->
-        <TextBlock IsVisible="{Binding ListaVazia}"
-                   Text="Nenhuma pesagem encontrada para este filtro."
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource Brush.TextSecondary}"
-                   FontSize="13"/>
-
-        <!-- Lista -->
-        <Border IsVisible="{Binding RepoPresenteLocal}"
-                Background="{DynamicResource Brush.SurfaceAlt}"
-                BorderBrush="{DynamicResource Brush.Border}"
-                BorderThickness="1" CornerRadius="8" Padding="8">
-          <Grid RowDefinitions="Auto,*">
-
-            <!-- Cabeçalho da tabela -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,200,130" Margin="12,4,12,6">
-              <TextBlock Grid.Column="0" Text="Cliente" FontWeight="Bold"
-                         Foreground="{DynamicResource Brush.TextPrimary}"/>
-              <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
-                         Foreground="{DynamicResource Brush.TextPrimary}"/>
-              <TextBlock Grid.Column="2" Text="Status" FontWeight="Bold"
-                         Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+            <!-- Barra: filtros + Sincronizar -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,8">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ToggleButton Classes="filtro"
+                              Content="Todos"
+                              IsChecked="{Binding FiltroStatus, Converter={StaticResource StrEq}, ConverterParameter=todos, Mode=OneWay}"
+                              Tag="todos"
+                              Click="FiltroButton_Click"/>
+                <ToggleButton Classes="filtro"
+                              Content="{Binding LabelPendente}"
+                              IsChecked="{Binding FiltroStatus, Converter={StaticResource StrEq}, ConverterParameter=pendente, Mode=OneWay}"
+                              Tag="pendente"
+                              Click="FiltroButton_Click"/>
+                <ToggleButton Classes="filtro"
+                              Content="{Binding LabelConcluido}"
+                              IsChecked="{Binding FiltroStatus, Converter={StaticResource StrEq}, ConverterParameter=concluido, Mode=OneWay}"
+                              Tag="concluido"
+                              Click="FiltroButton_Click"/>
+                <ToggleButton Classes="filtro"
+                              Content="{Binding LabelFalhou}"
+                              IsChecked="{Binding FiltroStatus, Converter={StaticResource StrEq}, ConverterParameter=falhou, Mode=OneWay}"
+                              Tag="falhou"
+                              Click="FiltroButton_Click"/>
+              </StackPanel>
+              <Button Grid.Column="1"
+                      Content="⟳ Sincronizar"
+                      IsEnabled="{Binding !Sincronizando}"
+                      Command="{Binding SincronizarCommand}"
+                      ToolTip.Tip="Sincronizar pesagens com repositório GitHub"/>
             </Grid>
 
-            <!-- Linhas clicáveis -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding PesagensFiltradas}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:PesagemItem">
-                    <Border BorderBrush="{DynamicResource Brush.Border}"
-                            BorderThickness="0,0,0,1"
-                            Padding="0,6"
-                            Cursor="Hand"
-                            PointerPressed="PesagemRow_PointerPressed">
-                      <Border.Styles>
-                        <Style Selector="Border:pointerover">
-                          <Setter Property="Background" Value="#22FFFFFF"/>
-                        </Style>
-                      </Border.Styles>
-                      <Grid ColumnDefinitions="*,200,130" Margin="12,2">
+            <!-- Status sincronização pesagens -->
+            <StackPanel Grid.Row="1" Margin="0,0,0,6" Spacing="2">
+              <TextBlock Text="{Binding Status}"
+                         IsVisible="{Binding StatusVisivel}"
+                         HorizontalAlignment="Center"
+                         FontSize="12"
+                         Foreground="{Binding StatusOk, Converter={StaticResource SyncStatusBrush}}"/>
+              <TextBlock Text="{Binding UltimaSincPesagens}"
+                         IsVisible="{Binding UltimaSincPesagensVisivel}"
+                         HorizontalAlignment="Center"
+                         FontSize="11"
+                         Foreground="#4CAF50"/>
+            </StackPanel>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding Cliente}"
-                                   VerticalAlignment="Center"
-                                   FontSize="13"
-                                   Foreground="White"/>
+            <!-- Sem repositório local -->
+            <StackPanel Grid.Row="2"
+                        IsVisible="{Binding !RepoPresenteLocal}"
+                        HorizontalAlignment="Center"
+                        Spacing="12"
+                        Margin="0,24,0,0">
+              <TextBlock Text="Repositório não sincronizado neste computador."
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource Brush.TextSecondary}"
+                         FontSize="13"/>
+              <Button Content="⟳ Sincronizar agora"
+                      HorizontalAlignment="Center"
+                      IsEnabled="{Binding !Sincronizando}"
+                      Command="{Binding SincronizarCommand}"/>
+            </StackPanel>
 
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding Horario}"
-                                   VerticalAlignment="Center"
-                                   FontSize="12"
-                                   Foreground="White"/>
+            <!-- Lista pesagens -->
+            <Border Grid.Row="3"
+                    IsVisible="{Binding RepoPresenteLocal}"
+                    Background="{DynamicResource Brush.SurfaceAlt}"
+                    BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="1" CornerRadius="8" Padding="8">
+              <Grid RowDefinitions="Auto,*">
 
-                        <TextBlock Grid.Column="2"
-                                   Text="{Binding StatusPesagem}"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   FontWeight="Bold"
-                                   FontSize="12"
-                                   Foreground="{Binding StatusPesagem, Converter={StaticResource StatusCorBrush}}"/>
+                <Grid Grid.Row="0" ColumnDefinitions="*,200,130" Margin="12,4,12,6">
+                  <TextBlock Grid.Column="0" Text="Cliente" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}"/>
+                  <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}"/>
+                  <TextBlock Grid.Column="2" Text="Status" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+                </Grid>
 
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </ScrollViewer>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding PesagensFiltradas}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PesagemItem">
+                        <Border BorderBrush="{DynamicResource Brush.Border}"
+                                BorderThickness="0,0,0,1"
+                                Padding="0,6"
+                                Cursor="Hand"
+                                PointerPressed="PesagemRow_PointerPressed">
+                          <Border.Styles>
+                            <Style Selector="Border:pointerover">
+                              <Setter Property="Background" Value="#22FFFFFF"/>
+                            </Style>
+                          </Border.Styles>
+                          <Grid ColumnDefinitions="*,200,130" Margin="12,2">
+                            <TextBlock Grid.Column="0" Text="{Binding Cliente}"
+                                       VerticalAlignment="Center" FontSize="13" Foreground="White"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Horario}"
+                                       VerticalAlignment="Center" FontSize="12" Foreground="White"/>
+                            <TextBlock Grid.Column="2" Text="{Binding StatusPesagem}"
+                                       VerticalAlignment="Center" HorizontalAlignment="Center"
+                                       FontWeight="Bold" FontSize="12"
+                                       Foreground="{Binding StatusPesagem, Converter={StaticResource StatusCorBrush}}"/>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+
+              </Grid>
+            </Border>
+
+            <!-- Lista vazia -->
+            <TextBlock Grid.Row="3"
+                       IsVisible="{Binding ListaVazia}"
+                       Text="Nenhuma pesagem encontrada para este filtro."
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource Brush.TextSecondary}"
+                       FontSize="13"/>
 
           </Grid>
-        </Border>
+        </TabItem>
 
-      </Grid>
+        <!-- ══════════════════════════════════════════════════
+             ABA 2: RECIBOS
+             ══════════════════════════════════════════════════ -->
+        <TabItem Header="Recibos">
+          <Grid RowDefinitions="Auto,Auto,*">
+
+            <!-- Barra: botão Sincronizar -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,8">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusRecibos}"
+                           IsVisible="{Binding StatusRecibosVisivel}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Foreground="{Binding StatusRecibosOk, Converter={StaticResource SyncStatusBrush}}"/>
+              </StackPanel>
+              <Button Grid.Column="1"
+                      Content="⟳ Sincronizar"
+                      IsEnabled="{Binding !SincronizandoRecibos}"
+                      Command="{Binding SincronizarRecibosCommand}"
+                      ToolTip.Tip="Sincronizar recibos com repositório GitHub"/>
+            </Grid>
+
+            <!-- Última sincronização -->
+            <TextBlock Grid.Row="1"
+                       Text="{Binding UltimaSincRecibos}"
+                       IsVisible="{Binding UltimaSincRecibosVisivel}"
+                       HorizontalAlignment="Center"
+                       FontSize="11"
+                       Foreground="#4CAF50"
+                       Margin="0,0,0,6"/>
+
+            <!-- Corpo -->
+            <Grid Grid.Row="2">
+
+              <!-- Sem repositório Recibos clonado -->
+              <StackPanel IsVisible="{Binding !RecibosDirPresente}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Spacing="12">
+                <TextBlock Text="Repositório de Recibos não sincronizado."
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource Brush.TextSecondary}"
+                           FontSize="13"/>
+                <Button Content="⟳ Sincronizar agora"
+                        HorizontalAlignment="Center"
+                        IsEnabled="{Binding !SincronizandoRecibos}"
+                        Command="{Binding SincronizarRecibosCommand}"/>
+              </StackPanel>
+
+              <!-- Lista vazia de PDFs -->
+              <TextBlock IsVisible="{Binding RecibosListaVazia}"
+                         Text="Nenhum recibo encontrado no repositório local."
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource Brush.TextSecondary}"
+                         FontSize="13"/>
+
+              <!-- Lista de PDFs -->
+              <Border IsVisible="{Binding RecibosDirPresente}"
+                      Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="{DynamicResource Brush.Border}"
+                      BorderThickness="1" CornerRadius="8" Padding="8">
+                <Grid RowDefinitions="Auto,*">
+
+                  <!-- Cabeçalho -->
+                  <Grid Grid.Row="0" ColumnDefinitions="*,180,Auto" Margin="12,4,12,6">
+                    <TextBlock Grid.Column="0" Text="Recibo" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="2" Text="" Width="80"/>
+                  </Grid>
+
+                  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Recibos}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ReciboItem">
+                          <Border BorderBrush="{DynamicResource Brush.Border}"
+                                  BorderThickness="0,0,0,1"
+                                  Padding="0,6">
+                            <Border.Styles>
+                              <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#22FFFFFF"/>
+                              </Style>
+                            </Border.Styles>
+                            <Grid ColumnDefinitions="*,180,Auto" Margin="12,2">
+                              <TextBlock Grid.Column="0"
+                                         Text="{Binding NomeArquivo}"
+                                         VerticalAlignment="Center"
+                                         FontSize="13"
+                                         TextTrimming="CharacterEllipsis"
+                                         Foreground="White"/>
+                              <TextBlock Grid.Column="1"
+                                         Text="{Binding DataCriacao}"
+                                         VerticalAlignment="Center"
+                                         FontSize="12"
+                                         Foreground="White"/>
+                              <Button Grid.Column="2"
+                                      Content="📄 Abrir"
+                                      Width="76"
+                                      FontSize="12"
+                                      Click="AbrirPdf_Click"
+                                      ToolTip.Tip="Abrir PDF do recibo"/>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+
+                </Grid>
+              </Border>
+
+            </Grid>
+          </Grid>
+        </TabItem>
+
+      </TabControl>
 
     </Grid>
   </Border>

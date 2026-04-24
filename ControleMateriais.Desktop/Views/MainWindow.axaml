@@ -18,6 +18,9 @@
         <conv:BoolToBrushConverter x:Key="SelectedRowBrush"
                                    TrueBrush="#2A4FC3F7"
                                    FalseBrush="Transparent"/>
+        <conv:BoolToBrushConverter x:Key="SyncStatusBrush"
+                                   TrueBrush="#4CAF50"
+                                   FalseBrush="#F44336"/>
     </Window.Resources>
 
   <Grid Background="{DynamicResource Brush.Surface}">
@@ -103,20 +106,39 @@
             <Grid RowDefinitions="Auto,*,Auto">
 
               <!-- Cabeçalho -->
-              <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <TextBlock Text="Tabela de Preços"
-                             FontSize="16" FontWeight="Bold"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource Brush.TextPrimary}"/>
-                  <TextBlock Text="{Binding TabelaVM.TabelaAtivaLabel}"
-                             VerticalAlignment="Center"
-                             Classes="muted" FontSize="11"/>
+              <Grid Grid.Row="0" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="Tabela de Preços"
+                               FontSize="16" FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Text="{Binding TabelaVM.TabelaAtivaLabel}"
+                               VerticalAlignment="Center"
+                               Classes="muted" FontSize="11"/>
+                  </StackPanel>
+                  <Button Grid.Column="1"
+                          Content="⟳ Sincronizar"
+                          VerticalAlignment="Center"
+                          Margin="0,0,8,0"
+                          IsEnabled="{Binding TabelaVM.Sincronizando, Converter={StaticResource BoolNot}}"
+                          Command="{Binding TabelaVM.SincronizarCommand}"/>
+                  <Button Grid.Column="2"
+                          Content="Fechar"
+                          VerticalAlignment="Center"
+                          Command="{Binding TabelaVM.FecharCommand}"/>
+                </Grid>
+                <!-- Status de sincronização -->
+                <StackPanel Grid.Row="1" Orientation="Vertical" Spacing="2" Margin="0,4,0,0">
+                  <TextBlock Text="{Binding TabelaVM.StatusSync}"
+                             IsVisible="{Binding TabelaVM.StatusSyncVisivel}"
+                             HorizontalAlignment="Center" FontSize="12"
+                             Foreground="{Binding TabelaVM.StatusSyncOk, Converter={StaticResource SyncStatusBrush}}"/>
+                  <TextBlock Text="{Binding TabelaVM.UltimaSync}"
+                             IsVisible="{Binding TabelaVM.UltimaSyncVisivel}"
+                             HorizontalAlignment="Center" FontSize="11"
+                             Foreground="#4CAF50"/>
                 </StackPanel>
-                <Button Grid.Column="1"
-                        Content="Fechar"
-                        VerticalAlignment="Center"
-                        Command="{Binding TabelaVM.FecharCommand}"/>
               </Grid>
 
               <!-- Corpo: lista à esquerda + editor à direita -->

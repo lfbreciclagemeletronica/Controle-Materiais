@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Serialization;
+using ControleMateriais.Desktop.Services;
 using ControleMateriais.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -124,6 +125,37 @@ namespace ControleMateriais.Desktop.ViewModels
         public event EventHandler? CloseRequested;
         public event EventHandler<TabelaAtivadaEventArgs>? PrecosAtualizados;
 
+        // ── Status sincronização ───────────────────────────────────────────────
+        private string _statusSync = string.Empty;
+        public string StatusSync
+        {
+            get => _statusSync;
+            private set { if (value != _statusSync) { _statusSync = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusSyncVisivel)); } }
+        }
+        public bool StatusSyncVisivel => !string.IsNullOrEmpty(_statusSync);
+
+        private bool _statusSyncOk = true;
+        public bool StatusSyncOk
+        {
+            get => _statusSyncOk;
+            private set { if (value != _statusSyncOk) { _statusSyncOk = value; OnPropertyChanged(); } }
+        }
+
+        private bool _sincronizando;
+        public bool Sincronizando
+        {
+            get => _sincronizando;
+            private set { if (value != _sincronizando) { _sincronizando = value; OnPropertyChanged(); } }
+        }
+
+        private string _ultimaSync = string.Empty;
+        public string UltimaSync
+        {
+            get => _ultimaSync;
+            private set { if (value != _ultimaSync) { _ultimaSync = value; OnPropertyChanged(); OnPropertyChanged(nameof(UltimaSyncVisivel)); } }
+        }
+        public bool UltimaSyncVisivel => !string.IsNullOrEmpty(_ultimaSync);
+
         // ── Commands ──────────────────────────────────────────────────────────
         public ICommand FecharCommand { get; }
         public ICommand NovaTabelaCommand { get; }
@@ -135,6 +167,7 @@ namespace ControleMateriais.Desktop.ViewModels
         public ICommand ExportarTabelaPdfCommand { get; }
         public ICommand ImportarDePdfCommand { get; }
         public ICommand SelecionarItemCommand { get; }
+        public ICommand SincronizarCommand { get; }
 
         public PriceTableManagerViewModel(ObservableCollection<MaterialItem> itensMain)
         {
@@ -162,12 +195,66 @@ namespace ControleMateriais.Desktop.ViewModels
                 foreach (var w in ItensEdicao)
                     w.IsSelected = ReferenceEquals(w, item);
             });
+            SincronizarCommand = new DelegateCommand(async () => await SincronizarAsync(), () => !Sincronizando);
+        }
+
+        private void AtualizarStatus(string msg, bool ok = true)
+        {
+            StatusSyncOk = ok;
+            StatusSync   = msg;
+        }
+
+        public async Task SincronizarAsync()
+        {
+            if (Sincronizando) return;
+            Sincronizando = true;
+            (SincronizarCommand as DelegateCommand)?.RaiseCanExecuteChanged();
+            try
+            {
+                if (!GitHubService.CredenciaisExistem(RootDir))
+                {
+                    AtualizarStatus("Configure as credenciais do GitHub antes de sincronizar.", ok: false);
+                    return;
+                }
+                await GitHubService.SincronizarTabelaPrecosAsync(RootDir, msg => AtualizarStatus(msg));
+                UltimaSync = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                AtualizarStatus(string.Empty);
+                // Recarrega a lista pois podem ter chegado novas tabelas do remoto
+                await RecarregarListaAsync();
+            }
+            catch (Exception ex)
+            {
+                AtualizarStatus($"Erro: {ex.Message}", ok: false);
+            }
+            finally
+            {
+                Sincronizando = false;
+                (SincronizarCommand as DelegateCommand)?.RaiseCanExecuteChanged();
+            }
         }
 
         // ── Inicialização: carrega lista de tabelas ───────────────────────────
         public async Task InicializarAsync()
         {
-            Directory.CreateDirectory(BaseDir);
+            // Garante que o repo está clonado/migrado antes de carregar
+            if (GitHubService.CredenciaisExistem(RootDir))
+            {
+                try
+                {
+                    AtualizarStatus("Inicializando repositório de Tabelas de Preços...");
+                    await GitHubService.GarantirTabelaPrecosRepoAsync(RootDir, msg => AtualizarStatus(msg));
+                    UltimaSync = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                    AtualizarStatus(string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    AtualizarStatus($"Aviso: {ex.Message}", ok: false);
+                }
+            }
+            else
+            {
+                Directory.CreateDirectory(BaseDir);
+            }
             await RecarregarListaAsync();
         }
 
@@ -246,12 +333,10 @@ namespace ControleMateriais.Desktop.ViewModels
         {
             if (!PodeSalvarNova()) return;
 
-            // Confirma edição de todos os wrappers antes de salvar
             foreach (var w in ItensEdicao)
                 w.ConfirmarEdicao();
 
             var nome = NovoNome.Trim();
-            // Sanitiza nome para arquivo
             foreach (var c in Path.GetInvalidFileNameChars())
                 nome = nome.Replace(c, '_');
 
@@ -273,9 +358,10 @@ namespace ControleMateriais.Desktop.ViewModels
 
             CriandoNova = false;
             await RecarregarListaAsync();
-
-            // Seleciona a tabela recém-criada
             TabelaSelecionada = Tabelas.FirstOrDefault(t => t.Arquivo == arquivo);
+
+            // Sincroniza com GitHub em background
+            _ = SincronizarComGitHubAsync(arquivo, $"Nova tabela: {NovoNome.Trim()}");
         }
 
         // ── Salvar tabela selecionada ─────────────────────────────────────────
@@ -288,6 +374,9 @@ namespace ControleMateriais.Desktop.ViewModels
 
             await SalvarTabelaAtualAsync(_tabelaSelecionada);
             TabelaSalvaRequested?.Invoke(this, _tabelaSelecionada.Nome);
+
+            // Sincroniza com GitHub em background
+            _ = SincronizarComGitHubAsync(_tabelaSelecionada.Arquivo, $"Atualizar tabela: {_tabelaSelecionada.Nome}");
         }
 
         public event EventHandler<string>? TabelaSalvaRequested;
@@ -721,6 +810,9 @@ namespace ControleMateriais.Desktop.ViewModels
         {
             if (_tabelaSelecionada is null) return;
 
+            var nomeArquivo = Path.GetFileName(_tabelaSelecionada.Arquivo);
+            var nomeTabelaExcluida = _tabelaSelecionada.Nome;
+
             try { File.Delete(_tabelaSelecionada.Arquivo); } catch { }
 
             if (_tabelaAtivaArquivo == _tabelaSelecionada.Arquivo)
@@ -728,6 +820,43 @@ namespace ControleMateriais.Desktop.ViewModels
 
             TabelaSelecionada = null;
             await RecarregarListaAsync();
+
+            // Remove do repo GitHub em background
+            _ = RemoverDoGitHubAsync(nomeArquivo, nomeTabelaExcluida);
+        }
+
+        private async Task SincronizarComGitHubAsync(string arquivo, string mensagemCommit)
+        {
+            if (!GitHubService.CredenciaisExistem(RootDir)) return;
+            try
+            {
+                AtualizarStatus("Sincronizando com GitHub...");
+                await GitHubService.PublicarTabelaAsync(RootDir, arquivo, mensagemCommit,
+                    msg => AtualizarStatus(msg));
+                UltimaSync = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                AtualizarStatus(string.Empty);
+            }
+            catch (Exception ex)
+            {
+                AtualizarStatus($"Aviso: não foi possível sincronizar — {ex.Message}", ok: false);
+            }
+        }
+
+        private async Task RemoverDoGitHubAsync(string nomeArquivo, string nomeTabela)
+        {
+            if (!GitHubService.CredenciaisExistem(RootDir)) return;
+            try
+            {
+                AtualizarStatus("Removendo do GitHub...");
+                await GitHubService.RemoverTabelaAsync(RootDir, nomeArquivo,
+                    msg => AtualizarStatus(msg));
+                UltimaSync = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                AtualizarStatus(string.Empty);
+            }
+            catch (Exception ex)
+            {
+                AtualizarStatus($"Aviso: não foi possível remover do GitHub — {ex.Message}", ok: false);
+            }
         }
 
         // ── DTOs de persistência ──────────────────────────────────────────────

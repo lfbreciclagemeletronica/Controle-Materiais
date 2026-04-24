@@ -305,7 +305,7 @@ public class PesagensViewModel : ViewModelBase
             await GitHubService.RunGit($"config user.name \"{creds.GitUsuario}\"", repoDir);
 
             // 5. Renomear arquivos JSON concluídos que ainda não têm sufixo _concluido
-            var renomeados = 0;
+            var renomeados = new List<(string novoNome, string cliente)>();
             foreach (var file in Directory.GetFiles(repoDir, "*.json", SearchOption.TopDirectoryOnly))
             {
                 var nomeArquivo = Path.GetFileName(file);
@@ -320,29 +320,32 @@ public class PesagensViewModel : ViewModelBase
                     if (!root.TryGetProperty("StatusPesagem", out var sp)) continue;
                     if (!"concluido".Equals(sp.GetString(), StringComparison.OrdinalIgnoreCase)) continue;
 
+                    var clienteNome = root.TryGetProperty("Cliente", out var cl) ? cl.GetString() ?? string.Empty : string.Empty;
+
                     var semExt   = Path.GetFileNameWithoutExtension(nomeArquivo);
                     var novoNome = $"{semExt}_concluido.json";
-                    var novoCaminho = Path.Combine(repoDir, novoNome);
 
-                    // git mv para manter histórico
                     var mv = await GitHubService.RunGit($"mv \"{nomeArquivo}\" \"{novoNome}\"", repoDir);
                     if (mv.exitCode == 0)
-                        renomeados++;
+                        renomeados.Add((novoNome, clienteNome));
                 }
                 catch { }
             }
 
-            // 6. Commit e push se houve renomeações
-            if (renomeados > 0)
+            // 6. Commit individual por pesagem e push único ao final
+            if (renomeados.Count > 0)
             {
-                MostrarStatus($"Renomeando {renomeados} arquivo(s) concluído(s)...", ok: true);
-                var commit = await GitHubService.RunGit(
-                    $"commit -m \"Renomear {renomeados} pesagem(ns) concluída(s)\"", repoDir);
-                if (commit.exitCode == 0)
+                foreach (var (novoNome, cliente) in renomeados)
                 {
-                    MostrarStatus("Enviando alterações ao GitHub...", ok: true);
-                    await GitHubService.RunGit("push origin main", repoDir);
+                    MostrarStatus($"Commitando: {novoNome}...", ok: true);
+                    var msgCommit = string.IsNullOrWhiteSpace(cliente)
+                        ? $"Pesagem concluída: {novoNome}"
+                        : $"{cliente} - pesagem concluída";
+                    await GitHubService.RunGit($"add \"{novoNome}\"", repoDir);
+                    await GitHubService.RunGit($"commit -m \"{msgCommit}\"", repoDir);
                 }
+                MostrarStatus("Enviando alterações ao GitHub...", ok: true);
+                await GitHubService.RunGit("push origin main", repoDir);
             }
 
             OnPropertyChanged(nameof(RepoPresenteLocal));

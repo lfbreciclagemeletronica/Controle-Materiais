@@ -11,7 +11,8 @@ public static class GitHubService
     private const string CredenciaisFileName = "credenciais.json";
     private const string RepoOwner = "lfbreciclagemeletronica";
     private const string RepoName  = "Pesagens";
-    private const string ReciboRepoName = "Recibos";
+    private const string ReciboRepoName       = "Recibos";
+    private const string TabelaPrecosRepoName = "TabelaPrecos";
 
     public static string CredenciaisPath(string rootDir) =>
         Path.Combine(rootDir, CredenciaisFileName);
@@ -41,6 +42,10 @@ public static class GitHubService
     // Diretório local do clone de Recibos
     public static string RecibosRepoDir(string rootDir) =>
         Path.Combine(rootDir, "Recibos");
+
+    // Diretório local do clone de TabelaPrecos
+    public static string TabelaPrecosRepoDir(string rootDir) =>
+        Path.Combine(rootDir, "TabelaPrecos");
 
     /// <summary>
     /// Garante que o repo Recibos está clonado localmente.
@@ -161,6 +166,183 @@ public static class GitHubService
         }
 
         progresso("Recibos sincronizados.");
+    }
+
+    /// <summary>
+    /// Garante que o repo TabelaPrecos está clonado localmente.
+    /// Se já existir um diretório "TabelaPrecos" com JSONs (sem .git), migra os arquivos para o repo clonado.
+    /// </summary>
+    public static async Task GarantirTabelaPrecosRepoAsync(string rootDir, Action<string> progresso)
+    {
+        if (!CredenciaisExistem(rootDir))
+            throw new InvalidOperationException("Configure as credenciais do GitHub antes de sincronizar.");
+
+        var creds     = CarregarCredenciais(rootDir)!;
+        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        var repoDir   = TabelaPrecosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+        var tempDir   = Path.Combine(rootDir, "tabelaprecos-repo-temp");
+
+        if (!Directory.Exists(gitDir))
+        {
+            // Verifica arquivos legados (JSONs sem .git)
+            string[]? jsonsLegados = null;
+            if (Directory.Exists(repoDir))
+                jsonsLegados = Directory.GetFiles(repoDir, "*.json", SearchOption.TopDirectoryOnly);
+
+            // Clona para pasta temporária
+            progresso("Clonando repositório de Tabelas de Preços...");
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            Directory.CreateDirectory(tempDir);
+            var r = await RunAsync("git", $"clone {remoteUrl} .", tempDir);
+            if (r.exitCode != 0)
+                throw new Exception($"Clone do repo TabelaPrecos falhou: {r.stderr}");
+            progresso("Clone concluído.");
+
+            // Migra JSONs legados para o repo clonado
+            if (jsonsLegados is { Length: > 0 })
+            {
+                progresso($"Migrando {jsonsLegados.Length} tabela(s) existente(s)...");
+                await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", tempDir);
+                await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", tempDir);
+                foreach (var json in jsonsLegados)
+                    File.Copy(json, Path.Combine(tempDir, Path.GetFileName(json)), overwrite: true);
+                await RunAsync("git", "add .", tempDir);
+                var commit = await RunAsync("git", "commit -m \"Migração de tabelas de preços existentes\"", tempDir);
+                if (commit.exitCode == 0)
+                {
+                    progresso("Enviando tabelas migradas ao GitHub...");
+                    await RunAsync("git", "push origin main", tempDir);
+                }
+                Directory.Delete(repoDir, true);
+            }
+            else if (Directory.Exists(repoDir))
+            {
+                Directory.Delete(repoDir, true);
+            }
+
+            Directory.Move(tempDir, repoDir);
+            progresso("Repositório de Tabelas de Preços pronto.");
+        }
+        else
+        {
+            progresso("Atualizando repositório de Tabelas de Preços...");
+            await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+            await RunAsync("git", "fetch origin main", repoDir);
+            await RunAsync("git", "rebase origin/main", repoDir);
+        }
+    }
+
+    /// <summary>
+    /// Sincroniza o repo TabelaPrecos: pull + push de JSONs locais não commitados.
+    /// Chama GarantirTabelaPrecosRepoAsync se ainda não clonado.
+    /// </summary>
+    public static async Task SincronizarTabelaPrecosAsync(string rootDir, Action<string> progresso)
+    {
+        if (!CredenciaisExistem(rootDir))
+            throw new InvalidOperationException("Configure as credenciais do GitHub na tela inicial.");
+
+        var creds     = CarregarCredenciais(rootDir)!;
+        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        var repoDir   = TabelaPrecosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+
+        if (!Directory.Exists(gitDir))
+        {
+            await GarantirTabelaPrecosRepoAsync(rootDir, progresso);
+            return;
+        }
+
+        progresso("Atualizando Tabelas de Preços (pull)...");
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+        await RunAsync("git", "fetch origin main", repoDir);
+        var pull = await RunAsync("git", "rebase origin/main", repoDir);
+        if (pull.exitCode != 0)
+            throw new Exception($"Pull do repo TabelaPrecos falhou: {pull.stderr}");
+
+        // Push de JSONs locais não commitados
+        progresso("Verificando tabelas locais não enviadas...");
+        await RunAsync("git", "add .", repoDir);
+        var status = await RunAsync("git", "status --porcelain", repoDir);
+        if (!string.IsNullOrWhiteSpace(status.stdout))
+        {
+            progresso("Enviando tabelas ao GitHub...");
+            var commit = await RunAsync("git", "commit -m \"Sincronização de tabelas de preços\"", repoDir);
+            if (commit.exitCode == 0)
+            {
+                var push = await RunAsync("git", "push origin main", repoDir);
+                if (push.exitCode != 0)
+                    throw new Exception($"Push do repo TabelaPrecos falhou: {push.stderr}");
+            }
+        }
+
+        progresso("Tabelas de Preços sincronizadas.");
+    }
+
+    /// <summary>
+    /// Faz commit e push de um arquivo JSON de tabela de preços específico.
+    /// </summary>
+    public static async Task PublicarTabelaAsync(string rootDir, string filePath, string mensagemCommit,
+                                                  Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+
+        var creds     = CarregarCredenciais(rootDir)!;
+        var repoDir   = TabelaPrecosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+
+        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        var destino = Path.Combine(repoDir, Path.GetFileName(filePath));
+        if (File.Exists(filePath) && filePath != destino)
+            File.Copy(filePath, destino, overwrite: true);
+
+        progresso?.Invoke("Adicionando arquivo...");
+        await RunAsync("git", $"add \"{Path.GetFileName(destino)}\"", repoDir);
+        progresso?.Invoke("Commitando...");
+        var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
+        if (commit.exitCode == 0)
+        {
+            progresso?.Invoke("Enviando para o GitHub...");
+            await RunAsync("git", "push origin main", repoDir);
+        }
+    }
+
+    /// <summary>
+    /// Remove um arquivo de tabela do repo e faz push.
+    /// </summary>
+    public static async Task RemoverTabelaAsync(string rootDir, string nomeArquivo, Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+
+        var creds     = CarregarCredenciais(rootDir)!;
+        var repoDir   = TabelaPrecosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+
+        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Removendo arquivo...");
+        var rm = await RunAsync("git", $"rm --ignore-unmatch \"{nomeArquivo}\"", repoDir);
+        if (rm.exitCode == 0 && !string.IsNullOrWhiteSpace(rm.stdout))
+        {
+            progresso?.Invoke("Commitando remoção...");
+            var commit = await RunAsync("git", $"commit -m \"Excluir tabela {nomeArquivo}\"", repoDir);
+            if (commit.exitCode == 0)
+            {
+                progresso?.Invoke("Enviando para o GitHub...");
+                await RunAsync("git", "push origin main", repoDir);
+            }
+        }
     }
 
     /// <summary>

@@ -9,10 +9,11 @@ namespace ControleMateriais.Desktop.Services;
 public static class GitHubService
 {
     private const string CredenciaisFileName = "credenciais.json";
-    private const string RepoOwner = "lfbreciclagemeletronica";
-    private const string RepoName  = "Pesagens";
-    private const string ReciboRepoName       = "Recibos";
-    private const string TabelaPrecosRepoName = "TabelaPrecos";
+
+    // Valores padrão legados (usados somente para migrar credenciais.json existentes sem URL)
+    private const string DefaultUrlPesagens     = "https://github.com/lfbreciclagemeletronica/Pesagens.git";
+    private const string DefaultUrlRecibos      = "https://github.com/lfbreciclagemeletronica/Recibos.git";
+    private const string DefaultUrlTabelaPrecos = "https://github.com/lfbreciclagemeletronica/TabelaPrecos.git";
 
     public static string CredenciaisPath(string rootDir) =>
         Path.Combine(rootDir, CredenciaisFileName);
@@ -24,13 +25,43 @@ public static class GitHubService
     {
         var path = CredenciaisPath(rootDir);
         if (!File.Exists(path)) return null;
-        return JsonSerializer.Deserialize<GitHubCredenciais>(File.ReadAllText(path));
+
+        var creds = JsonSerializer.Deserialize<GitHubCredenciais>(File.ReadAllText(path));
+        if (creds is null) return null;
+
+        // Migração: preenche URLs vazias com os valores que eram hardcoded e re-salva
+        var alterado = false;
+        if (string.IsNullOrWhiteSpace(creds.UrlPesagens))     { creds.UrlPesagens     = DefaultUrlPesagens;     alterado = true; }
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos))      { creds.UrlRecibos      = DefaultUrlRecibos;      alterado = true; }
+        if (string.IsNullOrWhiteSpace(creds.UrlTabelaPrecos)) { creds.UrlTabelaPrecos = DefaultUrlTabelaPrecos; alterado = true; }
+
+        if (alterado)
+            File.WriteAllText(path, JsonSerializer.Serialize(creds, new JsonSerializerOptions { WriteIndented = true }));
+
+        return creds;
     }
 
-    public static void SalvarCredenciais(string rootDir, string token, string gitUsuario, string gitEmail)
+    public static void SalvarCredenciais(
+        string rootDir,
+        string token,
+        string gitUsuario,
+        string gitEmail,
+        string urlPesagens,
+        string urlRecibos,
+        string urlTabelaPrecos,
+        string urlBancoDados)
     {
         Directory.CreateDirectory(rootDir);
-        var obj = new GitHubCredenciais { Token = token, GitUsuario = gitUsuario, GitEmail = gitEmail };
+        var obj = new GitHubCredenciais
+        {
+            Token           = token,
+            GitUsuario      = gitUsuario,
+            GitEmail        = gitEmail,
+            UrlPesagens     = urlPesagens,
+            UrlRecibos      = urlRecibos,
+            UrlTabelaPrecos = urlTabelaPrecos,
+            UrlBancoDados   = urlBancoDados
+        };
         File.WriteAllText(CredenciaisPath(rootDir),
             JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true }));
     }
@@ -57,7 +88,9 @@ public static class GitHubService
             throw new InvalidOperationException("Configure as credenciais do GitHub antes de exportar.");
 
         var creds     = CarregarCredenciais(rootDir)!;
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{ReciboRepoName}.git";
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos))
+            throw new InvalidOperationException("URL do repositório de Recibos não configurada. Edite as credenciais do GitHub.");
+        var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
         var repoDir   = RecibosRepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
         var tempDir   = Path.Combine(rootDir, "recibos-repo-temp");
@@ -114,6 +147,8 @@ public static class GitHubService
             // Já clonado — apenas pull
             progresso("Atualizando repositório de Recibos...");
             await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
             await RunAsync("git", "fetch origin main", repoDir);
             await RunAsync("git", "rebase origin/main", repoDir);
         }
@@ -128,7 +163,9 @@ public static class GitHubService
             throw new InvalidOperationException("Configure as credenciais do GitHub na tela inicial.");
 
         var creds     = CarregarCredenciais(rootDir)!;
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{ReciboRepoName}.git";
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos))
+            throw new InvalidOperationException("URL do repositório de Recibos não configurada. Edite as credenciais do GitHub.");
+        var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
         var repoDir   = RecibosRepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
 
@@ -178,7 +215,9 @@ public static class GitHubService
             throw new InvalidOperationException("Configure as credenciais do GitHub antes de sincronizar.");
 
         var creds     = CarregarCredenciais(rootDir)!;
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        if (string.IsNullOrWhiteSpace(creds.UrlTabelaPrecos))
+            throw new InvalidOperationException("URL do repositório de Tabela de Preços não configurada. Edite as credenciais do GitHub.");
+        var remoteUrl = InjetarToken(creds.UrlTabelaPrecos, creds.Token);
         var repoDir   = TabelaPrecosRepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
         var tempDir   = Path.Combine(rootDir, "tabelaprecos-repo-temp");
@@ -243,7 +282,9 @@ public static class GitHubService
             throw new InvalidOperationException("Configure as credenciais do GitHub na tela inicial.");
 
         var creds     = CarregarCredenciais(rootDir)!;
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        if (string.IsNullOrWhiteSpace(creds.UrlTabelaPrecos))
+            throw new InvalidOperationException("URL do repositório de Tabela de Preços não configurada. Edite as credenciais do GitHub.");
+        var remoteUrl = InjetarToken(creds.UrlTabelaPrecos, creds.Token);
         var repoDir   = TabelaPrecosRepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
 
@@ -293,8 +334,9 @@ public static class GitHubService
         var repoDir   = TabelaPrecosRepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
         if (!Directory.Exists(gitDir)) return;
+        if (string.IsNullOrWhiteSpace(creds.UrlTabelaPrecos)) return;
 
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        var remoteUrl = InjetarToken(creds.UrlTabelaPrecos, creds.Token);
         await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
@@ -325,8 +367,9 @@ public static class GitHubService
         var repoDir   = TabelaPrecosRepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
         if (!Directory.Exists(gitDir)) return;
+        if (string.IsNullOrWhiteSpace(creds.UrlTabelaPrecos)) return;
 
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{TabelaPrecosRepoName}.git";
+        var remoteUrl = InjetarToken(creds.UrlTabelaPrecos, creds.Token);
         await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
@@ -358,8 +401,9 @@ public static class GitHubService
         var gitDir  = Path.Combine(repoDir, ".git");
         if (!Directory.Exists(gitDir)) return;
 
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return;
         progresso?.Invoke("Configurando repositório...");
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{ReciboRepoName}.git";
+        var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
         await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
@@ -376,6 +420,88 @@ public static class GitHubService
         {
             progresso?.Invoke("Enviando para o GitHub...");
             await RunAsync("git", "push origin main", repoDir);
+        }
+    }
+
+    /// <summary>
+    /// Remove um arquivo PDF do repo Recibos e faz push.
+    /// </summary>
+    public static async Task RemoverReciboAsync(string rootDir, string nomeArquivo, Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+
+        var creds   = CarregarCredenciais(rootDir)!;
+        var repoDir = RecibosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return;
+
+        var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Atualizando repositório (pull)...");
+        await RunAsync("git", "fetch origin main", repoDir);
+        await RunAsync("git", "rebase origin/main", repoDir);
+
+        progresso?.Invoke("Removendo recibo...");
+        var rm = await RunAsync("git", $"rm --ignore-unmatch \"{nomeArquivo}\"", repoDir);
+        if (rm.exitCode == 0 && !string.IsNullOrWhiteSpace(rm.stdout))
+        {
+            progresso?.Invoke("Commitando remoção...");
+            var commit = await RunAsync("git", $"commit -m \"Excluir recibo {nomeArquivo}\"", repoDir);
+            if (commit.exitCode == 0)
+            {
+                progresso?.Invoke("Enviando para o GitHub...");
+                await RunAsync("git", "push origin main", repoDir);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Remove um arquivo JSON de pesagem do repo Pesagens e faz push.
+    /// </summary>
+    public static async Task RemoverPesagemAsync(string rootDir, string nomeArquivo, Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+
+        var creds   = CarregarCredenciais(rootDir)!;
+        var repoDir = RepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir))
+        {
+            var filePath = Path.Combine(repoDir, nomeArquivo);
+            if (File.Exists(filePath)) File.Delete(filePath);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(creds.UrlPesagens)) return;
+
+        var remoteUrl = InjetarToken(creds.UrlPesagens, creds.Token);
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Atualizando repositório (pull)...");
+        await RunAsync("git", "fetch origin main", repoDir);
+        await RunAsync("git", "rebase origin/main", repoDir);
+
+        progresso?.Invoke("Removendo pesagem...");
+        var rm = await RunAsync("git", $"rm --ignore-unmatch \"{nomeArquivo}\"", repoDir);
+        if (rm.exitCode == 0 && !string.IsNullOrWhiteSpace(rm.stdout))
+        {
+            progresso?.Invoke("Commitando remoção...");
+            var commit = await RunAsync("git", $"commit -m \"Excluir pesagem {nomeArquivo}\"", repoDir);
+            if (commit.exitCode == 0)
+            {
+                progresso?.Invoke("Enviando para o GitHub...");
+                await RunAsync("git", "push origin main", repoDir);
+            }
+        }
+        else
+        {
+            var filePath = Path.Combine(repoDir, nomeArquivo);
+            if (File.Exists(filePath)) File.Delete(filePath);
         }
     }
 
@@ -412,8 +538,9 @@ public static class GitHubService
         var creds = CarregarCredenciais(rootDir)
             ?? throw new InvalidOperationException("credenciais.json não encontrado.");
 
-        // git com token embutido na URL
-        var remoteUrl = $"https://{creds.Token}@github.com/{RepoOwner}/{RepoName}.git";
+        if (string.IsNullOrWhiteSpace(creds.UrlPesagens))
+            throw new InvalidOperationException("URL do repositório de Pesagens não configurada. Edite as credenciais do GitHub.");
+        var remoteUrl = InjetarToken(creds.UrlPesagens, creds.Token);
         var repoDir   = RepoDir(rootDir);
         var gitDir    = Path.Combine(repoDir, ".git");
 
@@ -457,6 +584,19 @@ public static class GitHubService
         if (push.exitCode != 0) throw new Exception($"Push falhou: {push.stderr}");
     }
 
+    /// <summary>
+    /// Injeta o token de autenticação em uma URL HTTPS do GitHub.
+    /// Suporta URLs no formato https://github.com/... ou https://token@github.com/...
+    /// </summary>
+    public static string InjetarTokenPublico(string url, string token) => InjetarToken(url, token);
+
+    private static string InjetarToken(string url, string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return url;
+        var uri = new Uri(url);
+        return $"{uri.Scheme}://{token}@{uri.Host}{uri.PathAndQuery}";
+    }
+
     public static Task<(int exitCode, string stdout, string stderr)> RunGit(string args, string workDir) =>
         RunAsync("git", args, workDir);
 
@@ -482,7 +622,11 @@ public static class GitHubService
 
 public class GitHubCredenciais
 {
-    public string Token      { get; set; } = string.Empty;
-    public string GitUsuario { get; set; } = string.Empty;
-    public string GitEmail   { get; set; } = string.Empty;
+    public string Token           { get; set; } = string.Empty;
+    public string GitUsuario      { get; set; } = string.Empty;
+    public string GitEmail        { get; set; } = string.Empty;
+    public string UrlPesagens     { get; set; } = string.Empty;
+    public string UrlRecibos      { get; set; } = string.Empty;
+    public string UrlTabelaPrecos { get; set; } = string.Empty;
+    public string UrlBancoDados   { get; set; } = string.Empty;
 }

@@ -26,7 +26,8 @@ public partial class HomeView : UserControl
         {
             GitHubService.SalvarCredenciais(
                 MainWindowViewModel.RootDirPublic,
-                config.Token, config.GitUsuario, config.GitEmail);
+                config.Token, config.GitUsuario, config.GitEmail,
+                config.UrlPesagens, config.UrlRecibos, config.UrlTabelaPrecos, config.UrlBancoDados);
 
             if (DataContext is MainWindowViewModel vm)
                 vm.GitConfigurado = true;

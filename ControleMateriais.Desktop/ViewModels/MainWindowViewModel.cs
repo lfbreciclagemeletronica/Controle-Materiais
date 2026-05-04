@@ -544,6 +544,7 @@ public class MainWindowViewModel : ViewModelBase
                 $"Recibo {NomeCliente} - {data:dd/MM/yyyy}",
                 msg => AtualizarStatusTela(msg));
             AtualizarStatusTela("Recibo enviado ao GitHub com sucesso.");
+            PesagensVM.NovoReciboPublicadoCallback?.Invoke();
         }
         catch (Exception ex)
         {
@@ -594,7 +595,8 @@ public class MainWindowViewModel : ViewModelBase
             if (GitHubService.CredenciaisExistem(RootDir))
             {
                 var creds     = GitHubService.CarregarCredenciais(RootDir)!;
-                var remoteUrl = $"https://{creds.Token}@github.com/lfbreciclagemeletronica/Pesagens.git";
+                if (string.IsNullOrWhiteSpace(creds.UrlPesagens)) return;
+                var remoteUrl = GitHubService.InjetarTokenPublico(creds.UrlPesagens, creds.Token);
                 await GitHubService.RunGit($"remote set-url origin {remoteUrl}", repoDir);
                 await GitHubService.RunGit($"config user.email \"{creds.GitEmail}\"", repoDir);
                 await GitHubService.RunGit($"config user.name \"{creds.GitUsuario}\"", repoDir);

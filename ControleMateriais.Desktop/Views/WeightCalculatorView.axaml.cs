@@ -45,7 +45,9 @@ public partial class WeightCalculatorView : UserControl
 
         var config = (GitHubConfigViewModel)dialog.DataContext!;
         if (config.Confirmado && DataContext is WeightCalculatorViewModel vm)
-            GitHubService.SalvarCredenciais(vm.RootDir, config.Token, config.GitUsuario, config.GitEmail);
+            GitHubService.SalvarCredenciais(vm.RootDir,
+                config.Token, config.GitUsuario, config.GitEmail,
+                config.UrlPesagens, config.UrlRecibos, config.UrlTabelaPrecos, config.UrlBancoDados);
     }
 
     private void PesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)

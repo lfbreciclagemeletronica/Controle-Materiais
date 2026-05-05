@@ -278,8 +278,12 @@ public static class GitHubService
             await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
             await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
             await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+            // Guarda mudanças locais para não bloquear o rebase
+            var stash = await RunAsync("git", "stash --include-untracked", repoDir);
+            var temStash = stash.exitCode == 0 && !stash.stdout.Contains("No local changes");
             await RunAsync("git", "fetch origin main", repoDir);
             await RunAsync("git", "rebase origin/main", repoDir);
+            if (temStash) await RunAsync("git", "stash pop", repoDir);
         }
     }
 
@@ -310,10 +314,14 @@ public static class GitHubService
         await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+        // Guarda mudanças locais para não bloquear o rebase
+        var stash = await RunAsync("git", "stash --include-untracked", repoDir);
+        var temStash = stash.exitCode == 0 && !stash.stdout.Contains("No local changes");
         await RunAsync("git", "fetch origin main", repoDir);
         var pull = await RunAsync("git", "rebase origin/main", repoDir);
         if (pull.exitCode != 0)
             throw new Exception($"Pull do repo Recibos falhou: {pull.stderr}");
+        if (temStash) await RunAsync("git", "stash pop", repoDir);
 
         // Push de PDFs locais que ainda não foram commitados (untracked ou modified)
         progresso("Verificando recibos locais não enviados...");

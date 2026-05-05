@@ -178,22 +178,8 @@ Controle de Estoque → 💰 Venda
 
 ---
 
-## 🕐 Esforço de Desenvolvimento
-
-| Sessão | Descrição | Tempo |
-|--------|-----------|-------|
-| 1 | VendaViewModel + VendaView + GitHubService.PublicarReciboVendaAsync | 1h30 |
-| 2 | Integração AppPage.Venda + navegação + compilação | 45min |
-| 3 | Lógica de salvamento simplificada (sem JSON banco-dados) | 20min |
-| 4 | Ajustes UI: R$ formatado, peso idêntico recibos, botão azul, modal VendaSucessoDialog | 1h |
-| 5 | Fix peso 0,000: .pdf.meta.json (ChangeExtension→concatenação), botões padrão | 30min |
-| 6 | Ajuste colunas aba Recibos de Venda + Release4.md + README | 20min |
-| **Total** | | **~4h25** |
-
----
-
 **Versão**: Release 4  
 **Branch**: `Release/4.0`  
 **Data**: 2026-05-05  
-**Responsável**: Cascade (AI Pair Programmer)  
+**Responsável**: Gabriel Stundner
 **Repositório**: `lfbreciclagemeletronica/Controle-Materiais`

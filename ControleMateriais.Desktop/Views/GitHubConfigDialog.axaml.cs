@@ -13,9 +13,13 @@ public partial class GitHubConfigDialog : Window
         var vm = new GitHubConfigViewModel();
         if (credenciaisExistentes is not null)
         {
-            vm.Token      = credenciaisExistentes.Token;
-            vm.GitUsuario = credenciaisExistentes.GitUsuario;
-            vm.GitEmail   = credenciaisExistentes.GitEmail;
+            vm.Token           = credenciaisExistentes.Token;
+            vm.GitUsuario      = credenciaisExistentes.GitUsuario;
+            vm.GitEmail        = credenciaisExistentes.GitEmail;
+            vm.UrlPesagens     = credenciaisExistentes.UrlPesagens;
+            vm.UrlRecibos      = credenciaisExistentes.UrlRecibos;
+            vm.UrlTabelaPrecos = credenciaisExistentes.UrlTabelaPrecos;
+            vm.UrlBancoDados   = credenciaisExistentes.UrlBancoDados;
         }
         vm.FecharDialog = Close;
         vm.AbrirAjuda = AbrirAjuda;

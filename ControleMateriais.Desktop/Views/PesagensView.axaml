@@ -145,13 +145,14 @@
                     BorderThickness="1" CornerRadius="8" Padding="8">
               <Grid RowDefinitions="Auto,*">
 
-                <Grid Grid.Row="0" ColumnDefinitions="*,200,130" Margin="12,4,12,6">
+                <Grid Grid.Row="0" ColumnDefinitions="*,160,110,Auto" Margin="12,4,12,6">
                   <TextBlock Grid.Column="0" Text="Cliente" FontWeight="Bold"
                              Foreground="{DynamicResource Brush.TextPrimary}"/>
                   <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
                              Foreground="{DynamicResource Brush.TextPrimary}"/>
                   <TextBlock Grid.Column="2" Text="Status" FontWeight="Bold"
                              Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center"/>
+                  <TextBlock Grid.Column="3" Text="" Width="80"/>
                 </Grid>
 
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -160,23 +161,32 @@
                       <DataTemplate x:DataType="vm:PesagemItem">
                         <Border BorderBrush="{DynamicResource Brush.Border}"
                                 BorderThickness="0,0,0,1"
-                                Padding="0,6"
-                                Cursor="Hand"
-                                PointerPressed="PesagemRow_PointerPressed">
+                                Padding="0,6">
                           <Border.Styles>
                             <Style Selector="Border:pointerover">
                               <Setter Property="Background" Value="#22FFFFFF"/>
                             </Style>
                           </Border.Styles>
-                          <Grid ColumnDefinitions="*,200,130" Margin="12,2">
+                          <Grid ColumnDefinitions="*,160,110,Auto" Margin="12,2">
                             <TextBlock Grid.Column="0" Text="{Binding Cliente}"
-                                       VerticalAlignment="Center" FontSize="13" Foreground="White"/>
+                                       VerticalAlignment="Center" FontSize="13" Foreground="White"
+                                       Cursor="Hand"
+                                       PointerPressed="PesagemNome_PointerPressed"/>
                             <TextBlock Grid.Column="1" Text="{Binding Horario}"
                                        VerticalAlignment="Center" FontSize="12" Foreground="White"/>
                             <TextBlock Grid.Column="2" Text="{Binding StatusPesagem}"
                                        VerticalAlignment="Center" HorizontalAlignment="Center"
                                        FontWeight="Bold" FontSize="12"
                                        Foreground="{Binding StatusPesagem, Converter={StaticResource StatusCorBrush}}"/>
+                            <Button Grid.Column="3"
+                                    Content="🗑 Excluir"
+                                    Width="80"
+                                    FontSize="12"
+                                    Background="#C0392B"
+                                    Foreground="White"
+                                    Margin="6,0,0,0"
+                                    Click="DeletarPesagem_Click"
+                                    ToolTip.Tip="Excluir esta pesagem"/>
                           </Grid>
                         </Border>
                       </DataTemplate>
@@ -205,9 +215,18 @@
         <TabItem Header="Recibos">
           <Grid RowDefinitions="Auto,Auto,*">
 
-            <!-- Barra: botão Sincronizar -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,8">
+            <!-- Barra: filtros + Sincronizar -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,6">
               <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBox Text="{Binding FiltroReciboNome, Mode=TwoWay}"
+                         Watermark="Buscar por nome..."
+                         Width="180" FontSize="12"
+                         VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding MesesDisponiveis}"
+                          SelectedItem="{Binding FiltroReciboMes, Mode=TwoWay}"
+                          Width="150" FontSize="12"
+                          VerticalAlignment="Center"
+                          ToolTip.Tip="Filtrar por mês"/>
                 <TextBlock Text="{Binding StatusRecibos}"
                            IsVisible="{Binding StatusRecibosVisivel}"
                            FontSize="12"
@@ -228,7 +247,7 @@
                        HorizontalAlignment="Center"
                        FontSize="11"
                        Foreground="#4CAF50"
-                       Margin="0,0,0,6"/>
+                       Margin="0,0,0,4"/>
 
             <!-- Corpo -->
             <Grid Grid.Row="2">
@@ -264,16 +283,16 @@
                 <Grid RowDefinitions="Auto,*">
 
                   <!-- Cabeçalho -->
-                  <Grid Grid.Row="0" ColumnDefinitions="*,180,Auto" Margin="12,4,12,6">
+                  <Grid Grid.Row="0" ColumnDefinitions="*,130,Auto" Margin="12,4,12,6">
                     <TextBlock Grid.Column="0" Text="Recibo" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
                     <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
-                    <TextBlock Grid.Column="2" Text="" Width="80"/>
+                    <TextBlock Grid.Column="2" Text="" Width="162"/>
                   </Grid>
 
                   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding Recibos}">
+                    <ItemsControl ItemsSource="{Binding RecibosVisiveis}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ReciboItem">
                           <Border BorderBrush="{DynamicResource Brush.Border}"
@@ -284,7 +303,7 @@
                                 <Setter Property="Background" Value="#22FFFFFF"/>
                               </Style>
                             </Border.Styles>
-                            <Grid ColumnDefinitions="*,180,Auto" Margin="12,2">
+                            <Grid ColumnDefinitions="*,130,Auto" Margin="12,2">
                               <TextBlock Grid.Column="0"
                                          Text="{Binding NomeArquivo}"
                                          VerticalAlignment="Center"
@@ -296,12 +315,20 @@
                                          VerticalAlignment="Center"
                                          FontSize="12"
                                          Foreground="White"/>
-                              <Button Grid.Column="2"
-                                      Content="📄 Abrir"
-                                      Width="76"
-                                      FontSize="12"
-                                      Click="AbrirPdf_Click"
-                                      ToolTip.Tip="Abrir PDF do recibo"/>
+                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
+                                <Button Content="📄 Abrir"
+                                        Width="76"
+                                        FontSize="12"
+                                        Click="AbrirPdf_Click"
+                                        ToolTip.Tip="Abrir PDF do recibo"/>
+                                <Button Content="🗑 Excluir"
+                                        Width="80"
+                                        FontSize="12"
+                                        Background="#C0392B"
+                                        Foreground="White"
+                                        Click="DeletarRecibo_Click"
+                                        ToolTip.Tip="Excluir este recibo"/>
+                              </StackPanel>
                             </Grid>
                           </Border>
                         </DataTemplate>

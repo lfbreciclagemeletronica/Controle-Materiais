@@ -181,7 +181,7 @@ public class ReciboFromPesagemViewModel : ViewModelBase
         }
 
         var data = DateTime.Now;
-        var nomeSeguro = string.Concat(NomeCliente.Split(Path.GetInvalidFileNameChars()));
+        var nomeSeguro = string.Concat(NomeCliente.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
         var nomeArquivo = $"{nomeSeguro}_{data:dd-MM-yyyy}.pdf";
 
         Directory.CreateDirectory(RecibosDir(_rootDir));

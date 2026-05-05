@@ -20,10 +20,18 @@ public class PesagemItemPeso
 
 public class ReciboItem
 {
-    public string NomeArquivo  { get; set; } = string.Empty;
+    public string NomeArquivo    { get; set; } = string.Empty;
     public string CaminhoCompleto { get; set; } = string.Empty;
-    public string DataCriacao  { get; set; } = string.Empty;
+    public string DataCriacao    { get; set; } = string.Empty;
     public DateTime DataCriacaoRaw { get; set; }
+}
+
+public class MesOpcao
+{
+    public int    Ano   { get; set; }
+    public int    Mes   { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public override string ToString() => Label;
 }
 
 public class PesagemItem
@@ -174,18 +182,95 @@ public class PesagensViewModel : ViewModelBase
     public bool ListaVazia => RepoPresenteLocal && PesagensFiltradas.Count == 0;
 
     public bool RecibosDirPresente => Directory.Exists(Path.Combine(GitHubService.RecibosRepoDir(RootDir), ".git"));
-    public bool RecibosListaVazia  => RecibosDirPresente && Recibos.Count == 0;
+    public bool RecibosListaVazia  => RecibosDirPresente && RecibosVisiveis.Count == 0;
 
-    public ICommand VoltarCommand          { get; }
-    public ICommand SincronizarCommand     { get; }
+    // ── Filtros de Recibos ────────────────────────────────────
+    private string _filtroReciboNome = string.Empty;
+    public string FiltroReciboNome
+    {
+        get => _filtroReciboNome;
+        set { if (value != _filtroReciboNome) { _filtroReciboNome = value; OnPropertyChanged(); AtualizarFiltroRecibos(); } }
+    }
+
+    private MesOpcao? _filtroReciboMes;
+    public MesOpcao? FiltroReciboMes
+    {
+        get => _filtroReciboMes;
+        set { if (value != _filtroReciboMes) { _filtroReciboMes = value; OnPropertyChanged(); AtualizarFiltroRecibos(); } }
+    }
+
+    public ObservableCollection<MesOpcao>   MesesDisponiveis { get; } = new();
+    public ObservableCollection<ReciboItem> RecibosVisiveis  { get; } = new();
+
+    private void AtualizarFiltroRecibos()
+    {
+        RecibosVisiveis.Clear();
+        var nome = _filtroReciboNome?.Trim() ?? string.Empty;
+        foreach (var r in Recibos
+            .Where(r =>
+                (string.IsNullOrEmpty(nome) || r.NomeArquivo.Contains(nome, StringComparison.OrdinalIgnoreCase)) &&
+                (_filtroReciboMes == null ||
+                 (r.DataCriacaoRaw.Year == _filtroReciboMes.Ano && r.DataCriacaoRaw.Month == _filtroReciboMes.Mes)))
+            .OrderBy(r => r.DataCriacaoRaw))
+        {
+            RecibosVisiveis.Add(r);
+        }
+        OnPropertyChanged(nameof(RecibosListaVazia));
+    }
+
+    private void ReconstruirMeses()
+    {
+        var mesSelecionado = _filtroReciboMes;
+        MesesDisponiveis.Clear();
+
+        var hoje = DateTime.Today;
+        var mesAtual = new MesOpcao
+        {
+            Ano   = hoje.Year,
+            Mes   = hoje.Month,
+            Label = new DateTime(hoje.Year, hoje.Month, 1).ToString("MMMM/yyyy",
+                        System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))
+        };
+        MesesDisponiveis.Add(mesAtual);
+
+        foreach (var m in Recibos
+            .Select(r => new { r.DataCriacaoRaw.Year, r.DataCriacaoRaw.Month })
+            .Distinct()
+            .OrderByDescending(m => m.Year).ThenByDescending(m => m.Month))
+        {
+            if (m.Year == hoje.Year && m.Month == hoje.Month) continue;
+            MesesDisponiveis.Add(new MesOpcao
+            {
+                Ano   = m.Year,
+                Mes   = m.Month,
+                Label = new DateTime(m.Year, m.Month, 1).ToString("MMMM/yyyy",
+                            System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))
+            });
+        }
+
+        // Restaura seleção ou usa mês atual
+        _filtroReciboMes = mesSelecionado is null
+            ? mesAtual
+            : MesesDisponiveis.FirstOrDefault(m => m.Ano == mesSelecionado.Ano && m.Mes == mesSelecionado.Mes)
+              ?? mesAtual;
+        OnPropertyChanged(nameof(FiltroReciboMes));
+    }
+
+    public ICommand VoltarCommand             { get; }
+    public ICommand SincronizarCommand        { get; }
     public ICommand SincronizarRecibosCommand { get; }
-    public ICommand AbrirReciboCommand     { get; }
-    public ICommand CriarNovoCommand       { get; }
-    public ICommand AbrirPdfCommand        { get; }
+    public ICommand AbrirReciboCommand        { get; }
+    public ICommand CriarNovoCommand          { get; }
+    public ICommand AbrirPdfCommand           { get; }
+    public ICommand DeletarReciboCommand      { get; }
+    public ICommand DeletarPesagemCommand     { get; }
 
-    public Func<Task>?               SolicitarConfiguracaoGitHubCallback { get; set; }
-    public Action<PesagemItem>?       AbrirReciboCallback { get; set; }
-    public Action?                    CriarNovoReciboCallback { get; set; }
+    public Func<Task>?                          SolicitarConfiguracaoGitHubCallback { get; set; }
+    public Action<PesagemItem>?                 AbrirReciboCallback { get; set; }
+    public Action?                              CriarNovoReciboCallback { get; set; }
+    public Func<ReciboItem, Task>?              ConfirmarDeletarReciboCallback { get; set; }
+    public Func<PesagemItem, Task>?             ConfirmarDeletarPesagemCallback { get; set; }
+    public Action?                              NovoReciboPublicadoCallback { get; set; }
 
     public PesagensViewModel(Action voltarCallback, string rootDir)
     {
@@ -204,6 +289,14 @@ public class PesagensViewModel : ViewModelBase
             if (item is null) return;
             try { Process.Start(new ProcessStartInfo(item.CaminhoCompleto) { UseShellExecute = true }); }
             catch { }
+        });
+        DeletarReciboCommand  = new DelegateCommand<ReciboItem>(item =>
+        {
+            if (item is not null) _ = ConfirmarDeletarReciboCallback?.Invoke(item);
+        });
+        DeletarPesagemCommand = new DelegateCommand<PesagemItem>(item =>
+        {
+            if (item is not null) _ = ConfirmarDeletarPesagemCallback?.Invoke(item);
         });
     }
 
@@ -280,7 +373,9 @@ public class PesagensViewModel : ViewModelBase
             var repoDir   = GitHubService.RepoDir(RootDir);
             var gitDir    = Path.Combine(repoDir, ".git");
             var creds     = GitHubService.CarregarCredenciais(RootDir)!;
-            var remoteUrl = $"https://{creds.Token}@github.com/lfbreciclagemeletronica/Pesagens.git";
+            if (string.IsNullOrWhiteSpace(creds.UrlPesagens))
+                throw new InvalidOperationException("URL do repositório de Pesagens não configurada. Edite as credenciais do GitHub.");
+            var remoteUrl = GitHubService.InjetarTokenPublico(creds.UrlPesagens, creds.Token);
 
             // 3. Clone ou pull
             if (!Directory.Exists(gitDir))
@@ -371,7 +466,7 @@ public class PesagensViewModel : ViewModelBase
         if (!Directory.Exists(repoDir)) { OnPropertyChanged(nameof(RecibosDirPresente)); OnPropertyChanged(nameof(RecibosListaVazia)); return; }
 
         foreach (var file in Directory.GetFiles(repoDir, "*.pdf", SearchOption.TopDirectoryOnly)
-                                      .OrderByDescending(f => File.GetLastWriteTime(f)))
+                                      .OrderBy(f => File.GetLastWriteTime(f)))
         {
             var semExt = Path.GetFileNameWithoutExtension(file);
             var (nomeCliente, dataExibicao, dataRaw) = ParsearNomeArquivoRecibo(semExt, file);
@@ -385,8 +480,95 @@ public class PesagensViewModel : ViewModelBase
             });
         }
 
+        ReconstruirMeses();
+        AtualizarFiltroRecibos();
         OnPropertyChanged(nameof(RecibosDirPresente));
         OnPropertyChanged(nameof(RecibosListaVazia));
+    }
+
+    public async Task DeletarReciboAsync(ReciboItem item)
+    {
+        try
+        {
+            var nomeArquivoPdf  = Path.GetFileName(item.CaminhoCompleto);
+            var nomeArquivoJson = Path.GetFileNameWithoutExtension(nomeArquivoPdf) + ".json";
+            var bancoDadosDir   = GitHubService.BancoDadosRepoDir(RootDir);
+            var jsonPath        = Path.Combine(bancoDadosDir, nomeArquivoJson);
+
+            // Subtrai do estoque.json os valores desse recibo antes de remover
+            if (File.Exists(jsonPath))
+            {
+                var itens         = EstoqueViewModel.LerItensJson(jsonPath);
+                var totaisEstoque = EstoqueViewModel.LerEstoque(RootDir);
+                foreach (var kv in itens)
+                {
+                    if (totaisEstoque.TryGetValue(kv.Key, out var atual))
+                        totaisEstoque[kv.Key] = Math.Max(0m, atual - kv.Value);
+                }
+                EstoqueViewModel.GravarEstoque(RootDir, totaisEstoque);
+            }
+
+            // Remove arquivo PDF local
+            if (File.Exists(item.CaminhoCompleto))
+                File.Delete(item.CaminhoCompleto);
+
+            // Remove .json do banco-de-dados local
+            if (File.Exists(jsonPath)) File.Delete(jsonPath);
+
+            // Remove do Git e faz push
+            if (GitHubService.CredenciaisExistem(RootDir))
+            {
+                MostrarStatusRecibos("Removendo recibo do GitHub...", ok: true);
+                await GitHubService.RemoverReciboAsync(RootDir,
+                    nomeArquivoPdf,
+                    msg => MostrarStatusRecibos(msg, ok: true));
+
+                MostrarStatusRecibos("Removendo dados do banco-de-dados...", ok: true);
+                await GitHubService.RemoverJsonBancoDadosAsync(RootDir,
+                    nomeArquivoJson,
+                    msg => MostrarStatusRecibos(msg, ok: true));
+
+                MostrarStatusRecibos(string.Empty, ok: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            MostrarStatusRecibos($"Erro ao deletar: {ex.Message}", ok: false);
+        }
+        finally
+        {
+            CarregarRecibos();
+        }
+    }
+
+    public async Task DeletarPesagemAsync(PesagemItem item)
+    {
+        try
+        {
+            var repoDir = GitHubService.RepoDir(RootDir);
+            var filePath = Path.Combine(repoDir, item.NomeArquivo);
+
+            if (GitHubService.CredenciaisExistem(RootDir))
+            {
+                MostrarStatus("Removendo pesagem do GitHub...", ok: true);
+                await GitHubService.RemoverPesagemAsync(RootDir,
+                    item.NomeArquivo,
+                    msg => MostrarStatus(msg, ok: true));
+                MostrarStatus(string.Empty, ok: true);
+            }
+            else if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            MostrarStatus($"Erro ao deletar: {ex.Message}", ok: false);
+        }
+        finally
+        {
+            CarregarPesagens();
+        }
     }
 
     // Extrai nome do cliente e data de um nome de arquivo no padrão:
@@ -399,7 +581,7 @@ public class PesagensViewModel : ViewModelBase
             semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2})$");
         if (matchComHora.Success)
         {
-            var nomeRaw = matchComHora.Groups[1].Value;
+            var nomeRaw = matchComHora.Groups[1].Value.Replace("_", " ");
             var dataStr = matchComHora.Groups[2].Value; // dd-MM-yyyy_HH-mm
             if (DateTime.TryParseExact(dataStr, "dd-MM-yyyy_HH-mm",
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -412,7 +594,7 @@ public class PesagensViewModel : ViewModelBase
             semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4})$");
         if (matchSemHora.Success)
         {
-            var nomeRaw = matchSemHora.Groups[1].Value;
+            var nomeRaw = matchSemHora.Groups[1].Value.Replace("_", " ");
             var dataStr = matchSemHora.Groups[2].Value;
             if (DateTime.TryParseExact(dataStr, "dd-MM-yyyy",
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -422,7 +604,7 @@ public class PesagensViewModel : ViewModelBase
 
         // Fallback: usa nome completo e data do sistema de arquivos
         var dtFallback = File.GetLastWriteTime(filePath);
-        return (semExt, dtFallback.ToString("dd/MM/yyyy"), dtFallback);
+        return (semExt.Replace("_", " "), dtFallback.ToString("dd/MM/yyyy"), dtFallback);
     }
 
     private async Task SincronizarRecibosAsync()

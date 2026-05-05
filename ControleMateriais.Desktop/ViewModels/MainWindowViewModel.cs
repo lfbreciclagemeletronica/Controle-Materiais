@@ -15,6 +15,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -120,6 +121,8 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand IrParaHomeCommand { get; }
     public ICommand IrParaCalculadoraPesosCommand { get; }
     public ICommand IrParaRecibosCommand { get; }
+    public ICommand IrParaEstoqueCommand { get; }
+    public ICommand IrParaVendaCommand   { get; }
     public ICommand VoltarParaPesagensCommand { get; }
     public ICommand ConfigurarGitHubCommand { get; }
     public ICommand SincronizarRecibosCommand { get; }
@@ -167,6 +170,8 @@ public class MainWindowViewModel : ViewModelBase
     public PriceTableManagerViewModel TabelaVM { get; }
     public WeightCalculatorViewModel CalculadoraVM { get; }
     public PesagensViewModel PesagensVM { get; }
+    public EstoqueViewModel EstoqueVM { get; }
+    public VendaViewModel    VendaVM   { get; }
 
     private PesagemItem? _pesagemAtiva;
 
@@ -192,6 +197,8 @@ public class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsPesagensPage));
                 OnPropertyChanged(nameof(IsRecibosPage));
                 OnPropertyChanged(nameof(IsCalculadoraPage));
+                OnPropertyChanged(nameof(IsEstoquePage));
+                OnPropertyChanged(nameof(IsVendaPage));
             }
         }
     }
@@ -199,6 +206,8 @@ public class MainWindowViewModel : ViewModelBase
     public bool IsPesagensPage       => _currentPage == AppPage.Pesagens;
     public bool IsRecibosPage        => _currentPage == AppPage.Recibos;
     public bool IsCalculadoraPage    => _currentPage == AppPage.Calculadora;
+    public bool IsEstoquePage        => _currentPage == AppPage.Estoque;
+    public bool IsVendaPage          => _currentPage == AppPage.Venda;
 
     public decimal TotalGeral
     {
@@ -253,6 +262,8 @@ public class MainWindowViewModel : ViewModelBase
         IrParaHomeCommand            = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Home; });
         IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Pesagens; });
         IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
+        IrParaEstoqueCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
+        IrParaVendaCommand           = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; });
         VoltarParaPesagensCommand    = new DelegateCommand(VoltarParaPesagens);
         ConfigurarGitHubCommand      = new DelegateCommand(async () => await AbrirConfigGitHubAsync());
         SincronizarRecibosCommand    = new DelegateCommand(async () => await SincronizarRecibosAsync());
@@ -305,6 +316,8 @@ public class MainWindowViewModel : ViewModelBase
 
         CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
         PesagensVM    = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        EstoqueVM     = new EstoqueViewModel(RootDir, () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; });
+        VendaVM       = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
         PesagensVM.AbrirReciboCallback      = AbrirReciboDetalhe;
         PesagensVM.CriarNovoReciboCallback  = CriarNovoRecibo;
 
@@ -483,7 +496,7 @@ public class MainWindowViewModel : ViewModelBase
 
         var data = DateTime.Now;
         var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
-            .Replace("/", "-").Replace("\\", "-").Replace(":", "-");
+            .Replace(" ", "_").Replace("/", "-").Replace("\\", "-").Replace(":", "-");
 
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
@@ -528,6 +541,14 @@ public class MainWindowViewModel : ViewModelBase
         AtualizarStatusTela("Gerando PDF...");
         GerarReciboPdf(filePath);
 
+        // Captura snapshot dos itens para o banco de dados ANTES de qualquer limpeza
+        var itensEstoque = Itens.Where(i => i.PesoAtual > 0)
+            .Select(i => (i.Nome, i.PesoAtual))
+            .Concat(ItensPersonalizados
+                .Where(c => c.PesoAtual > 0 && !string.IsNullOrWhiteSpace(c.Nome))
+                .Select(c => (c.Nome, c.PesoAtual)))
+            .ToList();
+
         if (_pesagemAtiva is not null)
         {
             AtualizarStatusTela("Atualizando pesagem...");
@@ -544,10 +565,57 @@ public class MainWindowViewModel : ViewModelBase
                 $"Recibo {NomeCliente} - {data:dd/MM/yyyy}",
                 msg => AtualizarStatusTela(msg));
             AtualizarStatusTela("Recibo enviado ao GitHub com sucesso.");
+            PesagensVM.NovoReciboPublicadoCallback?.Invoke();
         }
         catch (Exception ex)
         {
             AtualizarStatusTela($"Aviso: não foi possível sincronizar — {ex.Message}", ok: false);
+        }
+
+        // Salva .json no banco-de-dados e atualiza estoque.json
+        try
+        {
+            var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
+            Directory.CreateDirectory(bancoDadosDir);
+
+            var nomeJson  = Path.GetFileNameWithoutExtension(Path.GetFileName(filePath)) + ".json";
+            var jsonPath  = Path.Combine(bancoDadosDir, nomeJson);
+
+            // Cria JSON do recibo com decimais nativos + status já marcado
+            var jsonObj = new System.Text.Json.Nodes.JsonObject();
+            jsonObj["data"] = data.ToString("dd/MM/yyyy");
+            foreach (var (nome, peso) in itensEstoque)
+                jsonObj[nome] = JsonValue.Create(peso);
+            jsonObj["status"] = "Adicionado ao estoque";
+
+            var conteudo = jsonObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            await System.IO.File.WriteAllTextAsync(jsonPath, conteudo);
+
+            // Soma diretamente no estoque.json
+            AtualizarStatusTela("Atualizando estoque...");
+            var totaisEstoque = EstoqueViewModel.LerEstoque(RootDir);
+            foreach (var (nome, peso) in itensEstoque)
+                totaisEstoque[nome] = (totaisEstoque.TryGetValue(nome, out var ant) ? ant : 0m) + peso;
+            EstoqueViewModel.GravarEstoque(RootDir, totaisEstoque);
+
+            // Publica via Git se repo clonado
+            var bancoDadosGit = Path.Combine(bancoDadosDir, ".git");
+            if (Directory.Exists(bancoDadosGit))
+            {
+                AtualizarStatusTela("Enviando banco-de-dados ao GitHub...");
+                await GitHubService.PublicarJsonBancoDadosAsync(RootDir, nomeJson, conteudo,
+                    msg => AtualizarStatusTela(msg));
+                var estoqueConteudo = await System.IO.File.ReadAllTextAsync(
+                    Path.Combine(bancoDadosDir, "estoque.json"));
+                await GitHubService.PublicarJsonBancoDadosAsync(RootDir, "estoque.json", estoqueConteudo,
+                    msg => AtualizarStatusTela(msg));
+            }
+
+            EstoqueVM.Recarregar();
+        }
+        catch (Exception ex)
+        {
+            AtualizarStatusTela($"Aviso: erro ao salvar banco-de-dados — {ex.Message}", ok: false);
         }
 
         // Abre modal de sucesso somente após tudo concluído
@@ -594,7 +662,8 @@ public class MainWindowViewModel : ViewModelBase
             if (GitHubService.CredenciaisExistem(RootDir))
             {
                 var creds     = GitHubService.CarregarCredenciais(RootDir)!;
-                var remoteUrl = $"https://{creds.Token}@github.com/lfbreciclagemeletronica/Pesagens.git";
+                if (string.IsNullOrWhiteSpace(creds.UrlPesagens)) return;
+                var remoteUrl = GitHubService.InjetarTokenPublico(creds.UrlPesagens, creds.Token);
                 await GitHubService.RunGit($"remote set-url origin {remoteUrl}", repoDir);
                 await GitHubService.RunGit($"config user.email \"{creds.GitEmail}\"", repoDir);
                 await GitHubService.RunGit($"config user.name \"{creds.GitUsuario}\"", repoDir);
@@ -1231,6 +1300,8 @@ public enum AppPage
     Home,
     Pesagens,
     Recibos,
-    Calculadora
+    Calculadora,
+    Estoque,
+    Venda
 }
 

@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.ConfirmDeleteDialog"
+        Title="Confirmar exclusão"
+        Width="420" Height="200"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="28,24" Background="{DynamicResource Brush.Surface}">
+    <Grid RowDefinitions="*,Auto">
+
+      <StackPanel Grid.Row="0" Spacing="10" VerticalAlignment="Center">
+        <TextBlock Text="Confirmar exclusão"
+                   FontSize="15" FontWeight="Bold"
+                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+        <TextBlock Name="MensagemText"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource Brush.TextSecondary}"/>
+      </StackPanel>
+
+      <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                  Spacing="10" Margin="0,16,0,0">
+        <Button Content="Cancelar" Click="Cancelar_Click" Width="90"/>
+        <Button Content="Excluir"
+                Click="Confirmar_Click"
+                Background="#C0392B"
+                Foreground="White"
+                Width="90"/>
+      </StackPanel>
+
+    </Grid>
+  </Border>
+
+</Window>

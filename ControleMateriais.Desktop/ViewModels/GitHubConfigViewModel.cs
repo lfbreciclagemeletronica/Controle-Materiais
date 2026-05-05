@@ -25,10 +25,41 @@ public class GitHubConfigViewModel : ViewModelBase
         set { if (value != _gitEmail) { _gitEmail = value; OnPropertyChanged(); OnPropertyChanged(nameof(PodeSalvar)); } }
     }
 
+    private string _urlPesagens = string.Empty;
+    public string UrlPesagens
+    {
+        get => _urlPesagens;
+        set { if (value != _urlPesagens) { _urlPesagens = value; OnPropertyChanged(); OnPropertyChanged(nameof(PodeSalvar)); } }
+    }
+
+    private string _urlRecibos = string.Empty;
+    public string UrlRecibos
+    {
+        get => _urlRecibos;
+        set { if (value != _urlRecibos) { _urlRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(PodeSalvar)); } }
+    }
+
+    private string _urlTabelaPrecos = string.Empty;
+    public string UrlTabelaPrecos
+    {
+        get => _urlTabelaPrecos;
+        set { if (value != _urlTabelaPrecos) { _urlTabelaPrecos = value; OnPropertyChanged(); OnPropertyChanged(nameof(PodeSalvar)); } }
+    }
+
+    private string _urlBancoDados = string.Empty;
+    public string UrlBancoDados
+    {
+        get => _urlBancoDados;
+        set { if (value != _urlBancoDados) { _urlBancoDados = value; OnPropertyChanged(); } }
+    }
+
     public bool PodeSalvar =>
         !string.IsNullOrWhiteSpace(Token) &&
         !string.IsNullOrWhiteSpace(GitUsuario) &&
-        !string.IsNullOrWhiteSpace(GitEmail);
+        !string.IsNullOrWhiteSpace(GitEmail) &&
+        !string.IsNullOrWhiteSpace(UrlPesagens) &&
+        !string.IsNullOrWhiteSpace(UrlRecibos) &&
+        !string.IsNullOrWhiteSpace(UrlTabelaPrecos);
 
     public bool Confirmado { get; private set; }
 

@@ -160,6 +160,45 @@
           </Button.Template>
         </Button>
 
+
+        <!-- Controle de Estoque -->
+        <Button Command="{Binding IrParaEstoqueCommand}"
+                Width="260" Height="155"
+                Padding="0"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center">
+          <Button.Template>
+            <ControlTemplate>
+              <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="#FF9800"
+                      BorderThickness="2"
+                      CornerRadius="16"
+                      Padding="24,20">
+                <Border.Styles>
+                  <Style Selector="Border:pointerover">
+                    <Setter Property="Background" Value="#1AFF9800"/>
+                  </Style>
+                </Border.Styles>
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                  <TextBlock Text="&#x1F4E6;"
+                             FontSize="42"
+                             HorizontalAlignment="Center"/>
+                  <TextBlock Text="Controle de Estoque"
+                             FontSize="15" FontWeight="Bold"
+                             Foreground="{DynamicResource Brush.TextPrimary}"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                  <TextBlock Text="Totais de materiais por recibo"
+                             FontSize="11"
+                             Foreground="White"
+                             HorizontalAlignment="Center"
+                             TextAlignment="Center"/>
+                </StackPanel>
+              </Border>
+            </ControlTemplate>
+          </Button.Template>
+        </Button>
+
       </StackPanel>
     </StackPanel>
 

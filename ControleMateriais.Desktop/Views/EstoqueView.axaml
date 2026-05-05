@@ -1,0 +1,240 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+             xmlns:conv="using:ControleMateriais.Desktop.Converters"
+             x:Class="ControleMateriais.Desktop.Views.EstoqueView"
+             x:DataType="vm:EstoqueViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*">
+
+    <!-- Cabeçalho -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,4">
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <TextBlock Text="&#x1F4E6;" FontSize="22" VerticalAlignment="Center"/>
+        <TextBlock Text="Controle de Estoque"
+                   FontSize="20" FontWeight="Bold"
+                   Foreground="{DynamicResource Brush.TextPrimary}"
+                   VerticalAlignment="Center"/>
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Content="&#x1F4B0; Venda"
+                Command="{Binding IrParaVendaCommand}"
+                ToolTip.Tip="Registrar uma venda e subtrair do estoque"/>
+        <Button Content="&#8679; Sincronizar"
+                Command="{Binding SincronizarGitCommand}"
+                IsEnabled="{Binding !Sincronizando}"
+                ToolTip.Tip="Pull do repositório banco-de-dados e publica estoque.json atualizado"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Status -->
+    <TextBlock Grid.Row="1"
+               Text="{Binding Status}"
+               IsVisible="{Binding StatusVisivel}"
+               HorizontalAlignment="Center"
+               FontSize="12" Foreground="#4CAF50"
+               Margin="0,4,0,4"/>
+
+    <!-- Abas: Estoque | Recibos de Venda -->
+    <TabControl Grid.Row="2" x:Name="MainTabControl">
+
+      <!-- ── ABA ESTOQUE ─────────────────────────────────────────── -->
+      <TabItem Header="Estoque">
+        <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                BorderBrush="{DynamicResource Brush.Border}"
+                BorderThickness="1" CornerRadius="0,10,10,10" Padding="0">
+          <Grid RowDefinitions="Auto,*">
+            <Border Grid.Row="0" Background="#1A3B82F6"
+                    CornerRadius="0,10,0,0" Padding="20,12">
+              <Grid ColumnDefinitions="*,200">
+                <TextBlock Grid.Column="0" Text="Material"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="Total em Estoque"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"
+                           HorizontalAlignment="Right"/>
+              </Grid>
+            </Border>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Itens}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EstoqueItem">
+                    <Border BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="0,0,0,1" Padding="20,9">
+                      <Border.Styles>
+                        <Style Selector="Border:pointerover">
+                          <Setter Property="Background" Value="#0F3B82F6"/>
+                        </Style>
+                      </Border.Styles>
+                      <Grid ColumnDefinitions="*,200">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                          <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center">
+                            <Border.Background>
+                              <SolidColorBrush Color="{Binding TotalKg, Converter={x:Static conv:DecimalToColorConverter.Instance}}"/>
+                            </Border.Background>
+                          </Border>
+                          <TextBlock Text="{Binding Material}" FontSize="12"
+                                     Foreground="{DynamicResource Brush.TextPrimary}"
+                                     VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" CornerRadius="6" Padding="12,3"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Background="#0F555555" BorderBrush="#33555555" BorderThickness="1">
+                          <TextBlock Text="{Binding TotalKgStr}"
+                                     FontSize="12" FontWeight="SemiBold"
+                                     HorizontalAlignment="Center">
+                            <TextBlock.Foreground>
+                              <SolidColorBrush Color="{Binding TotalKg, Converter={x:Static conv:DecimalToColorConverter.Instance}}"/>
+                            </TextBlock.Foreground>
+                          </TextBlock>
+                        </Border>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Grid>
+        </Border>
+      </TabItem>
+
+      <!-- ── ABA RECIBOS DE VENDA ────────────────────────────────── -->
+      <TabItem Header="Recibos de Venda">
+        <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                BorderBrush="{DynamicResource Brush.Border}"
+                BorderThickness="1" CornerRadius="10,10,10,10" Padding="0">
+          <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+            <!-- Filtros -->
+            <Border Grid.Row="0" Padding="14,10" Background="#0AFF9800">
+              <Grid ColumnDefinitions="*,20,160,20,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding FiltroNome}"
+                         Watermark="Filtrar por cliente..."
+                         FontSize="12"/>
+                <TextBox Grid.Column="2"
+                         Text="{Binding FiltroMes}"
+                         Watermark="Mês/Ano (ex: 05/2026)"
+                         FontSize="12"/>
+                <Button Grid.Column="4"
+                        Content="&#x27F3; Atualizar"
+                        Command="{Binding AtualizarCommand}"
+                        FontSize="12"/>
+              </Grid>
+            </Border>
+
+            <!-- Status -->
+            <TextBlock Grid.Row="1"
+                       Text="{Binding Status}"
+                       IsVisible="{Binding StatusVisivel}"
+                       HorizontalAlignment="Center"
+                       FontSize="12" Foreground="#4CAF50"
+                       Margin="0,4,0,0"/>
+
+            <!-- Cabeçalho tabela -->
+            <Border Grid.Row="2" Background="#1AFF9800" Padding="14,10">
+              <Grid ColumnDefinitions="*,120,110,100,175">
+                <TextBlock Grid.Column="0" Text="Cliente"
+                           FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="Peso Total"
+                           FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="Valor Total"
+                           FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="3" Text="Data"
+                           FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="4" Text="Ações"
+                           FontSize="11" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"
+                           HorizontalAlignment="Center"/>
+              </Grid>
+            </Border>
+
+            <!-- Lista -->
+            <Grid Grid.Row="3">
+              <!-- Vazio -->
+              <StackPanel IsVisible="{Binding RecibosVendaVazia}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center" Spacing="10">
+                <TextBlock Text="Nenhum recibo de venda encontrado."
+                           FontSize="14"
+                           Foreground="{DynamicResource Brush.TextSecondary}"
+                           HorizontalAlignment="Center"/>
+              </StackPanel>
+
+              <ScrollViewer IsVisible="{Binding !RecibosVendaVazia}"
+                            VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding RecibosVenda}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReciboVendaItem">
+                      <Border BorderBrush="{DynamicResource Brush.Border}"
+                              BorderThickness="0,0,0,1" Padding="14,8">
+                        <Border.Styles>
+                          <Style Selector="Border:pointerover">
+                            <Setter Property="Background" Value="#0AFF9800"/>
+                          </Style>
+                        </Border.Styles>
+                        <Grid ColumnDefinitions="*,120,110,100,175">
+                          <TextBlock Grid.Column="0"
+                                     Text="{Binding NomeCliente}"
+                                     FontSize="12"
+                                     Foreground="{DynamicResource Brush.TextPrimary}"
+                                     VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding PesoTotalStr}"
+                                     FontSize="12" FontWeight="SemiBold"
+                                     Foreground="#FF9800"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="2"
+                                     Text="{Binding ValorVendaStr}"
+                                     FontSize="12" FontWeight="SemiBold"
+                                     Foreground="#4CAF50"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="3"
+                                     Text="{Binding DataCriacao}"
+                                     FontSize="12"
+                                     Foreground="{DynamicResource Brush.TextPrimary}"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                          <StackPanel Grid.Column="4"
+                                      Orientation="Horizontal" Spacing="6"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                            <Button Content="📄 Abrir"
+                                    Width="76" FontSize="12"
+                                    ToolTip.Tip="Abrir PDF do recibo"
+                                    Command="{Binding $parent[ItemsControl].((vm:EstoqueViewModel)DataContext).AbrirReciboVendaCommand}"
+                                    CommandParameter="{Binding}"/>
+                            <Button Content="🗑 Excluir"
+                                    Width="80" FontSize="12"
+                                    Background="#C0392B" Foreground="White"
+                                    ToolTip.Tip="Excluir este recibo"
+                                    Command="{Binding $parent[ItemsControl].((vm:EstoqueViewModel)DataContext).ExcluirReciboVendaCommand}"
+                                    CommandParameter="{Binding}"/>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
+
+          </Grid>
+        </Border>
+      </TabItem>
+
+    </TabControl>
+
+  </Grid>
+
+</UserControl>

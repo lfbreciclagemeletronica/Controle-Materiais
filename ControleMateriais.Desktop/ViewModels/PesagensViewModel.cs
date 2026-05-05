@@ -490,17 +490,44 @@ public class PesagensViewModel : ViewModelBase
     {
         try
         {
-            // Remove arquivo local
+            var nomeArquivoPdf  = Path.GetFileName(item.CaminhoCompleto);
+            var nomeArquivoJson = Path.GetFileNameWithoutExtension(nomeArquivoPdf) + ".json";
+            var bancoDadosDir   = GitHubService.BancoDadosRepoDir(RootDir);
+            var jsonPath        = Path.Combine(bancoDadosDir, nomeArquivoJson);
+
+            // Subtrai do estoque.json os valores desse recibo antes de remover
+            if (File.Exists(jsonPath))
+            {
+                var itens         = EstoqueViewModel.LerItensJson(jsonPath);
+                var totaisEstoque = EstoqueViewModel.LerEstoque(RootDir);
+                foreach (var kv in itens)
+                {
+                    if (totaisEstoque.TryGetValue(kv.Key, out var atual))
+                        totaisEstoque[kv.Key] = Math.Max(0m, atual - kv.Value);
+                }
+                EstoqueViewModel.GravarEstoque(RootDir, totaisEstoque);
+            }
+
+            // Remove arquivo PDF local
             if (File.Exists(item.CaminhoCompleto))
                 File.Delete(item.CaminhoCompleto);
+
+            // Remove .json do banco-de-dados local
+            if (File.Exists(jsonPath)) File.Delete(jsonPath);
 
             // Remove do Git e faz push
             if (GitHubService.CredenciaisExistem(RootDir))
             {
                 MostrarStatusRecibos("Removendo recibo do GitHub...", ok: true);
                 await GitHubService.RemoverReciboAsync(RootDir,
-                    Path.GetFileName(item.CaminhoCompleto),
+                    nomeArquivoPdf,
                     msg => MostrarStatusRecibos(msg, ok: true));
+
+                MostrarStatusRecibos("Removendo dados do banco-de-dados...", ok: true);
+                await GitHubService.RemoverJsonBancoDadosAsync(RootDir,
+                    nomeArquivoJson,
+                    msg => MostrarStatusRecibos(msg, ok: true));
+
                 MostrarStatusRecibos(string.Empty, ok: true);
             }
         }
@@ -554,7 +581,7 @@ public class PesagensViewModel : ViewModelBase
             semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2})$");
         if (matchComHora.Success)
         {
-            var nomeRaw = matchComHora.Groups[1].Value;
+            var nomeRaw = matchComHora.Groups[1].Value.Replace("_", " ");
             var dataStr = matchComHora.Groups[2].Value; // dd-MM-yyyy_HH-mm
             if (DateTime.TryParseExact(dataStr, "dd-MM-yyyy_HH-mm",
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -567,7 +594,7 @@ public class PesagensViewModel : ViewModelBase
             semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4})$");
         if (matchSemHora.Success)
         {
-            var nomeRaw = matchSemHora.Groups[1].Value;
+            var nomeRaw = matchSemHora.Groups[1].Value.Replace("_", " ");
             var dataStr = matchSemHora.Groups[2].Value;
             if (DateTime.TryParseExact(dataStr, "dd-MM-yyyy",
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -577,7 +604,7 @@ public class PesagensViewModel : ViewModelBase
 
         // Fallback: usa nome completo e data do sistema de arquivos
         var dtFallback = File.GetLastWriteTime(filePath);
-        return (semExt, dtFallback.ToString("dd/MM/yyyy"), dtFallback);
+        return (semExt.Replace("_", " "), dtFallback.ToString("dd/MM/yyyy"), dtFallback);
     }
 
     private async Task SincronizarRecibosAsync()

@@ -97,6 +97,32 @@
         <views:ReciboView IsVisible="{Binding IsRecibosPage}"
                           DataContext="{Binding}"/>
 
+        <!-- Painel VENDA -->
+        <Grid IsVisible="{Binding $parent[Window].DataContext.IsVendaPage}">
+          <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                  BorderBrush="{DynamicResource Brush.Border}"
+                  BorderThickness="1" CornerRadius="10" Padding="20">
+            <views:VendaView DataContext="{Binding $parent[Window].DataContext.VendaVM}"/>
+          </Border>
+        </Grid>
+
+        <!-- Painel ESTOQUE -->
+        <Grid IsVisible="{Binding $parent[Window].DataContext.IsEstoquePage}">
+          <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                  BorderBrush="{DynamicResource Brush.Border}"
+                  BorderThickness="1" CornerRadius="10" Padding="20">
+            <Grid RowDefinitions="Auto,*">
+              <Button Grid.Row="0"
+                      Content="&#8592; Início"
+                      Command="{Binding $parent[Window].DataContext.IrParaHomeCommand}"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,0,16"/>
+              <views:EstoqueView Grid.Row="1"
+                                 DataContext="{Binding $parent[Window].DataContext.EstoqueVM}"/>
+            </Grid>
+          </Border>
+        </Grid>
+
         <!-- Painel TABELA DE PREÇOS -->
         <Grid IsVisible="{Binding IsGerindoTabela}"
               x:DataType="vm:MainWindowViewModel">

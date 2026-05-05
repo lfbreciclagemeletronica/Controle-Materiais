@@ -5,8 +5,8 @@
 
 # LFB Controle de Materiais — LFB Reciclagem Eletrônica
 
-**Sistema desktop completo para controle de pesagem, triagem e valoração de materiais eletrônicos recicláveis.**  
-Registra pesagens, gera recibos em PDF, gerencia tabelas de preços e sincroniza tudo automaticamente com o GitHub.
+**Sistema desktop completo para controle de pesagem, triagem, valoração e venda de materiais eletrônicos recicláveis.**  
+Registra pesagens, gera recibos em PDF, gerencia tabelas de preços, controla o estoque por material e registra vendas com recibo dedicado — tudo sincronizado automaticamente com o GitHub.
 
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![Avalonia](https://img.shields.io/badge/Avalonia-UI-8A2BE2?style=flat-square)](https://avaloniaui.net/)
@@ -39,6 +39,11 @@ Registra pesagens, gera recibos em PDF, gerencia tabelas de preços e sincroniza
   - [Sincronização de Recibos com o GitHub](#sincronização-de-recibos-com-o-github)
 - [Estrutura de Diretórios Locais](#estrutura-de-diretórios-locais)
 - [Estrutura de Repositórios no GitHub](#estrutura-de-repositórios-no-github)
+- [Sistema de Controle de Estoque](#sistema-de-controle-de-estoque)
+- [Sistema de Venda de Estoque](#sistema-de-venda-de-estoque)
+  - [Registrar uma venda](#registrar-uma-venda)
+  - [Recibo de Venda PDF](#recibo-de-venda-pdf)
+  - [Aba Recibos de Venda](#aba-recibos-de-venda)
 - [Publicar / Build](#publicar--build)
 - [Tecnologias](#tecnologias)
 
@@ -48,11 +53,13 @@ Registra pesagens, gera recibos em PDF, gerencia tabelas de preços e sincroniza
 
 O **Controle de Materiais LFB** é um sistema desktop desenvolvido para a [LFB Reciclagem Eletrônica](https://github.com/lfbreciclagemeletronica) que automatiza o processo de pesagem, triagem e valoração de materiais eletrônicos recicláveis.
 
-O sistema é composto por três módulos integrados:
+O sistema é composto por cinco módulos integrados:
 
 - **Calculadora de Pesos** — registra os materiais e pesos recebidos de um fornecedor, calcula o valor total usando a tabela de preços ativa e gera o recibo em PDF
 - **Sistema de Pesagens** — gerencia todas as pesagens geradas pelo aplicativo de balanças externo, exibindo status (pendente, concluído, falhou) e sincronizando com o GitHub
 - **Sistema de Recibos** — armazena e exibe todos os PDFs de recibos gerados, sincronizando com repositório GitHub dedicado
+- **Controle de Estoque** — consolida todas as pesagens do banco de dados em um estoque unificado por material, com sincronização Git
+- **Venda de Estoque** — registra saídas de estoque por venda, gera recibo PDF dedicado e atualiza o `estoque.json` automaticamente
 
 Toda a sincronização é feita via **Git** usando repositórios privados no GitHub da organização `lfbreciclagemeletronica`, sem necessidade de nenhuma outra infraestrutura.
 
@@ -67,9 +74,15 @@ Toda a sincronização é feita via **Git** usando repositórios privados no Git
 │   ├── .git/
 │   ├── Cliente_24-04-2026.json           ← pesagem pendente
 │   └── Cliente_24-04-2026_concluido.json ← pesagem concluída (renomeada automaticamente)
-├── Recibos/                      ← Repositório git clonado (lfbreciclagemeletronica/Recibos)
+├── banco-de-dados/               ← Repositório git clonado (lfbreciclagemeletronica/banco-de-dados)
 │   ├── .git/
-│   └── Cliente_24-04-2026.pdf
+│   └── estoque.json
+├── Recibos/
+│   ├── .git/
+│   ├── *.pdf
+│   └── Recibos_Venda/
+│       ├── Cliente_05-05-2026.pdf
+│       └── Cliente_05-05-2026.pdf.meta.json
 └── TabelaPrecos/                 ← Repositório git clonado (lfbreciclagemeletronica/TabelaPrecos)
     ├── .git/
     └── Tabela2026CI.json
@@ -556,6 +569,97 @@ O repositório `lfbreciclagemeletronica/Recibos` armazena todos os PDFs de recib
 | Tabela excluída | `Excluir tabela <nome.json>` |
 | Migração de arquivos legados | `Migração de tabelas de preços existentes` |
 | Sync geral | `Sincronização de tabelas de preços` |
+
+---
+
+## Sistema de Controle de Estoque
+
+A tela **Controle de Estoque** é acessível pelo botão **📦 Estoque** na tela inicial. Ela consolida todas as pesagens registradas em `banco-de-dados/` e calcula o saldo atual de cada material.
+
+<div align="center">
+
+<!-- Imagem da tela Controle de Estoque — aba Estoque -->
+
+</div>
+
+**Funcionalidades:**
+- Lista todos os materiais do catálogo com o total em kg acumulado.
+- Botão **⟳ Sincronizar** — pull do repositório `banco-de-dados` e push do `estoque.json` atualizado.
+- Botão **💰 Venda** — abre o módulo de venda de estoque.
+- **Aba Recibos de Venda** — lista todos os recibos de venda gerados.
+
+---
+
+## Sistema de Venda de Estoque
+
+### Registrar uma venda
+
+Acesse pelo botão **💰 Venda** na tela de Controle de Estoque.
+
+<div align="center">
+
+<!-- Imagem da tela de Nova Venda de Estoque -->
+
+</div>
+
+**Fluxo de uso:**
+
+1. Preencha o **Nome do Cliente** (obrigatório).
+2. Preencha o **Valor da Venda (R$)** — campo formata automaticamente como `R$ X.XXX,XX` ao confirmar.
+3. Informe o **peso em kg** de cada material vendido — funciona igual ao sistema de pesagens.
+4. O **Peso Total** é atualizado automaticamente em tempo real.
+5. Clique em **💾 Salvar Venda**.
+
+**O que acontece ao salvar:**
+
+1. PDF do recibo gerado em `Recibos/Recibos_Venda/`.
+2. Arquivo `.pdf.meta.json` salvo ao lado com cliente, peso, valor e data.
+3. Itens vendidos subtraídos do `estoque.json` local (nunca fica negativo).
+4. Modal de sucesso exibido com botão **📄 Abrir PDF**.
+5. PDF publicado no GitHub (`Recibos/Recibos_Venda/`).
+6. `estoque.json` atualizado publicado no GitHub (`banco-de-dados/`).
+
+---
+
+### Recibo de Venda PDF
+
+Gerado com QuestPDF com layout profissional:
+
+<div align="center">
+
+<!-- Imagem do recibo de venda PDF gerado -->
+
+</div>
+
+- Cabeçalho LFB idêntico ao recibo de pesagem (logo, CNPJ, IE, endereço).
+- Faixa de informações: **CLIENTE** | **PESO** | **VALOR** | **DATA**.
+- Título: `RECIBO DE VENDA DE ESTOQUE`.
+- Tabela de itens com apenas **MATERIAL** e **KG** (sem preço/kg).
+- Nome do arquivo: `{NomeCliente}_{dd-MM-yyyy}.pdf`.
+
+---
+
+### Aba Recibos de Venda
+
+Segunda aba do Controle de Estoque exibe todos os recibos de venda gerados.
+
+<div align="center">
+
+<!-- Imagem da aba Recibos de Venda -->
+
+</div>
+
+**Filtros:**
+- Campo de texto — filtra por nome do cliente em tempo real.
+- Campo de Mês/Ano (ex: `05/2026`) — filtra pelos recibos do mês.
+- Botão **⟳ Atualizar** — recarrega a lista do diretório local.
+
+**Por linha:**
+- **Peso Total** — em laranja.
+- **Valor Total** — em verde (vazio para recibos antigos sem `.meta.json`).
+- **Data** — em texto principal (visível no tema escuro).
+- Botão **📄 Abrir** — abre o PDF no visualizador padrão.
+- Botão **🗑 Excluir** (vermelho) — remove PDF e `.meta.json` com confirmação.
 
 ---
 

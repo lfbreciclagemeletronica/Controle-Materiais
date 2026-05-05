@@ -78,6 +78,135 @@ public static class GitHubService
     public static string TabelaPrecosRepoDir(string rootDir) =>
         Path.Combine(rootDir, "TabelaPrecos");
 
+    // Diretório local do clone de BancoDados
+    public static string BancoDadosRepoDir(string rootDir) =>
+        Path.Combine(rootDir, "banco-de-dados");
+
+    /// <summary>
+    /// Garante que o repo BancoDados está clonado localmente.
+    /// </summary>
+    public static async Task GarantirBancoDadosRepoAsync(string rootDir, Action<string> progresso)
+    {
+        if (!CredenciaisExistem(rootDir))
+            throw new InvalidOperationException("Configure as credenciais do GitHub antes de usar o estoque.");
+
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados))
+            throw new InvalidOperationException("URL do repositório de Banco de Dados não configurada. Edite as credenciais do GitHub.");
+
+        var remoteUrl = InjetarToken(creds.UrlBancoDados, creds.Token);
+        var repoDir   = BancoDadosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+
+        if (!Directory.Exists(gitDir))
+        {
+            progresso("Clonando repositório banco-de-dados...");
+            if (Directory.Exists(repoDir))
+                Directory.Delete(repoDir, true);
+            Directory.CreateDirectory(repoDir);
+            var r = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (r.exitCode != 0)
+                throw new Exception($"Clone do repo banco-de-dados falhou: {r.stderr}");
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+            progresso("Repositório banco-de-dados pronto.");
+        }
+        else
+        {
+            progresso("Atualizando banco-de-dados (pull)...");
+            await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+            await RunAsync("git", "fetch origin main", repoDir);
+            await RunAsync("git", "rebase origin/main", repoDir);
+        }
+    }
+
+    /// <summary>
+    /// Salva o .json de estoque no repo banco-de-dados e faz push.
+    /// </summary>
+    public static async Task PublicarJsonBancoDadosAsync(string rootDir, string nomeArquivo, string conteudoJson,
+                                                          Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return;
+
+        var repoDir = BancoDadosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+
+        var remoteUrl = InjetarToken(creds.UrlBancoDados, creds.Token);
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Atualizando banco-de-dados (pull)...");
+        await RunAsync("git", "fetch origin main", repoDir);
+        await RunAsync("git", "rebase origin/main", repoDir);
+
+        var destino = Path.Combine(repoDir, nomeArquivo);
+        await System.IO.File.WriteAllTextAsync(destino, conteudoJson);
+
+        progresso?.Invoke("Salvando dados no banco-de-dados...");
+        await RunAsync("git", $"add \"{nomeArquivo}\"", repoDir);
+        var commit = await RunAsync("git", $"commit -m \"Dados recibo {nomeArquivo}\"", repoDir);
+        if (commit.exitCode == 0)
+        {
+            progresso?.Invoke("Enviando banco-de-dados ao GitHub...");
+            await RunAsync("git", "push origin main", repoDir);
+        }
+    }
+
+    /// <summary>
+    /// Remove o .json de estoque do repo banco-de-dados e faz push.
+    /// </summary>
+    public static async Task RemoverJsonBancoDadosAsync(string rootDir, string nomeArquivo,
+                                                         Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+
+        var repoDir = BancoDadosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+
+        // Se não tiver repo git, apenas remove o arquivo local
+        if (!Directory.Exists(gitDir))
+        {
+            var localPath = Path.Combine(repoDir, nomeArquivo);
+            if (System.IO.File.Exists(localPath)) System.IO.File.Delete(localPath);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return;
+        var remoteUrl = InjetarToken(creds.UrlBancoDados, creds.Token);
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Atualizando banco-de-dados (pull)...");
+        await RunAsync("git", "fetch origin main", repoDir);
+        await RunAsync("git", "rebase origin/main", repoDir);
+
+        progresso?.Invoke("Removendo dados do banco-de-dados...");
+        var rm = await RunAsync("git", $"rm --ignore-unmatch \"{nomeArquivo}\"", repoDir);
+
+        // Também remove localmente se ainda existir (caso não estivesse no git)
+        var filePath = Path.Combine(repoDir, nomeArquivo);
+        if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
+
+        if (rm.exitCode == 0 && !string.IsNullOrWhiteSpace(rm.stdout))
+        {
+            progresso?.Invoke("Commitando remoção...");
+            var commit = await RunAsync("git", $"commit -m \"Excluir dados recibo {nomeArquivo}\"", repoDir);
+            if (commit.exitCode == 0)
+            {
+                progresso?.Invoke("Enviando ao GitHub...");
+                await RunAsync("git", "push origin main", repoDir);
+            }
+        }
+    }
+
     /// <summary>
     /// Garante que o repo Recibos está clonado localmente.
     /// Se já existir um diretório "Recibos" com PDFs (sem .git), migra os PDFs para o repo clonado e remove o diretório antigo.
@@ -414,6 +543,43 @@ public static class GitHubService
 
         progresso?.Invoke("Adicionando arquivo...");
         await RunAsync("git", $"add \"{Path.GetFileName(filePath)}\"", repoDir);
+        progresso?.Invoke("Commitando...");
+        var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
+        if (commit.exitCode == 0)
+        {
+            progresso?.Invoke("Enviando para o GitHub...");
+            await RunAsync("git", "push origin main", repoDir);
+        }
+    }
+
+    /// <summary>
+    /// Faz commit e push de um PDF de venda no subdiretório Recibos_Venda dentro do repo Recibos.
+    /// </summary>
+    public static async Task PublicarReciboVendaAsync(string rootDir, string filePath, string mensagemCommit,
+                                                       Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds   = CarregarCredenciais(rootDir)!;
+        var repoDir = RecibosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return;
+
+        var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
+        progresso?.Invoke("Configurando repositório...");
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        var subDir  = Path.Combine(repoDir, "Recibos_Venda");
+        Directory.CreateDirectory(subDir);
+        var destino = Path.Combine(subDir, Path.GetFileName(filePath));
+        if (!File.Exists(destino))
+            File.Copy(filePath, destino, overwrite: true);
+
+        var relPath = Path.Combine("Recibos_Venda", Path.GetFileName(filePath)).Replace('\\', '/');
+        progresso?.Invoke("Adicionando arquivo...");
+        await RunAsync("git", $"add \"{relPath}\"", repoDir);
         progresso?.Invoke("Commitando...");
         var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
         if (commit.exitCode == 0)

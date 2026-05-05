@@ -99,6 +99,7 @@ Antes de usar qualquer funcionalidade de sincronização, é necessário configu
 <div align="center">
 
 <!-- Coloque aqui uma imagem da tela de configuração do GitHub -->
+<img src="images/pagina-inicial.png" alt="pagina inicial" width="900">
 
 </div>
 
@@ -113,15 +114,16 @@ As credenciais são salvas em `~/Downloads/ControleMateriaisLFB/credenciais.json
 
 ---
 
-## Sistema de Pesos (Calculadora)
+## Sistema de Pesos (Pesagem)
 
-### Como funciona a Calculadora
+### Como funciona a Pesagem
 
-A calculadora é a tela principal do sistema. Ela exibe a lista completa de **52 categorias de materiais** (placas, metais, cabos, celulares, etc.) com os respectivos preços por kg da tabela ativa.
+A tela exibe a lista completa de **52 categorias de materiais** (placas, metais, cabos, celulares, etc.) onde a pessoa coloca a quantidade de cada material que foi pesada.
 
 <div align="center">
 
 <!-- Coloque aqui uma imagem da tela principal da calculadora -->
+<img src="images/pesagem-criar-pesagem.png" alt="Tela de criação de pesagem" width="900">
 
 </div>
 
@@ -131,16 +133,68 @@ A calculadora é a tela principal do sistema. Ela exibe a lista completa de **52
 2. Clique em qualquer campo de **Peso atual (kg)** na linha do material desejado
 3. Digite o peso recebido e pressione **Enter** ou clique fora do campo para confirmar
 4. Pressione **Esc** para cancelar e restaurar o valor anterior sem salvar
-5. O **Total** de cada item (kg × preço/kg) e o **Valor Total** geral são atualizados automaticamente em tempo real
-6. Clique em qualquer parte de uma linha para **selecioná-la** com destaque visual azul
+5. Clique em qualquer parte de uma linha para **selecioná-la** com destaque visual azul
+6. Após preencher todos os pesos, clique no botão **"Salvar Pesagem"** para salvar a pesagem
+7. Após Salvar ele vai enviar para o repositório do Github de pesagens e manter no local também
 
 <div align="center">
 
 <!-- Coloque aqui uma imagem com pesos preenchidos e totais calculados -->
+<img src="images/pesagem-salvar-pesagem.png" alt="Tela de salvamento de pesagem" width="900">
 
 </div>
 
-> Itens com peso zero são **omitidos automaticamente** do recibo PDF gerado — só aparecem no PDF os materiais efetivamente pesados.
+---
+
+## Sistema de Recibos
+
+### Abas de pesagens feitas
+
+A tela exibe a lista completa de **pesagens feitas** onde a pessoa pode ver todas as pesagens que foram salvas.
+
+<div align="center">
+
+<!-- Coloque aqui uma imagem da tela de pesagens feitas -->
+<img src="images/recibos-recebido-pesagem.png" alt="Tela de listagem de pesagens" width="900">
+
+</div>
+
+> Quando aparece o status de **pendente** significa que a pesagem ainda não foi criada um recibo dela, clique no nome do cliente para começar o processo de criação de recibo dessa pesagem.
+
+---
+
+### Criando um recibo
+
+Após clicar no nome do cliente, você será direcionado para a tela de criação de recibo.
+
+Os pesos dos itens pesados serão automaticamente preenchidos na tela de criação de recibo.
+
+Selecione a **Tabela de Preços** que será utilizada para calcular o valor do recibo.
+
+<div align="center">
+
+<!-- Coloque aqui uma imagem da tela de criação de recibo -->
+<img src="images/recibos-escolher-tabela-preco.png" alt="Tela de criação de recibo" width="900">
+
+</div>
+
+Depois, selecione qual a tabela de preços ou crie uma nova, depois clique em **Ativar Tabela**
+
+<div align="center">
+
+<!-- Coloque aqui uma imagem da tela de criação de recibo -->
+<img src="images/recibos-ativar-tabela-precos.png" alt="Tela de criação de recibo" width="900">
+
+</div>
+
+O sistema vai pegar os valores da tabela de preços e os pesos e vai calcular automaticamente todos os valores do recibo. Para finalizar clique em **Exportar**.
+
+<div align="center">
+
+<!-- Coloque aqui uma imagem da tela de exportação de recibo -->
+<img src="images/recibos-valores-no-recibo.png" alt="Informação dos valores no recibo" width="900">
+
+</div>
 
 ---
 
@@ -150,12 +204,6 @@ Abaixo da lista principal existem recursos adicionais para casos especiais:
 
 - **4 Itens Personalizados** — linhas livres com nome editável. Preencha o nome do material, o peso (kg) e o preço por kg. Itens com nome e peso preenchidos aparecem no recibo PDF com os mesmos campos dos itens padrão.
 - **Campo Impurezas** — campo de peso exclusivo. O peso de impurezas é somado ao **Peso Total** e incluído no final do recibo, mas **não entra no cálculo do valor monetário**.
-
-<div align="center">
-
-<!-- Coloque aqui uma imagem dos itens personalizados e impurezas -->
-
-</div>
 
 ---
 
@@ -168,8 +216,11 @@ Acesse clicando em **"Tabela de Preços"** na tela principal.
 <div align="center">
 
 <!-- Coloque aqui uma imagem da tela de tabelas de preços -->
+<img src="images/recibos-ativar-tabela-precos.png" alt="Tela de listagem de tabelas de preços" width="900">
 
 </div>
+
+---
 
 #### Criar nova tabela
 

@@ -105,38 +105,88 @@
 
         <!-- Linhas -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-          <ItemsControl ItemsSource="{Binding Itens}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:VendaItemWrapper">
-                <Border BorderBrush="{DynamicResource Brush.Border}"
-                        BorderThickness="0,0,0,1"
-                        Padding="20,6">
-                  <Border.Styles>
-                    <Style Selector="Border:pointerover">
-                      <Setter Property="Background" Value="#0A3B82F6"/>
-                    </Style>
-                  </Border.Styles>
-                  <Grid ColumnDefinitions="*,180">
-                    <TextBlock Grid.Column="0"
-                               Text="{Binding Nome}"
+          <StackPanel>
+
+            <!-- Itens do catálogo fixo -->
+            <ItemsControl ItemsSource="{Binding ItensFixos}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VendaItemWrapper">
+                  <Border BorderBrush="{DynamicResource Brush.Border}"
+                          BorderThickness="0,0,0,1"
+                          Padding="20,6">
+                    <Border.Styles>
+                      <Style Selector="Border:pointerover">
+                        <Setter Property="Background" Value="#0A3B82F6"/>
+                      </Style>
+                    </Border.Styles>
+                    <Grid ColumnDefinitions="*,180">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding Nome}"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"
+                                 VerticalAlignment="Center"/>
+                      <TextBox Grid.Column="1"
+                               Text="{Binding PesoTexto}"
                                FontSize="12"
-                               Foreground="{DynamicResource Brush.TextPrimary}"
-                               VerticalAlignment="Center"/>
-                    <TextBox Grid.Column="1"
-                             Text="{Binding PesoTexto}"
-                             FontSize="12"
-                             TextAlignment="Right"
-                             Width="160"
-                             HorizontalAlignment="Right"
-                             VerticalAlignment="Center"
-                             GotFocus="PesoTextBox_GotFocus"
-                             LostFocus="PesoTextBox_LostFocus"
-                             KeyDown="PesoTextBox_KeyDown"/>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+                               TextAlignment="Right"
+                               Width="160"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               GotFocus="PesoTextBox_GotFocus"
+                               LostFocus="PesoTextBox_LostFocus"
+                               KeyDown="PesoTextBox_KeyDown"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Separador + itens extras do estoque -->
+            <Border IsVisible="{Binding TemItensExtras}"
+                    BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,4,0,0" Padding="20,6,20,0">
+              <TextBlock Text="Outros itens em estoque"
+                         FontSize="11" FontWeight="SemiBold"
+                         Foreground="{DynamicResource Brush.TextSecondary}"
+                         Margin="0,0,0,4"/>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding ItensExtras}"
+                          IsVisible="{Binding TemItensExtras}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VendaItemWrapper">
+                  <Border BorderBrush="{DynamicResource Brush.Border}"
+                          BorderThickness="0,0,0,1"
+                          Padding="20,6">
+                    <Border.Styles>
+                      <Style Selector="Border:pointerover">
+                        <Setter Property="Background" Value="#0A3B82F6"/>
+                      </Style>
+                    </Border.Styles>
+                    <Grid ColumnDefinitions="*,180">
+                      <TextBlock Grid.Column="0"
+                                 Text="{Binding Nome}"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource Brush.TextPrimary}"
+                                 VerticalAlignment="Center"/>
+                      <TextBox Grid.Column="1"
+                               Text="{Binding PesoTexto}"
+                               FontSize="12"
+                               TextAlignment="Right"
+                               Width="160"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               GotFocus="PesoTextBox_GotFocus"
+                               LostFocus="PesoTextBox_LostFocus"
+                               KeyDown="PesoTextBox_KeyDown"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </StackPanel>
         </ScrollViewer>
 
       </Grid>

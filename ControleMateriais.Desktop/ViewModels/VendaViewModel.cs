@@ -84,7 +84,16 @@ public class VendaViewModel : ViewModelBase
     private readonly string _rootDir;
     private readonly Action _voltarCallback;
 
-    public ObservableCollection<VendaItemWrapper> Itens { get; } = new();
+    public ObservableCollection<VendaItemWrapper> Itens      { get; } = new();
+    public ObservableCollection<VendaItemWrapper> ItensFixos  { get; } = new();
+    public ObservableCollection<VendaItemWrapper> ItensExtras { get; } = new();
+
+    private bool _temItensExtras;
+    public bool TemItensExtras
+    {
+        get => _temItensExtras;
+        private set { if (value != _temItensExtras) { _temItensExtras = value; OnPropertyChanged(); } }
+    }
 
     private string _nomeCliente = string.Empty;
     public string NomeCliente
@@ -159,11 +168,58 @@ public class VendaViewModel : ViewModelBase
             var item = new VendaItemWrapper(nome);
             item.PesoChanged = RecalcularTotal;
             Itens.Add(item);
+            ItensFixos.Add(item);
         }
 
         VoltarCommand = new DelegateCommand(() => _voltarCallback());
         SalvarCommand = new DelegateCommand(() => _ = SalvarVendaAsync());
         LimparCommand = new DelegateCommand(Limpar);
+    }
+
+    public void CarregarItensExtras()
+    {
+        var totais = EstoqueViewModel.LerEstoque(_rootDir);
+
+        var nomesExtrasEstoque = totais.Keys
+            .Where(k => !ItemCatalog.OrderedItems.Contains(k, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(n => n)
+            .ToList();
+
+        // Rebuild ItensExtras from scratch to reflect current estoque.json
+        // Remove from Itens any extra that is no longer in the estoque
+        var extrasParaRemover = Itens
+            .Where(i => !ItemCatalog.OrderedItems.Contains(i.Nome, StringComparer.OrdinalIgnoreCase)
+                        && !nomesExtrasEstoque.Contains(i.Nome, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var r in extrasParaRemover)
+            Itens.Remove(r);
+
+        var nomesExtrasAtuais = Itens
+            .Where(i => !ItemCatalog.OrderedItems.Contains(i.Nome, StringComparer.OrdinalIgnoreCase))
+            .Select(i => i.Nome)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Add new extras not yet in Itens
+        foreach (var nome in nomesExtrasEstoque)
+        {
+            if (!nomesExtrasAtuais.Contains(nome))
+            {
+                var item = new VendaItemWrapper(nome);
+                item.PesoChanged = RecalcularTotal;
+                Itens.Add(item);
+            }
+        }
+
+        // Rebuild ItensExtras observable collection so ItemsControl updates
+        ItensExtras.Clear();
+        foreach (var nome in nomesExtrasEstoque)
+        {
+            var item = Itens.First(i => i.Nome.Equals(nome, StringComparison.OrdinalIgnoreCase));
+            ItensExtras.Add(item);
+        }
+
+        TemItensExtras = ItensExtras.Count > 0;
+        RecalcularTotal();
     }
 
     private void RecalcularTotal()
@@ -180,6 +236,7 @@ public class VendaViewModel : ViewModelBase
         foreach (var i in Itens) i.ResetarPeso();
         RecalcularTotal();
         Status = string.Empty;
+        CarregarItensExtras();
     }
 
     private async Task SalvarVendaAsync()

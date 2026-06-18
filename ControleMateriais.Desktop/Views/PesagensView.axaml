@@ -233,11 +233,16 @@
                            VerticalAlignment="Center"
                            Foreground="{Binding StatusRecibosOk, Converter={StaticResource SyncStatusBrush}}"/>
               </StackPanel>
-              <Button Grid.Column="1"
-                      Content="⟳ Sincronizar"
-                      IsEnabled="{Binding !SincronizandoRecibos}"
-                      Command="{Binding SincronizarRecibosCommand}"
-                      ToolTip.Tip="Sincronizar recibos com repositório GitHub"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                <Button Content="📊 Exportar Excel"
+                        IsEnabled="{Binding !ExportandoExcel}"
+                        Command="{Binding ExportarExcelCommand}"
+                        ToolTip.Tip="Gerar planilha Excel com pesagens por dia de todos os recibos"/>
+                <Button Content="⟳ Sincronizar"
+                        IsEnabled="{Binding !SincronizandoRecibos}"
+                        Command="{Binding SincronizarRecibosCommand}"
+                        ToolTip.Tip="Sincronizar recibos com repositório GitHub"/>
+              </StackPanel>
             </Grid>
 
             <!-- Última sincronização -->

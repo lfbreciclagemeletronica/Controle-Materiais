@@ -364,6 +364,11 @@ public class EstoqueViewModel : ViewModelBase
         Status = "Conectando ao repositório...";
         try
         {
+            // Sincroniza repositório Recibos (inclui Recibos_Venda/)
+            await GitHubService.GarantirRecibosRepoAsync(_rootDir, msg => Status = msg);
+            await GitHubService.SincronizarRecibosAsync(_rootDir, msg => Status = msg);
+
+            // Sincroniza repositório banco-de-dados
             await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             var novos = ProcessarNovosJsons();
             Status = novos > 0

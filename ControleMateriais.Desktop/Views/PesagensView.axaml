@@ -238,6 +238,12 @@
                         IsEnabled="{Binding !ExportandoExcel}"
                         Command="{Binding ExportarExcelCommand}"
                         ToolTip.Tip="Gerar planilha Excel com pesagens por dia de todos os recibos"/>
+                <Button Content="🔄 Reconstruir Banco"
+                        IsEnabled="{Binding !ReconstruindoBancoDados}"
+                        Command="{Binding ReconstruirBancoDadosCommand}"
+                        Background="#E65100"
+                        Foreground="White"
+                        ToolTip.Tip="Apaga todos os JSONs e reconstrói o banco-de-dados a partir dos PDFs de recibos"/>
                 <Button Content="⟳ Sincronizar"
                         IsEnabled="{Binding !SincronizandoRecibos}"
                         Command="{Binding SincronizarRecibosCommand}"

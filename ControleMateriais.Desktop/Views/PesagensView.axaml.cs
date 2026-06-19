@@ -27,6 +27,14 @@ public partial class PesagensView : UserControl
 
             vm.ConfirmarDeletarReciboCallback  = AbrirConfirmDeleteReciboAsync;
             vm.ConfirmarDeletarPesagemCallback = AbrirConfirmDeletePesagemAsync;
+            vm.ConfirmarReconstruirBancoDadosCallback = async msg =>
+            {
+                var owner = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;
+                if (owner is null) return false;
+                var dlg = new ConfirmDeleteDialog(msg);
+                await dlg.ShowDialog(owner);
+                return dlg.Confirmado;
+            };
 
             // Quando um novo recibo é publicado, reseta flag para re-sync na próxima abertura da aba
             vm.NovoReciboPublicadoCallback = () => _sincRecibosFeita = false;

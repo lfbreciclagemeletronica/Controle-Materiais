@@ -265,7 +265,8 @@ public class PesagensViewModel : ViewModelBase
     public ICommand AbrirPdfCommand           { get; }
     public ICommand DeletarReciboCommand      { get; }
     public ICommand DeletarPesagemCommand     { get; }
-    public ICommand ExportarExcelCommand      { get; }
+    public ICommand ExportarExcelCommand        { get; }
+    public ICommand ReconstruirBancoDadosCommand { get; }
 
     public Func<Task>?                          SolicitarConfiguracaoGitHubCallback { get; set; }
     public Action<PesagemItem>?                 AbrirReciboCallback { get; set; }
@@ -273,6 +274,7 @@ public class PesagensViewModel : ViewModelBase
     public Func<ReciboItem, Task>?              ConfirmarDeletarReciboCallback { get; set; }
     public Func<PesagemItem, Task>?             ConfirmarDeletarPesagemCallback { get; set; }
     public Action?                              NovoReciboPublicadoCallback { get; set; }
+    public Func<string, Task<bool>>?            ConfirmarReconstruirBancoDadosCallback { get; set; }
 
     public PesagensViewModel(Action voltarCallback, string rootDir)
     {
@@ -300,7 +302,8 @@ public class PesagensViewModel : ViewModelBase
         {
             if (item is not null) _ = ConfirmarDeletarPesagemCallback?.Invoke(item);
         });
-        ExportarExcelCommand = new DelegateCommand(() => _ = ExportarExcelAsync());
+        ExportarExcelCommand        = new DelegateCommand(() => _ = ExportarExcelAsync());
+        ReconstruirBancoDadosCommand = new DelegateCommand(() => _ = ReconstruirBancoDadosAsync());
     }
 
     public void CarregarPesagens()
@@ -711,6 +714,55 @@ public class PesagensViewModel : ViewModelBase
         finally
         {
             ExportandoExcel = false;
+        }
+    }
+
+    private bool _reconstruindoBancoDados;
+    public bool ReconstruindoBancoDados
+    {
+        get => _reconstruindoBancoDados;
+        private set { if (value != _reconstruindoBancoDados) { _reconstruindoBancoDados = value; OnPropertyChanged(); } }
+    }
+
+    private async Task ReconstruirBancoDadosAsync()
+    {
+        if (ReconstruindoBancoDados) return;
+
+        if (ConfirmarReconstruirBancoDadosCallback is not null)
+        {
+            var ok = await ConfirmarReconstruirBancoDadosCallback(
+                "Esta ação irá apagar todos os JSONs em banco-de-dados/ e recriá-los a partir dos PDFs de recibos.\n\n" +
+                "O estoque.json será recalculado somando todas as pesagens e subtraindo as vendas.\n\n" +
+                "Deseja continuar?");
+            if (!ok) return;
+        }
+
+        ReconstruindoBancoDados = true;
+        MostrarStatusRecibos("Reconstruindo banco de dados...", ok: true);
+
+        try
+        {
+            var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
+            if (!Directory.Exists(bancoDadosDir))
+            {
+                MostrarStatusRecibos("Diretório banco-de-dados não encontrado.", ok: false);
+                return;
+            }
+
+            await Task.Run(() =>
+                ReconstruirBancoDadosService.Reconstruir(RootDir,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(
+                        () => MostrarStatusRecibos(msg, ok: true))));
+
+            MostrarStatusRecibos("Banco de dados reconstruído com sucesso!", ok: true);
+        }
+        catch (Exception ex)
+        {
+            MostrarStatusRecibos($"Erro ao reconstruir: {ex.Message}", ok: false);
+        }
+        finally
+        {
+            ReconstruindoBancoDados = false;
         }
     }
 }

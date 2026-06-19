@@ -1,3 +1,4 @@
+using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Services;
 using System;
 using System.Collections.ObjectModel;
@@ -211,7 +212,7 @@ public class PesagensViewModel : ViewModelBase
                 (string.IsNullOrEmpty(nome) || r.NomeArquivo.Contains(nome, StringComparison.OrdinalIgnoreCase)) &&
                 (_filtroReciboMes == null ||
                  (r.DataCriacaoRaw.Year == _filtroReciboMes.Ano && r.DataCriacaoRaw.Month == _filtroReciboMes.Mes)))
-            .OrderBy(r => r.DataCriacaoRaw))
+            .OrderByDescending(r => r.DataCriacaoRaw))
         {
             RecibosVisiveis.Add(r);
         }
@@ -264,6 +265,8 @@ public class PesagensViewModel : ViewModelBase
     public ICommand AbrirPdfCommand           { get; }
     public ICommand DeletarReciboCommand      { get; }
     public ICommand DeletarPesagemCommand     { get; }
+    public ICommand ExportarExcelCommand        { get; }
+    public ICommand ReconstruirBancoDadosCommand { get; }
 
     public Func<Task>?                          SolicitarConfiguracaoGitHubCallback { get; set; }
     public Action<PesagemItem>?                 AbrirReciboCallback { get; set; }
@@ -271,6 +274,7 @@ public class PesagensViewModel : ViewModelBase
     public Func<ReciboItem, Task>?              ConfirmarDeletarReciboCallback { get; set; }
     public Func<PesagemItem, Task>?             ConfirmarDeletarPesagemCallback { get; set; }
     public Action?                              NovoReciboPublicadoCallback { get; set; }
+    public Func<string, Task<bool>>?            ConfirmarReconstruirBancoDadosCallback { get; set; }
 
     public PesagensViewModel(Action voltarCallback, string rootDir)
     {
@@ -298,6 +302,8 @@ public class PesagensViewModel : ViewModelBase
         {
             if (item is not null) _ = ConfirmarDeletarPesagemCallback?.Invoke(item);
         });
+        ExportarExcelCommand        = new DelegateCommand(() => _ = ExportarExcelAsync());
+        ReconstruirBancoDadosCommand = new DelegateCommand(() => _ = ReconstruirBancoDadosAsync());
     }
 
     public void CarregarPesagens()
@@ -650,5 +656,113 @@ public class PesagensViewModel : ViewModelBase
     {
         StatusRecibos    = mensagem;
         StatusRecibosOk  = ok;
+    }
+
+    private bool _exportandoExcel;
+    public bool ExportandoExcel
+    {
+        get => _exportandoExcel;
+        private set { if (value != _exportandoExcel) { _exportandoExcel = value; OnPropertyChanged(); } }
+    }
+
+    private async Task ExportarExcelAsync()
+    {
+        if (ExportandoExcel) return;
+        ExportandoExcel = true;
+        MostrarStatusRecibos("Preparando exportação...", ok: true);
+
+        try
+        {
+            var recibosDir = GitHubService.RecibosRepoDir(RootDir);
+            if (!Directory.Exists(recibosDir))
+            {
+                MostrarStatusRecibos("Diretório de recibos não encontrado. Sincronize primeiro.", ok: false);
+                return;
+            }
+
+            var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
+                            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            if (topLevel is null) return;
+
+            var suggestedName = $"Relatorio_Pesagens_{DateTime.Now:dd-MM-yyyy}.xlsx";
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(
+                new Avalonia.Platform.Storage.FilePickerSaveOptions
+                {
+                    Title             = "Salvar relatório Excel",
+                    SuggestedFileName = suggestedName,
+                    FileTypeChoices   = new[]
+                    {
+                        new Avalonia.Platform.Storage.FilePickerFileType("Excel")
+                            { Patterns = new[] { "*.xlsx" } }
+                    }
+                });
+
+            var outputPath = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(outputPath)) { MostrarStatusRecibos(string.Empty, ok: true); return; }
+
+            await Task.Run(() =>
+                RelatorioExcelService.Gerar(recibosDir, outputPath,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(
+                        () => MostrarStatusRecibos(msg, ok: true))));
+
+            MostrarStatusRecibos($"Excel exportado com sucesso.", ok: true);
+        }
+        catch (Exception ex)
+        {
+            MostrarStatusRecibos($"Erro ao exportar Excel: {ex.Message}", ok: false);
+        }
+        finally
+        {
+            ExportandoExcel = false;
+        }
+    }
+
+    private bool _reconstruindoBancoDados;
+    public bool ReconstruindoBancoDados
+    {
+        get => _reconstruindoBancoDados;
+        private set { if (value != _reconstruindoBancoDados) { _reconstruindoBancoDados = value; OnPropertyChanged(); } }
+    }
+
+    private async Task ReconstruirBancoDadosAsync()
+    {
+        if (ReconstruindoBancoDados) return;
+
+        if (ConfirmarReconstruirBancoDadosCallback is not null)
+        {
+            var ok = await ConfirmarReconstruirBancoDadosCallback(
+                "Esta ação irá apagar todos os JSONs em banco-de-dados/ e recriá-los a partir dos PDFs de recibos.\n\n" +
+                "O estoque.json será recalculado somando todas as pesagens e subtraindo as vendas.\n\n" +
+                "Deseja continuar?");
+            if (!ok) return;
+        }
+
+        ReconstruindoBancoDados = true;
+        MostrarStatusRecibos("Reconstruindo banco de dados...", ok: true);
+
+        try
+        {
+            var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
+            if (!Directory.Exists(bancoDadosDir))
+            {
+                MostrarStatusRecibos("Diretório banco-de-dados não encontrado.", ok: false);
+                return;
+            }
+
+            await Task.Run(() =>
+                ReconstruirBancoDadosService.Reconstruir(RootDir,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(
+                        () => MostrarStatusRecibos(msg, ok: true))));
+
+            MostrarStatusRecibos("Banco de dados reconstruído com sucesso!", ok: true);
+        }
+        catch (Exception ex)
+        {
+            MostrarStatusRecibos($"Erro ao reconstruir: {ex.Message}", ok: false);
+        }
+        finally
+        {
+            ReconstruindoBancoDados = false;
+        }
     }
 }

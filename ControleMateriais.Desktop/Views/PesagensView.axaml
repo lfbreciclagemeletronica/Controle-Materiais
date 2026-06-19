@@ -213,10 +213,10 @@
              ABA 2: RECIBOS
              ══════════════════════════════════════════════════ -->
         <TabItem Header="Recibos">
-          <Grid RowDefinitions="Auto,Auto,*">
+          <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-            <!-- Barra: filtros + Sincronizar -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,6">
+            <!-- Barra: filtros + botões -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,4">
               <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <TextBox Text="{Binding FiltroReciboNome, Mode=TwoWay}"
                          Watermark="Buscar por nome..."
@@ -227,11 +227,6 @@
                           Width="150" FontSize="12"
                           VerticalAlignment="Center"
                           ToolTip.Tip="Filtrar por mês"/>
-                <TextBlock Text="{Binding StatusRecibos}"
-                           IsVisible="{Binding StatusRecibosVisivel}"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           Foreground="{Binding StatusRecibosOk, Converter={StaticResource SyncStatusBrush}}"/>
               </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                 <Button Content="📊 Exportar Excel"
@@ -251,8 +246,17 @@
               </StackPanel>
             </Grid>
 
-            <!-- Última sincronização -->
+            <!-- Mensagem de status (sincronização / erros) -->
             <TextBlock Grid.Row="1"
+                       Text="{Binding StatusRecibos}"
+                       IsVisible="{Binding StatusRecibosVisivel}"
+                       HorizontalAlignment="Center"
+                       FontSize="12"
+                       Margin="0,2,0,2"
+                       Foreground="{Binding StatusRecibosOk, Converter={StaticResource SyncStatusBrush}}"/>
+
+            <!-- Última sincronização -->
+            <TextBlock Grid.Row="2"
                        Text="{Binding UltimaSincRecibos}"
                        IsVisible="{Binding UltimaSincRecibosVisivel}"
                        HorizontalAlignment="Center"
@@ -261,7 +265,7 @@
                        Margin="0,0,0,4"/>
 
             <!-- Corpo -->
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="3">
 
               <!-- Sem repositório Recibos clonado -->
               <StackPanel IsVisible="{Binding !RecibosDirPresente}"

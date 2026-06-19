@@ -591,6 +591,10 @@ public class MainWindowViewModel : ViewModelBase
             var conteudo = jsonObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             await System.IO.File.WriteAllTextAsync(jsonPath, conteudo);
 
+            // Valida que o JSON foi criado corretamente
+            if (!System.IO.File.Exists(jsonPath) || new System.IO.FileInfo(jsonPath).Length == 0)
+                throw new InvalidOperationException($"Falha ao criar o arquivo JSON do recibo no banco de dados: {jsonPath}");
+
             // Soma diretamente no estoque.json
             AtualizarStatusTela("Atualizando estoque...");
             var totaisEstoque = EstoqueViewModel.LerEstoque(RootDir);

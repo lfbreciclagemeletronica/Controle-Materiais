@@ -469,7 +469,7 @@ public class VendaViewModel : ViewModelBase
                             table.Cell().Element(BCell).AlignCenter()
                                  .Text(it.Nome).FontSize(cellFontSize);
                             table.Cell().Element(BCell).AlignCenter()
-                                 .Text(it.PesoAtual.ToString("N3")).FontSize(cellFontSize);
+                                 .Text(it.PesoAtual.ToString("N3", ptBR)).FontSize(cellFontSize);
                         }
                     });
                 });

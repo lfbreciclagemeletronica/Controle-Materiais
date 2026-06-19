@@ -120,6 +120,7 @@
                 <Button Grid.Column="4"
                         Content="&#x27F3; Atualizar"
                         Command="{Binding AtualizarCommand}"
+                        IsEnabled="{Binding !Atualizando}"
                         FontSize="12"/>
               </Grid>
             </Border>

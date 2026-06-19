@@ -87,6 +87,13 @@ public class EstoqueViewModel : ViewModelBase
         private set { if (value != _sincronizando) { _sincronizando = value; OnPropertyChanged(); } }
     }
 
+    private bool _atualizando;
+    public bool Atualizando
+    {
+        get => _atualizando;
+        private set { if (value != _atualizando) { _atualizando = value; OnPropertyChanged(); } }
+    }
+
     public ICommand SincronizarGitCommand { get; }
     public ICommand IrParaVendaCommand    { get; }
 
@@ -95,7 +102,7 @@ public class EstoqueViewModel : ViewModelBase
         _rootDir = rootDir;
         SincronizarGitCommand     = new DelegateCommand(() => _ = SincronizarGitAsync());
         IrParaVendaCommand        = new DelegateCommand(() => irParaVendaAction?.Invoke());
-        AtualizarCommand          = new DelegateCommand(Recarregar);
+        AtualizarCommand          = new DelegateCommand(() => _ = AtualizarAsync());
         AbrirReciboVendaCommand   = new DelegateCommand<ReciboVendaItem?>(AbrirReciboVenda);
         ExcluirReciboVendaCommand = new DelegateCommand<ReciboVendaItem?>(r => _ = ExcluirReciboVendaAsync(r));
     }
@@ -356,6 +363,32 @@ public class EstoqueViewModel : ViewModelBase
         RecibosVendaVazia = RecibosVenda.Count == 0;
     }
 
+    // ── Pull Recibos_Venda do GitHub + recarrega lista ────────────────────
+    private async Task AtualizarAsync()
+    {
+        if (Atualizando) return;
+        Atualizando = true;
+        Status = "Atualizando recibos de venda...";
+        try
+        {
+            if (GitHubService.CredenciaisExistem(_rootDir))
+            {
+                await GitHubService.GarantirRecibosRepoAsync(_rootDir, msg => Status = msg);
+                await GitHubService.SincronizarRecibosAsync(_rootDir, msg => Status = msg);
+            }
+            Recarregar();
+            Status = "Recibos de venda atualizados.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Erro ao atualizar: {ex.Message}";
+        }
+        finally
+        {
+            Atualizando = false;
+        }
+    }
+
     // ── Pull Git + processa novos JSONs remotos ────────────────────────────
     private async Task SincronizarGitAsync()
     {
@@ -364,6 +397,11 @@ public class EstoqueViewModel : ViewModelBase
         Status = "Conectando ao repositório...";
         try
         {
+            // Sincroniza repositório Recibos (inclui Recibos_Venda/)
+            await GitHubService.GarantirRecibosRepoAsync(_rootDir, msg => Status = msg);
+            await GitHubService.SincronizarRecibosAsync(_rootDir, msg => Status = msg);
+
+            // Sincroniza repositório banco-de-dados
             await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             var novos = ProcessarNovosJsons();
             Status = novos > 0

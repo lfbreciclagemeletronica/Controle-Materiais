@@ -24,9 +24,10 @@ public static class ReciboParserService
         "cnpj", "impurezas"
     };
 
-    // Regex: número com 3 casas decimais no formato brasileiro (ex: 22,710 ou 1.234,567)
+    // Regex: número com 3 casas decimais — pt-BR (vírgula) OU invariant (ponto)
+    // Ex: 22,710 | 1.234,567 | 1.258 | 22.710
     private static readonly Regex _rePeso = new(
-        @"(?<!\d)([\d]{1,3}(?:\.\d{3})*,\d{3})(?!\d)|(?<!\d)(\d+,\d{3})(?!\d)",
+        @"(?<!\d)([\d]{1,3}(?:\.\d{3})*,\d{3})(?!\d)|(?<!\d)(\d+,\d{3})(?!\d)|(?<!\d)(\d+\.\d{3})(?!\d)",
         RegexOptions.Compiled);
 
     // Corrige artefato do iText: "2 2,710" → "22,710"
@@ -197,9 +198,20 @@ public static class ReciboParserService
         {
             var raw = m.Groups[g].Value.Trim();
             if (string.IsNullOrEmpty(raw)) continue;
-            raw = raw.Replace(".", "").Replace(",", ".");
-            if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
-                return val;
+
+            // Formato pt-BR com vírgula decimal: "1.234,567" ou "22,710"
+            if (raw.Contains(','))
+            {
+                var ptbr = raw.Replace(".", "").Replace(",", ".");
+                if (decimal.TryParse(ptbr, NumberStyles.Any, CultureInfo.InvariantCulture, out var v1))
+                    return v1;
+            }
+            // Formato invariant com ponto decimal: "1.258" ou "22.710"
+            else if (raw.Contains('.'))
+            {
+                if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var v2))
+                    return v2;
+            }
         }
         return null;
     }

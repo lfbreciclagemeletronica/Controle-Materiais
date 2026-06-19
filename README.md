@@ -8,6 +8,8 @@
 **Sistema desktop completo para controle de pesagem, triagem, valoração e venda de materiais eletrônicos recicláveis.**  
 Registra pesagens, gera recibos em PDF, gerencia tabelas de preços, controla o estoque por material e registra vendas com recibo dedicado — tudo sincronizado automaticamente com o GitHub.
 
+> **Versão atual: V5.0.1**
+
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![Avalonia](https://img.shields.io/badge/Avalonia-UI-8A2BE2?style=flat-square)](https://avaloniaui.net/)
 [![Platform](https://img.shields.io/badge/Plataforma-Windows%20%7C%20Linux-0078D6?style=flat-square)]()
@@ -44,6 +46,8 @@ Registra pesagens, gera recibos em PDF, gerencia tabelas de preços, controla o 
   - [Registrar uma venda](#registrar-uma-venda)
   - [Recibo de Venda PDF](#recibo-de-venda-pdf)
   - [Aba Recibos de Venda](#aba-recibos-de-venda)
+- [Exportar Excel](#exportar-excel)
+- [Reconstruir Banco de Dados](#reconstruir-banco-de-dados)
 - [Publicar / Build](#publicar--build)
 - [Tecnologias](#tecnologias)
 
@@ -53,13 +57,15 @@ Registra pesagens, gera recibos em PDF, gerencia tabelas de preços, controla o 
 
 O **Controle de Materiais LFB** é um sistema desktop desenvolvido para a [LFB Reciclagem Eletrônica](https://github.com/lfbreciclagemeletronica) que automatiza o processo de pesagem, triagem e valoração de materiais eletrônicos recicláveis.
 
-O sistema é composto por cinco módulos integrados:
+O sistema é composto por sete módulos integrados:
 
 - **Calculadora de Pesos** — registra os materiais e pesos recebidos de um fornecedor, calcula o valor total usando a tabela de preços ativa e gera o recibo em PDF
 - **Sistema de Pesagens** — gerencia todas as pesagens geradas pelo aplicativo de balanças externo, exibindo status (pendente, concluído, falhou) e sincronizando com o GitHub
 - **Sistema de Recibos** — armazena e exibe todos os PDFs de recibos gerados, sincronizando com repositório GitHub dedicado
 - **Controle de Estoque** — consolida todas as pesagens do banco de dados em um estoque unificado por material, com sincronização Git
 - **Venda de Estoque** — registra saídas de estoque por venda, gera recibo PDF dedicado e atualiza o `estoque.json` automaticamente
+- **Exportar Excel** — gera planilha `.xlsx` com pesagens e vendas por dia e coluna de Estoque Atual calculada
+- **Reconstruir Banco** — reconstrói todo o `banco-de-dados/` a partir dos PDFs existentes, reprocessando pesagens e descontando vendas
 
 Toda a sincronização é feita via **Git** usando repositórios privados no GitHub da organização `lfbreciclagemeletronica`, sem necessidade de nenhuma outra infraestrutura.
 
@@ -76,7 +82,9 @@ Toda a sincronização é feita via **Git** usando repositórios privados no Git
 │   └── Cliente_24-04-2026_concluido.json ← pesagem concluída (renomeada automaticamente)
 ├── banco-de-dados/               ← Repositório git clonado (lfbreciclagemeletronica/banco-de-dados)
 │   ├── .git/
-│   └── estoque.json
+│   ├── estoque.json
+│   └── <NomeCliente>_<data>.json  ← JSON por pesagem concluída
+├── reconstruir-banco.log         ← Log gerado pelo Reconstruir Banco (diagnóstico)
 ├── Recibos/
 │   ├── .git/
 │   ├── *.pdf
@@ -606,8 +614,9 @@ O repositório `lfbreciclagemeletronica/Recibos` armazena todos os PDFs de recib
 | Repositório | URL | Conteúdo |
 |---|---|---|
 | `Pesagens` | `github.com/lfbreciclagemeletronica/Pesagens` | JSONs de pesagens (pendentes e concluídas) |
-| `Recibos` | `github.com/lfbreciclagemeletronica/Recibos` | PDFs de recibos gerados |
+| `Recibos` | `github.com/lfbreciclagemeletronica/Recibos` | PDFs de pesagem + subpasta `Recibos_Venda/` |
 | `TabelaPrecos` | `github.com/lfbreciclagemeletronica/TabelaPrecos` | JSONs de tabelas de preços |
+| `banco-de-dados` | `github.com/lfbreciclagemeletronica/banco-de-dados` | JSONs por pesagem + `estoque.json` consolidado |
 
 **Padrão de mensagens de commit:**
 
@@ -635,9 +644,10 @@ A tela **Controle de Estoque** é acessível pelo botão **📦 Estoque** na tel
 
 **Funcionalidades:**
 - Lista todos os materiais do catálogo com o total em kg acumulado.
-- Botão **⟳ Sincronizar** — pull do repositório `banco-de-dados` e push do `estoque.json` atualizado.
+- Botão **⟳ Sincronizar** — pull do repositório `banco-de-dados` e push do `estoque.json` atualizado. Também sincroniza `Recibos/Recibos_Venda/` antes de recarregar.
 - Botão **💰 Venda** — abre o módulo de venda de estoque.
 - **Aba Recibos de Venda** — lista todos os recibos de venda gerados.
+- Botão **⟳ Atualizar** (aba Recibos de Venda) — pull de `Recibos_Venda/` do GitHub antes de recarregar a lista.
 
 ---
 
@@ -714,6 +724,73 @@ Segunda aba do Controle de Estoque exibe todos os recibos de venda gerados.
 
 ---
 
+## Exportar Excel
+
+Acessível pelo botão **📊 Exportar Excel** na aba de Recibos (tela de Pesagens).
+
+<div align="center">
+
+<!-- Imagem do botão Exportar Excel na aba de Recibos -->
+
+</div>
+
+**O que é gerado:**
+
+| Bloco | Cor | Conteúdo |
+|-------|-----|----------|
+| **Pesagens por dia** | Verde | Uma coluna por data + coluna **TOTAL** |
+| **Vendas por dia** | Laranja | Uma coluna por data de venda + coluna **TOTAL VENDAS** |
+| **Estoque Atual** | Azul | `TOTAL pesagem − TOTAL VENDAS` por item |
+
+<div align="center">
+
+<!-- Imagem da planilha Excel gerada com os três blocos de colunas -->
+
+</div>
+
+**Detalhes:**
+- Lê todos os PDFs de pesagem em `Recibos/` (raiz).
+- Lê todos os PDFs de venda em `Recibos/Recibos_Venda/`.
+- Extrai pesos por item via `ReciboParserService` (iText7).
+- Linha de totais ao final em cada bloco.
+- Itens fora do catálogo exibidos em seção separada com linha divisória roxa.
+- Cabeçalho e coluna de nomes congelados.
+- Compatível com zero vendas: blocos laranja e azul omitidos automaticamente.
+
+---
+
+## Reconstruir Banco de Dados
+
+Acessível pelo botão **🔄 Reconstruir Banco** na aba de Recibos (tela de Pesagens).
+
+<div align="center">
+
+<!-- Imagem do botão Reconstruir Banco na aba de Recibos -->
+
+</div>
+
+> ⚠️ **Ação destrutiva** — apaga todos os JSONs em `banco-de-dados/` e recalcula do zero a partir dos PDFs.
+
+**Fluxo:**
+
+```
+1. Sincroniza Recibos/Recibos_Venda/ com o GitHub (pull)
+2. Apaga todos os .json em banco-de-dados/ (exceto .git/)
+3. Para cada PDF em Recibos/*.pdf (excluindo PDFs que também existem em Recibos_Venda/):
+   → extrai pesos via ReciboParserService
+   → grava <nome>.json em banco-de-dados/
+   → acumula em totaisPesagem
+4. Para cada PDF em Recibos/Recibos_Venda/*.pdf:
+   → subtrai pesos do totaisEstoque
+5. Grava estoque.json com o saldo final
+6. Atualiza a tela de Estoque automaticamente
+7. Grava log de diagnóstico em reconstruir-banco.log
+```
+
+**Após a reconstrução**, a tela de Controle de Estoque é atualizada automaticamente sem precisar navegar de volta.
+
+---
+
 ## Publicar / Build
 
 Para gerar os binários de distribuição (requer .NET SDK instalado):
@@ -758,6 +835,7 @@ powershell -ExecutionPolicy Bypass -File generate-icon.ps1
 | [Avalonia UI](https://avaloniaui.net/) | 11 | Framework de UI multiplataforma (MVVM) |
 | [QuestPDF](https://www.questpdf.com/) | latest | Geração de recibos e listas em PDF |
 | [iText7](https://itextpdf.com/) | latest | Extração de texto de PDFs importados |
+| [ClosedXML](https://github.com/ClosedXML/ClosedXML) | latest | Geração de planilhas `.xlsx` |
 | Git | — | Controle de versão e sincronização com GitHub |
 
 ---

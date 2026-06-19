@@ -318,8 +318,9 @@ public class MainWindowViewModel : ViewModelBase
         PesagensVM    = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
         EstoqueVM     = new EstoqueViewModel(RootDir, () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
         VendaVM       = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
-        PesagensVM.AbrirReciboCallback      = AbrirReciboDetalhe;
-        PesagensVM.CriarNovoReciboCallback  = CriarNovoRecibo;
+        PesagensVM.AbrirReciboCallback        = AbrirReciboDetalhe;
+        PesagensVM.CriarNovoReciboCallback    = CriarNovoRecibo;
+        PesagensVM.EstoqueRecarregarCallback  = () => EstoqueVM.Recarregar();
 
         _ = CarregarPrecosNaInicializacaoAsync();
     }

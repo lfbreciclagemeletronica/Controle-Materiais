@@ -568,10 +568,17 @@ public static class GitHubService
     {
         if (!CredenciaisExistem(rootDir)) return;
         var creds   = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return;
+
         var repoDir = RecibosRepoDir(rootDir);
         var gitDir  = Path.Combine(repoDir, ".git");
-        if (!Directory.Exists(gitDir)) return;
-        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return;
+
+        // Garante que o repo está clonado antes de tentar publicar
+        if (!Directory.Exists(gitDir))
+        {
+            progresso?.Invoke("Clonando repositório de Recibos...");
+            await GarantirRecibosRepoAsync(rootDir, msg => progresso?.Invoke(msg));
+        }
 
         var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
         progresso?.Invoke("Configurando repositório...");
@@ -579,15 +586,30 @@ public static class GitHubService
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
 
+        // Pull antes do push para evitar conflitos
+        await RunAsync("git", "fetch origin main", repoDir);
+        await RunAsync("git", "rebase origin/main", repoDir);
+
         var subDir  = Path.Combine(repoDir, "Recibos_Venda");
         Directory.CreateDirectory(subDir);
-        var destino = Path.Combine(subDir, Path.GetFileName(filePath));
-        if (!File.Exists(destino))
-            File.Copy(filePath, destino, overwrite: true);
 
-        var relPath = Path.Combine("Recibos_Venda", Path.GetFileName(filePath)).Replace('\\', '/');
-        progresso?.Invoke("Adicionando arquivo...");
-        await RunAsync("git", $"add \"{relPath}\"", repoDir);
+        // Copia PDF
+        var destPdf = Path.Combine(subDir, Path.GetFileName(filePath));
+        File.Copy(filePath, destPdf, overwrite: true);
+        var relPdf = Path.Combine("Recibos_Venda", Path.GetFileName(filePath)).Replace('\\', '/');
+
+        // Copia .meta.json se existir ao lado do PDF original
+        var metaOrigem  = filePath + ".meta.json";
+        var metaNome    = Path.GetFileName(filePath) + ".meta.json";
+        var relMeta     = Path.Combine("Recibos_Venda", metaNome).Replace('\\', '/');
+        if (File.Exists(metaOrigem))
+            File.Copy(metaOrigem, Path.Combine(subDir, metaNome), overwrite: true);
+
+        progresso?.Invoke("Adicionando arquivos...");
+        await RunAsync("git", $"add \"{relPdf}\"", repoDir);
+        if (File.Exists(metaOrigem))
+            await RunAsync("git", $"add \"{relMeta}\"", repoDir);
+
         progresso?.Invoke("Commitando...");
         var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
         if (commit.exitCode == 0)

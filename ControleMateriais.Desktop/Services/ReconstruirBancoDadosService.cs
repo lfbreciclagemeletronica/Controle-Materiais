@@ -20,6 +20,15 @@ public static class ReconstruirBancoDadosService
         var bancoDadosDir = GitHubService.BancoDadosRepoDir(rootDir);
         var recibosDir    = GitHubService.RecibosRepoDir(rootDir);
         var vendaDir      = Path.Combine(recibosDir, "Recibos_Venda");
+        var logPath       = Path.Combine(rootDir, "reconstruir-banco.log");
+
+        var logLines    = new System.Collections.Generic.List<string>();
+        var progressoOrig = progresso;
+        progresso = msg =>
+        {
+            logLines.Add($"[{DateTime.Now:HH:mm:ss}] {msg}");
+            progressoOrig?.Invoke(msg);
+        };
 
         // ── 1. Apagar todos os .json existentes em banco-de-dados/ ────────────
         progresso?.Invoke("Removendo JSONs antigos...");
@@ -34,8 +43,17 @@ public static class ReconstruirBancoDadosService
         }
 
         // ── 2. Processar cada PDF de pesagem → gerar JSON ────────────────────
+        // Exclui PDFs cujo nome também existe em Recibos_Venda/ (são recibos de venda na pasta errada)
+        var nomesVenda = Directory.Exists(vendaDir)
+            ? new HashSet<string>(
+                Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                         .Select(Path.GetFileName)!,
+                StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         var pdfs = Directory.Exists(recibosDir)
             ? Directory.GetFiles(recibosDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                       .Where(f => !nomesVenda.Contains(Path.GetFileName(f)))
                        .OrderBy(f => f)
                        .ToList()
             : new List<string>();
@@ -98,12 +116,22 @@ public static class ReconstruirBancoDadosService
 
                 Dictionary<string, decimal> itensVenda;
                 try { itensVenda = ReciboParserService.ExtrairPesos(pdf); }
-                catch { continue; }
+                catch (Exception ex) { progresso?.Invoke($"  ERRO ao ler {Path.GetFileName(pdf)}: {ex.Message}"); continue; }
+
+                if (itensVenda.Count == 0)
+                {
+                    progresso?.Invoke($"  AVISO: {Path.GetFileName(pdf)} — nenhum item reconhecido pelo parser.");
+                    continue;
+                }
+
+                progresso?.Invoke($"  {Path.GetFileName(pdf)}: {itensVenda.Count} item(ns) — {string.Join(", ", itensVenda.Select(kv => $"{kv.Key}={kv.Value:N3}"))}");
 
                 foreach (var kv in itensVenda)
                 {
                     if (totaisEstoque.TryGetValue(kv.Key, out var atual))
                         totaisEstoque[kv.Key] = Math.Max(0m, atual - kv.Value);
+                    else
+                        progresso?.Invoke($"  AVISO: item \"{kv.Key}\" não encontrado no estoque de pesagem.");
                 }
             }
         }
@@ -120,6 +148,8 @@ public static class ReconstruirBancoDadosService
         EstoqueViewModel.GravarEstoque(rootDir, totaisEstoque);
 
         progresso?.Invoke($"Concluído. {gerados} JSONs + estoque.json gravados.");
+
+        try { File.WriteAllLines(logPath, logLines); } catch { }
     }
 
     private static string ExtrairDataDoNome(string filePath)

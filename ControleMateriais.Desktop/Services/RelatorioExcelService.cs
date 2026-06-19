@@ -21,12 +21,12 @@ public static class RelatorioExcelService
     /// <param name="progresso">Callback opcional para reportar progresso (mensagem)</param>
     public static void Gerar(string recibosDir, string outputPath, Action<string>? progresso = null)
     {
-        // ── 1. Listar PDFs (ignora subpastas como Recibos_Venda) ─────────────
+        // ── 1. Listar PDFs de pesagem (ignora subpastas como Recibos_Venda) ──
         var pdfs = Directory.GetFiles(recibosDir, "*.pdf", SearchOption.TopDirectoryOnly)
             .OrderBy(f => f)
             .ToList();
 
-        // ── 2. Extrair dados de cada PDF ──────────────────────────────────────
+        // ── 2. Extrair dados de cada PDF de pesagem ───────────────────────────
         // dataStr → {nomeItem → pesoTotal do dia}
         var porDia = new Dictionary<string, Dictionary<string, decimal>>(StringComparer.OrdinalIgnoreCase);
         // todos os nomes de itens extras encontrados
@@ -58,32 +58,77 @@ public static class RelatorioExcelService
             }
         }
 
-        // ── 3. Ordenar datas (colunas) de mais antiga a mais recente ─────────
+        // ── 3. Ordenar datas de pesagem de mais antiga a mais recente ─────────
         var datas = porDia.Keys
             .OrderBy(d => ParseData(d))
             .ToList();
 
-        // ── 4. Montar lista de linhas: catálogo + extras alfabético ───────────
+        // ── 4. Listar PDFs de venda (Recibos_Venda/) ─────────────────────────
+        var vendaDir  = Path.Combine(recibosDir, "Recibos_Venda");
+        var pdfsVenda = Directory.Exists(vendaDir)
+            ? Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly).OrderBy(f => f).ToList()
+            : new List<string>();
+
+        var porDiaVenda = new Dictionary<string, Dictionary<string, decimal>>(StringComparer.OrdinalIgnoreCase);
+
+        int contadorVenda = 0;
+        foreach (var pdf in pdfsVenda)
+        {
+            contadorVenda++;
+            var dataStr = ExtrairDataDoNome(pdf);
+            progresso?.Invoke($"Venda {contadorVenda}/{pdfsVenda.Count}: {Path.GetFileName(pdf)}");
+
+            Dictionary<string, decimal> itens;
+            try { itens = ReciboParserService.ExtrairPesos(pdf); }
+            catch { continue; }
+
+            if (!porDiaVenda.TryGetValue(dataStr, out var diaDict))
+            {
+                diaDict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                porDiaVenda[dataStr] = diaDict;
+            }
+
+            foreach (var kv in itens)
+                diaDict[kv.Key] = diaDict.TryGetValue(kv.Key, out var atual) ? atual + kv.Value : kv.Value;
+        }
+
+        var datasVenda = porDiaVenda.Keys
+            .OrderBy(d => ParseData(d))
+            .ToList();
+
+        // ── 5. Montar lista de linhas: catálogo + extras alfabético ───────────
         var linhasItens = ItemCatalog.OrderedItems
             .Concat(extrasGlobal.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
             .ToList();
 
-        // ── 5. Gerar Excel ────────────────────────────────────────────────────
+        // ── 6. Gerar Excel ────────────────────────────────────────────────────
         progresso?.Invoke("Gerando Excel...");
 
         using var wb = new XLWorkbook();
         var ws = wb.Worksheets.Add("Pesagens por Dia");
 
-        // Estilo base
+        // Cores — pesagens (verde)
         var headerFill  = XLColor.FromHtml("#2E7D32");
         var headerFont  = XLColor.White;
         var totalFill   = XLColor.FromHtml("#E8F5E9");
         var extraFill   = XLColor.FromHtml("#FFF8E1");
         var borderColor = XLColor.FromHtml("#BDBDBD");
 
-        int colOffset = 2; // coluna A = nome do item, dados a partir de B
+        // Cores — vendas (laranja)
+        var vendaHeaderFill      = XLColor.FromHtml("#E65100");
+        var vendaTotalColFill    = XLColor.FromHtml("#FFF3E0");
+        var vendaGrandTotalFill  = XLColor.FromHtml("#FFE0B2");
+        var vendaTotalHeaderFill = XLColor.FromHtml("#BF360C");
 
-        // ── Cabeçalho linha 1: "Item" + datas + "TOTAL" ─────────────────────
+        // Cores — estoque atual (azul)
+        var estoqueHeaderFill     = XLColor.FromHtml("#0D47A1");
+        var estoqueCellFill       = XLColor.FromHtml("#E3F2FD");
+        var estoqueGrandTotalFill = XLColor.FromHtml("#BBDEFB");
+
+        int colOffset     = 2;                              // coluna A = nomes, B em diante = datas pesagem
+        int colVendaStart = colOffset + datas.Count + 1;   // primeira coluna de venda (após TOTAL verde)
+
+        // ── Cabeçalho linha 1: "Item" + datas pesagem + "TOTAL" ──────────────
         var cellItem = ws.Cell(1, 1);
         cellItem.Value = "Item";
         EstiloHeader(cellItem, headerFill, headerFont);
@@ -99,11 +144,31 @@ public static class RelatorioExcelService
         cellTotal.Value = "TOTAL";
         EstiloHeader(cellTotal, XLColor.FromHtml("#1B5E20"), headerFont);
 
+        // ── Cabeçalho linha 1: datas venda + "TOTAL VENDAS" ──────────────────
+        for (int d = 0; d < datasVenda.Count; d++)
+        {
+            var cell = ws.Cell(1, colVendaStart + d);
+            cell.Value = datasVenda[d];
+            EstiloHeader(cell, vendaHeaderFill, headerFont);
+        }
+
+        if (datasVenda.Count > 0)
+        {
+            var cellTotalVendas = ws.Cell(1, colVendaStart + datasVenda.Count);
+            cellTotalVendas.Value = "TOTAL VENDAS";
+            EstiloHeader(cellTotalVendas, vendaTotalHeaderFill, headerFont);
+        }
+
+        // ── Cabeçalho: "Estoque Atual" ────────────────────────────────────────
+        int colEstoqueAtual = (datasVenda.Count > 0 ? colVendaStart + datasVenda.Count + 1 : colOffset + datas.Count + 1);
+        var cellEstoqueHeader = ws.Cell(1, colEstoqueAtual);
+        cellEstoqueHeader.Value = "Estoque Atual";
+        EstiloHeader(cellEstoqueHeader, estoqueHeaderFill, headerFont);
+
         // ── Linhas de itens ───────────────────────────────────────────────────
         var extrasExistem = extrasGlobal.Count > 0;
-        int excelRow = 2; // linha 1 = cabeçalho
+        int excelRow = 2;
 
-        // Itens do catálogo
         var itensFixos = linhasItens
             .Where(n => ItemCatalog.OrderedItems.Contains(n, StringComparer.OrdinalIgnoreCase))
             .ToList();
@@ -118,6 +183,7 @@ public static class RelatorioExcelService
             cellNome.Style.Font.Bold = !isExtra;
             if (isExtra) cellNome.Style.Fill.BackgroundColor = extraFill;
 
+            // — colunas de pesagem —
             decimal rowTotal = 0m;
             for (int d = 0; d < datas.Count; d++)
             {
@@ -130,6 +196,29 @@ public static class RelatorioExcelService
             var cellRowTotal = ws.Cell(excelRow, colOffset + datas.Count);
             if (rowTotal > 0) { cellRowTotal.Value = rowTotal; cellRowTotal.Style.NumberFormat.Format = "#,##0.000"; cellRowTotal.Style.Font.Bold = true; }
             cellRowTotal.Style.Fill.BackgroundColor = totalFill;
+
+            // — colunas de venda —
+            decimal rowTotalVenda = 0m;
+            for (int d = 0; d < datasVenda.Count; d++)
+            {
+                var val = porDiaVenda.TryGetValue(datasVenda[d], out var dv) && dv.TryGetValue(nome, out var vv) ? vv : 0m;
+                rowTotalVenda += val;
+                var cell = ws.Cell(excelRow, colVendaStart + d);
+                if (val > 0) { cell.Value = val; cell.Style.NumberFormat.Format = "#,##0.000"; }
+            }
+            if (datasVenda.Count > 0)
+            {
+                var cellRowTotalVenda = ws.Cell(excelRow, colVendaStart + datasVenda.Count);
+                if (rowTotalVenda > 0) { cellRowTotalVenda.Value = rowTotalVenda; cellRowTotalVenda.Style.NumberFormat.Format = "#,##0.000"; cellRowTotalVenda.Style.Font.Bold = true; }
+                cellRowTotalVenda.Style.Fill.BackgroundColor = vendaTotalColFill;
+            }
+
+            // — coluna Estoque Atual —
+            decimal estoqueAtual = Math.Max(0m, rowTotal - rowTotalVenda);
+            var cellEstoqueAtual = ws.Cell(excelRow, colEstoqueAtual);
+            if (estoqueAtual > 0) { cellEstoqueAtual.Value = estoqueAtual; cellEstoqueAtual.Style.NumberFormat.Format = "#,##0.000"; cellEstoqueAtual.Style.Font.Bold = true; }
+            cellEstoqueAtual.Style.Fill.BackgroundColor = estoqueCellFill;
+
             excelRow++;
         }
 
@@ -138,8 +227,9 @@ public static class RelatorioExcelService
 
         if (extrasExistem)
         {
-            // Linha separadora
-            var sepRange = ws.Range(excelRow, 1, excelRow, colOffset + datas.Count);
+            // Linha separadora — estende até a coluna Estoque Atual
+            int lastCol = colEstoqueAtual;
+            var sepRange = ws.Range(excelRow, 1, excelRow, lastCol);
             sepRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#F3E5F5");
             ws.Cell(excelRow, 1).Value = "── Outros itens ──";
             ws.Cell(excelRow, 1).Style.Font.Italic = true;
@@ -150,7 +240,7 @@ public static class RelatorioExcelService
                 EscreverLinhaItem(nome, isExtra: true);
         }
 
-        // ── Linha TOTAL (soma por coluna) ────────────────────────────────────
+        // ── Linha TOTAL pesagem (soma por coluna) ─────────────────────────────
         int totalRow = excelRow;
 
         var cellTotalLabel = ws.Cell(totalRow, 1);
@@ -179,18 +269,58 @@ public static class RelatorioExcelService
         cellGrandTotal.Style.Font.Bold = true;
         cellGrandTotal.Style.Fill.BackgroundColor = XLColor.FromHtml("#C8E6C9");
 
-        // ── Bordas em toda a tabela ───────────────────────────────────────────
-        var tableRange = ws.Range(1, 1, totalRow, colOffset + datas.Count);
-        tableRange.Style.Border.OutsideBorder     = XLBorderStyleValues.Thin;
+        // ── Linha TOTAL vendas (soma por coluna de venda) ─────────────────────
+        if (datasVenda.Count > 0)
+        {
+            decimal grandTotalVenda = 0m;
+            for (int d = 0; d < datasVenda.Count; d++)
+            {
+                var colTotal = porDiaVenda.TryGetValue(datasVenda[d], out var dv)
+                    ? dv.Values.Sum()
+                    : 0m;
+                grandTotalVenda += colTotal;
+
+                var cell = ws.Cell(totalRow, colVendaStart + d);
+                cell.Value = colTotal;
+                cell.Style.NumberFormat.Format = "#,##0.000";
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.BackgroundColor = vendaTotalColFill;
+            }
+
+            var cellGrandTotalVenda = ws.Cell(totalRow, colVendaStart + datasVenda.Count);
+            cellGrandTotalVenda.Value = grandTotalVenda;
+            cellGrandTotalVenda.Style.NumberFormat.Format = "#,##0.000";
+            cellGrandTotalVenda.Style.Font.Bold = true;
+            cellGrandTotalVenda.Style.Fill.BackgroundColor = vendaGrandTotalFill;
+        }
+
+        // ── Linha TOTAL estoque atual ─────────────────────────────────────────
+        decimal grandTotalEstoqueAtual = Math.Max(0m, grandTotal - (datasVenda.Count > 0 ? porDiaVenda.Values.SelectMany(d => d.Values).Sum() : 0m));
+        var cellGrandEstoque = ws.Cell(totalRow, colEstoqueAtual);
+        cellGrandEstoque.Value = grandTotalEstoqueAtual;
+        cellGrandEstoque.Style.NumberFormat.Format = "#,##0.000";
+        cellGrandEstoque.Style.Font.Bold = true;
+        cellGrandEstoque.Style.Fill.BackgroundColor = estoqueGrandTotalFill;
+
+        // ── Bordas em toda a tabela (pesagens + vendas + estoque) ─────────────
+        int lastTableCol = colEstoqueAtual;
+        var tableRange = ws.Range(1, 1, totalRow, lastTableCol);
+        tableRange.Style.Border.OutsideBorder      = XLBorderStyleValues.Thin;
         tableRange.Style.Border.OutsideBorderColor = borderColor;
-        tableRange.Style.Border.InsideBorder      = XLBorderStyleValues.Hair;
+        tableRange.Style.Border.InsideBorder       = XLBorderStyleValues.Hair;
         tableRange.Style.Border.InsideBorderColor  = borderColor;
 
-        // ── Ajuste automático de largura de colunas ───────────────────────────
+        // ── Ajuste de largura de colunas ──────────────────────────────────────
         ws.Column(1).Width = 38;
         for (int d = 0; d < datas.Count; d++)
             ws.Column(colOffset + d).Width = 14;
-        ws.Column(colOffset + datas.Count).Width = 14;
+        ws.Column(colOffset + datas.Count).Width = 14;   // TOTAL pesagem
+
+        for (int d = 0; d < datasVenda.Count; d++)
+            ws.Column(colVendaStart + d).Width = 14;
+        if (datasVenda.Count > 0)
+            ws.Column(colVendaStart + datasVenda.Count).Width = 16; // TOTAL VENDAS
+        ws.Column(colEstoqueAtual).Width = 16;                      // Estoque Atual
 
         // Congela cabeçalho e coluna de nome
         ws.SheetView.Freeze(1, 1);

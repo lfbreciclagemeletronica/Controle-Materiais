@@ -275,6 +275,7 @@ public class PesagensViewModel : ViewModelBase
     public Func<PesagemItem, Task>?             ConfirmarDeletarPesagemCallback { get; set; }
     public Action?                              NovoReciboPublicadoCallback { get; set; }
     public Func<string, Task<bool>>?            ConfirmarReconstruirBancoDadosCallback { get; set; }
+    public Action?                              EstoqueRecarregarCallback { get; set; }
 
     public PesagensViewModel(Action voltarCallback, string rootDir)
     {
@@ -749,12 +750,23 @@ public class PesagensViewModel : ViewModelBase
                 return;
             }
 
+            // Sincroniza Recibos (incluindo Recibos_Venda/) antes de reconstruir
+            if (GitHubService.CredenciaisExistem(RootDir))
+            {
+                MostrarStatusRecibos("Sincronizando recibos de venda com GitHub...", ok: true);
+                await GitHubService.GarantirRecibosRepoAsync(RootDir,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => MostrarStatusRecibos(msg, ok: true)));
+                await GitHubService.SincronizarRecibosAsync(RootDir,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => MostrarStatusRecibos(msg, ok: true)));
+            }
+
             await Task.Run(() =>
                 ReconstruirBancoDadosService.Reconstruir(RootDir,
                     msg => Avalonia.Threading.Dispatcher.UIThread.Post(
                         () => MostrarStatusRecibos(msg, ok: true))));
 
             MostrarStatusRecibos("Banco de dados reconstruído com sucesso!", ok: true);
+            EstoqueRecarregarCallback?.Invoke();
         }
         catch (Exception ex)
         {

@@ -343,7 +343,7 @@ public class ReciboFromPesagemViewModel : ViewModelBase
                         foreach (var it in itens)
                         {
                             table.Cell().Element(BCell).AlignCenter().Text(it.Nome).FontSize(cellFontSize);
-                            table.Cell().Element(BCell).AlignCenter().Text(it.PesoAtual.ToString("N3")).FontSize(cellFontSize);
+                            table.Cell().Element(BCell).AlignCenter().Text(it.PesoAtual.ToString("N3", ptBR)).FontSize(cellFontSize);
                             table.Cell().Element(BCell).AlignCenter()
                                  .Text(it.PrecoPorKg > 0 ? it.PrecoPorKg.ToString("C", ptBR) : string.Empty).FontSize(cellFontSize);
                             table.Cell().Element(BCell).AlignCenter()

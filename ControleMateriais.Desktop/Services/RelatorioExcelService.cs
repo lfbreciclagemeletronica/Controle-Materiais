@@ -66,7 +66,9 @@ public static class RelatorioExcelService
         // ── 4. Listar PDFs de venda (Recibos_Venda/) ─────────────────────────
         var vendaDir  = Path.Combine(recibosDir, "Recibos_Venda");
         var pdfsVenda = Directory.Exists(vendaDir)
-            ? Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly).OrderBy(f => f).ToList()
+            ? Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                       .Where(f => !Path.GetFileName(f).StartsWith("ESTOQUE", StringComparison.OrdinalIgnoreCase))
+                       .OrderBy(f => f).ToList()
             : new List<string>();
 
         var porDiaVenda = new Dictionary<string, Dictionary<string, decimal>>(StringComparer.OrdinalIgnoreCase);
@@ -219,9 +221,9 @@ public static class RelatorioExcelService
             }
 
             // — coluna Estoque Atual —
-            decimal estoqueAtual = Math.Max(0m, rowTotal - rowTotalVenda);
+            decimal estoqueAtual = rowTotal - rowTotalVenda;
             var cellEstoqueAtual = ws.Cell(excelRow, colEstoqueAtual);
-            if (estoqueAtual > 0) { cellEstoqueAtual.SetValue(estoqueAtual.ToString("N3", PtBR)); cellEstoqueAtual.Style.Font.Bold = true; }
+            if (estoqueAtual != 0m) { cellEstoqueAtual.SetValue(estoqueAtual.ToString("N3", PtBR)); cellEstoqueAtual.Style.Font.Bold = true; }
             cellEstoqueAtual.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             cellEstoqueAtual.Style.Fill.BackgroundColor = estoqueCellFill;
 
@@ -301,7 +303,7 @@ public static class RelatorioExcelService
         }
 
         // ── Linha TOTAL estoque atual ─────────────────────────────────────────
-        decimal grandTotalEstoqueAtual = Math.Max(0m, grandTotal - (datasVenda.Count > 0 ? porDiaVenda.Values.SelectMany(d => d.Values).Sum() : 0m));
+        decimal grandTotalEstoqueAtual = grandTotal - (datasVenda.Count > 0 ? porDiaVenda.Values.SelectMany(d => d.Values).Sum() : 0m);
         var cellGrandEstoque = ws.Cell(totalRow, colEstoqueAtual);
         cellGrandEstoque.SetValue(grandTotalEstoqueAtual.ToString("N3", PtBR));
         cellGrandEstoque.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;

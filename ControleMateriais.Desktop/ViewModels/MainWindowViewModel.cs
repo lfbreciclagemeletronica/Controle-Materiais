@@ -840,7 +840,7 @@ public class MainWindowViewModel : ViewModelBase
                                  .Text(it.Nome ?? string.Empty).FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
-                                 .Text(it.PesoAtual.ToString("N3"))
+                                 .Text(it.PesoAtual.ToString("N3", ptBR))
                                  .FontSize(cellFontSize);
 
                             table.Cell().Element(BCell).AlignCenter()
@@ -883,7 +883,7 @@ public class MainWindowViewModel : ViewModelBase
                             table.Cell().Element(BCell).AlignCenter()
                                  .Text("Impurezas").FontSize(cellFontSize);
                             table.Cell().Element(BCell).AlignCenter()
-                                 .Text(impurezasPeso.ToString("N3")).FontSize(cellFontSize);
+                                 .Text(impurezasPeso.ToString("N3", ptBR)).FontSize(cellFontSize);
                             table.Cell().Element(BCell).Text(string.Empty);
                             table.Cell().Element(BCell).Text(string.Empty);
                         }

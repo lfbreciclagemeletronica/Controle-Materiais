@@ -106,6 +106,7 @@ public static class RelatorioExcelService
 
         using var wb = new XLWorkbook();
         var ws = wb.Worksheets.Add("Pesagens por Dia");
+        ws.Workbook.Properties.Company = "LFB Reciclagem Eletrônica";
 
         // Cores — pesagens (verde)
         var headerFill  = XLColor.FromHtml("#2E7D32");
@@ -190,11 +191,13 @@ public static class RelatorioExcelService
                 var val = porDia.TryGetValue(datas[d], out var dd) && dd.TryGetValue(nome, out var v) ? v : 0m;
                 rowTotal += val;
                 var cell = ws.Cell(excelRow, colOffset + d);
-                if (val > 0) { cell.Value = val; cell.Style.NumberFormat.Format = "#,##0.000"; }
+                if (val > 0) { cell.SetValue(val.ToString("N3", PtBR)); }
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
                 if (isExtra) cell.Style.Fill.BackgroundColor = extraFill;
             }
             var cellRowTotal = ws.Cell(excelRow, colOffset + datas.Count);
-            if (rowTotal > 0) { cellRowTotal.Value = rowTotal; cellRowTotal.Style.NumberFormat.Format = "#,##0.000"; cellRowTotal.Style.Font.Bold = true; }
+            if (rowTotal > 0) { cellRowTotal.SetValue(rowTotal.ToString("N3", PtBR)); cellRowTotal.Style.Font.Bold = true; }
+            cellRowTotal.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             cellRowTotal.Style.Fill.BackgroundColor = totalFill;
 
             // — colunas de venda —
@@ -204,19 +207,22 @@ public static class RelatorioExcelService
                 var val = porDiaVenda.TryGetValue(datasVenda[d], out var dv) && dv.TryGetValue(nome, out var vv) ? vv : 0m;
                 rowTotalVenda += val;
                 var cell = ws.Cell(excelRow, colVendaStart + d);
-                if (val > 0) { cell.Value = val; cell.Style.NumberFormat.Format = "#,##0.000"; }
+                if (val > 0) { cell.SetValue(val.ToString("N3", PtBR)); }
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             }
             if (datasVenda.Count > 0)
             {
                 var cellRowTotalVenda = ws.Cell(excelRow, colVendaStart + datasVenda.Count);
-                if (rowTotalVenda > 0) { cellRowTotalVenda.Value = rowTotalVenda; cellRowTotalVenda.Style.NumberFormat.Format = "#,##0.000"; cellRowTotalVenda.Style.Font.Bold = true; }
+                if (rowTotalVenda > 0) { cellRowTotalVenda.SetValue(rowTotalVenda.ToString("N3", PtBR)); cellRowTotalVenda.Style.Font.Bold = true; }
+                cellRowTotalVenda.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
                 cellRowTotalVenda.Style.Fill.BackgroundColor = vendaTotalColFill;
             }
 
             // — coluna Estoque Atual —
             decimal estoqueAtual = Math.Max(0m, rowTotal - rowTotalVenda);
             var cellEstoqueAtual = ws.Cell(excelRow, colEstoqueAtual);
-            if (estoqueAtual > 0) { cellEstoqueAtual.Value = estoqueAtual; cellEstoqueAtual.Style.NumberFormat.Format = "#,##0.000"; cellEstoqueAtual.Style.Font.Bold = true; }
+            if (estoqueAtual > 0) { cellEstoqueAtual.SetValue(estoqueAtual.ToString("N3", PtBR)); cellEstoqueAtual.Style.Font.Bold = true; }
+            cellEstoqueAtual.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             cellEstoqueAtual.Style.Fill.BackgroundColor = estoqueCellFill;
 
             excelRow++;
@@ -257,15 +263,15 @@ public static class RelatorioExcelService
             grandTotal += colTotal;
 
             var cell = ws.Cell(totalRow, colOffset + d);
-            cell.Value = colTotal;
-            cell.Style.NumberFormat.Format = "#,##0.000";
+            cell.SetValue(colTotal.ToString("N3", PtBR));
             cell.Style.Font.Bold = true;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             cell.Style.Fill.BackgroundColor = totalFill;
         }
 
         var cellGrandTotal = ws.Cell(totalRow, colOffset + datas.Count);
-        cellGrandTotal.Value = grandTotal;
-        cellGrandTotal.Style.NumberFormat.Format = "#,##0.000";
+        cellGrandTotal.SetValue(grandTotal.ToString("N3", PtBR));
+        cellGrandTotal.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
         cellGrandTotal.Style.Font.Bold = true;
         cellGrandTotal.Style.Fill.BackgroundColor = XLColor.FromHtml("#C8E6C9");
 
@@ -281,15 +287,15 @@ public static class RelatorioExcelService
                 grandTotalVenda += colTotal;
 
                 var cell = ws.Cell(totalRow, colVendaStart + d);
-                cell.Value = colTotal;
-                cell.Style.NumberFormat.Format = "#,##0.000";
+                cell.SetValue(colTotal.ToString("N3", PtBR));
                 cell.Style.Font.Bold = true;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
                 cell.Style.Fill.BackgroundColor = vendaTotalColFill;
             }
 
             var cellGrandTotalVenda = ws.Cell(totalRow, colVendaStart + datasVenda.Count);
-            cellGrandTotalVenda.Value = grandTotalVenda;
-            cellGrandTotalVenda.Style.NumberFormat.Format = "#,##0.000";
+            cellGrandTotalVenda.SetValue(grandTotalVenda.ToString("N3", PtBR));
+            cellGrandTotalVenda.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             cellGrandTotalVenda.Style.Font.Bold = true;
             cellGrandTotalVenda.Style.Fill.BackgroundColor = vendaGrandTotalFill;
         }
@@ -297,8 +303,8 @@ public static class RelatorioExcelService
         // ── Linha TOTAL estoque atual ─────────────────────────────────────────
         decimal grandTotalEstoqueAtual = Math.Max(0m, grandTotal - (datasVenda.Count > 0 ? porDiaVenda.Values.SelectMany(d => d.Values).Sum() : 0m));
         var cellGrandEstoque = ws.Cell(totalRow, colEstoqueAtual);
-        cellGrandEstoque.Value = grandTotalEstoqueAtual;
-        cellGrandEstoque.Style.NumberFormat.Format = "#,##0.000";
+        cellGrandEstoque.SetValue(grandTotalEstoqueAtual.ToString("N3", PtBR));
+        cellGrandEstoque.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
         cellGrandEstoque.Style.Font.Bold = true;
         cellGrandEstoque.Style.Fill.BackgroundColor = estoqueGrandTotalFill;
 

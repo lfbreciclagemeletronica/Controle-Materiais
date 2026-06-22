@@ -510,7 +510,7 @@ public class PesagensViewModel : ViewModelBase
                 foreach (var kv in itens)
                 {
                     if (totaisEstoque.TryGetValue(kv.Key, out var atual))
-                        totaisEstoque[kv.Key] = Math.Max(0m, atual - kv.Value);
+                        totaisEstoque[kv.Key] = atual - kv.Value;
                 }
                 EstoqueViewModel.GravarEstoque(RootDir, totaisEstoque);
             }

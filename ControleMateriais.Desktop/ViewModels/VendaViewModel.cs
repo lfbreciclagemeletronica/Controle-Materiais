@@ -278,7 +278,7 @@ public class VendaViewModel : ViewModelBase
             foreach (var item in itensSelecionados)
             {
                 if (totais.TryGetValue(item.Nome, out var atual))
-                    totais[item.Nome] = Math.Max(0m, atual - item.PesoAtual);
+                    totais[item.Nome] = atual - item.PesoAtual;
             }
             EstoqueViewModel.GravarEstoque(_rootDir, totais);
 

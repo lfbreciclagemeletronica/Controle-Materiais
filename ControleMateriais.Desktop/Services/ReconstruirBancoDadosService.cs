@@ -104,6 +104,7 @@ public static class ReconstruirBancoDadosService
         if (Directory.Exists(vendaDir))
         {
             var vendaPdfs = Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly)
+                                     .Where(f => !Path.GetFileName(f).StartsWith("ESTOQUE", StringComparison.OrdinalIgnoreCase))
                                      .OrderBy(f => f)
                                      .ToList();
 
@@ -129,17 +130,17 @@ public static class ReconstruirBancoDadosService
                 foreach (var kv in itensVenda)
                 {
                     if (totaisEstoque.TryGetValue(kv.Key, out var atual))
-                        totaisEstoque[kv.Key] = Math.Max(0m, atual - kv.Value);
+                        totaisEstoque[kv.Key] = atual - kv.Value;
                     else
                         progresso?.Invoke($"  AVISO: item \"{kv.Key}\" não encontrado no estoque de pesagem.");
                 }
             }
         }
 
-        // Remove itens com peso zero ou negativo
+        // Remove itens com peso exatamente zero (sem movimentação alguma)
         foreach (var key in totaisEstoque.Keys.ToList())
         {
-            if (totaisEstoque[key] <= 0m)
+            if (totaisEstoque[key] == 0m)
                 totaisEstoque.Remove(key);
         }
 

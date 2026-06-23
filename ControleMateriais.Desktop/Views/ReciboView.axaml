@@ -24,9 +24,9 @@
       <StackPanel Margin="0,0,0,12" Spacing="6">
         <Grid ColumnDefinitions="Auto,*,Auto">
 
-          <!-- Botão voltar pesagens -->
+          <!-- Botão voltar início -->
           <Button Grid.Column="0"
-                  Content="← Pesagens"
+                  Content="← Inicio"
                   HorizontalAlignment="Left"
                   Command="{Binding VoltarParaPesagensCommand}"/>
 

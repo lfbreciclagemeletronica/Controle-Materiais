@@ -37,12 +37,14 @@ public static class ReciboParserService
     private static readonly Dictionary<string, string[]> _aliases =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["HD sem placa/Sucateado"]                  = ["HD sem Placa Sucateado", "HD sem Placa", "HD Sucateado"],
-            ["Celular Smart sem Bateria Botão e Flip"]  = ["Celular Sem bateria Botao e Flip", "Celular Sem bateria Botão e Flip", "Sem bateria Botao e Flip"],
-            ["Celular Replicas com e sem Baterias"]     = ["Celular Replicas com e sem Bateria", "Replicas com e sem Baterias"],
-            ["Memória Prata"]                           = ["Memorias Prata", "Memórias Prata", "Memoria Prateada"],
-            ["Memórias Douradas"]                       = ["Memorias Douradas", "Memoria Dourada"],
-            ["Desmanche Eletrônicos Consultar"]         = ["Desmanche Eletronicos Consultar", "Desmanche Eletrônicos Consultar Itens", "Desmanche Eletronicos"],
+            ["HD sem placa/Sucateado"]                           = ["HD sem Placa Sucateado", "HD sem Placa", "HD Sucateado"],
+            ["Celular Sem tampa e bateria (Botão e Flip)"]       = ["Celular Smart sem Bateria Botão e Flip", "Celular Sem bateria Botao e Flip", "Celular Sem bateria Botão e Flip", "Sem bateria Botao e Flip"],
+            ["Celular Smart sem tampa e Sem bateria"]            = ["Celular Smart Sem Bateria"],
+            ["Celular Smart Com Bateria Blindada"]               = ["Celular Smart Com Bateria"],
+            ["Celular Replicas blindado e sem Baterias"]         = ["Celular Replicas com e sem Baterias", "Celular Replicas com e sem Bateria", "Replicas com e sem Baterias"],
+            ["Memória Prata"]                                    = ["Memorias Prata", "Memórias Prata", "Memoria Prateada"],
+            ["Memórias Douradas"]                                = ["Memorias Douradas", "Memoria Dourada"],
+            ["Desmanche Eletrônicos Consultar"]                  = ["Desmanche Eletronicos Consultar", "Desmanche Eletrônicos Consultar Itens", "Desmanche Eletronicos"],
         };
 
     /// <summary>

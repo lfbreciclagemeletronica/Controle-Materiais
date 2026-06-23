@@ -300,6 +300,9 @@ namespace ControleMateriais.Desktop.ViewModels
                 {
                     if (byName.TryGetValue(w.Nome, out var preco))
                         w.SetPreco(preco);
+                    else if (ItemCatalog.LegacyNameMap.FirstOrDefault(kv => kv.Value.Equals(w.Nome, StringComparison.OrdinalIgnoreCase)).Key is { } legacyKey
+                             && byName.TryGetValue(legacyKey, out var precoLegacy))
+                        w.SetPreco(precoLegacy);
                     else
                         w.SetPreco(0m);
                 }
@@ -557,12 +560,14 @@ namespace ControleMateriais.Desktop.ViewModels
             // Baseados no conteúdo real extraído pelo iText7
             var aliases = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
-                ["HD sem Placa/Sucateado"]                  = new[] { "HD sem Placa Sucateado", "HD sem Placa", "HD Sucateado" },
-                ["Desmanche Eletrônicos Consultar Itens"]   = new[] { "Desmanche Eletronicos Consultar itens", "Desmanche Eletrônicos Consultar", "Desmanche Eletronicos" },
-                ["Celular Smart sem Bateria Botão e Flip"]  = new[] { "Celular Sem bateria Botao e Flip", "Celular Sem bateria Botão e Flip", "Sem bateria Botao e Flip" },
-                ["Celular Replicas com e sem Baterias"]     = new[] { "Celular Replicas com e sem Bateria", "Replicas com e sem Baterias" },
-                ["Memória Prata"]                           = new[] { "Memorias Prata", "Memórias Prata", "Memoria Prateada" },
-                ["Memórias Douradas"]                       = new[] { "Memorias Douradas", "Memoria Dourada" },
+                ["HD sem Placa/Sucateado"]                        = new[] { "HD sem Placa Sucateado", "HD sem Placa", "HD Sucateado" },
+                ["Desmanche Eletrônicos Consultar Itens"]          = new[] { "Desmanche Eletronicos Consultar itens", "Desmanche Eletrônicos Consultar", "Desmanche Eletronicos" },
+                ["Celular Sem tampa e bateria (Botão e Flip)"]     = new[] { "Celular Smart sem Bateria Botão e Flip", "Celular Sem bateria Botao e Flip", "Celular Sem bateria Botão e Flip", "Sem bateria Botao e Flip" },
+                ["Celular Smart sem tampa e Sem bateria"]          = new[] { "Celular Smart Sem Bateria" },
+                ["Celular Smart Com Bateria Blindada"]             = new[] { "Celular Smart Com Bateria" },
+                ["Celular Replicas blindado e sem Baterias"]       = new[] { "Celular Replicas com e sem Baterias", "Celular Replicas com e sem Bateria", "Replicas com e sem Baterias" },
+                ["Memória Prata"]                                  = new[] { "Memorias Prata", "Memórias Prata", "Memoria Prateada" },
+                ["Memórias Douradas"]                              = new[] { "Memorias Douradas", "Memoria Dourada" },
             };
 
             // Ordena por comprimento DECRESCENTE: nomes mais longos têm prioridade

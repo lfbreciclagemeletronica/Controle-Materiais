@@ -154,7 +154,8 @@ public static class GitHubService
         if (commit.exitCode == 0)
         {
             progresso?.Invoke("Enviando banco-de-dados ao GitHub...");
-            await RunAsync("git", "push origin main", repoDir);
+            var branchAtual = await ObterBranchAtual(repoDir);
+            await RunAsync("git", $"push origin {branchAtual}", repoDir);
         }
     }
 
@@ -202,7 +203,8 @@ public static class GitHubService
             if (commit.exitCode == 0)
             {
                 progresso?.Invoke("Enviando ao GitHub...");
-                await RunAsync("git", "push origin main", repoDir);
+                var branchAtual = await ObterBranchAtual(repoDir);
+                await RunAsync("git", $"push origin {branchAtual}", repoDir);
             }
         }
     }
@@ -333,7 +335,8 @@ public static class GitHubService
             var commit = await RunAsync("git", "commit -m \"Sincronização de recibos locais\"", repoDir);
             if (commit.exitCode == 0)
             {
-                var push = await RunAsync("git", "push origin main", repoDir);
+                var branchAtual = await ObterBranchAtual(repoDir);
+                var push = await RunAsync("git", $"push origin {branchAtual}", repoDir);
                 if (push.exitCode != 0)
                     throw new Exception($"Push do repo Recibos falhou: {push.stderr}");
             }
@@ -556,7 +559,8 @@ public static class GitHubService
         if (commit.exitCode == 0)
         {
             progresso?.Invoke("Enviando para o GitHub...");
-            await RunAsync("git", "push origin main", repoDir);
+            var branchAtual = await ObterBranchAtual(repoDir);
+            await RunAsync("git", $"push origin {branchAtual}", repoDir);
         }
     }
 
@@ -615,7 +619,8 @@ public static class GitHubService
         if (commit.exitCode == 0)
         {
             progresso?.Invoke("Enviando para o GitHub...");
-            await RunAsync("git", "push origin main", repoDir);
+            var branchAtual = await ObterBranchAtual(repoDir);
+            await RunAsync("git", $"push origin {branchAtual}", repoDir);
         }
     }
 
@@ -813,6 +818,15 @@ public static class GitHubService
         var stderr = await p.StandardError.ReadToEndAsync();
         await p.WaitForExitAsync();
         return (p.ExitCode, stdout, stderr);
+    }
+
+    /// <summary>
+    /// Obtém o nome da branch atual do repositório Git local.
+    /// </summary>
+    private static async Task<string> ObterBranchAtual(string repoDir)
+    {
+        var result = await RunAsync("git", "rev-parse --abbrev-ref HEAD", repoDir);
+        return result.exitCode == 0 ? result.stdout.Trim() : "main";
     }
 }
 

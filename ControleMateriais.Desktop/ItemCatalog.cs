@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ControleMateriais.Desktop
@@ -38,10 +39,10 @@ namespace ControleMateriais.Desktop
             "HD sem placa/Sucateado",
             "Placa de HD",
             "Placa de Celular Completa",
-            "Celular Smart sem Bateria Botão e Flip",
-            "Celular Smart Sem Bateria",
-            "Celular Smart Com Bateria",
-            "Celular Replicas com e sem Baterias",
+            "Celular Sem tampa e bateria (Botão e Flip)",
+            "Celular Smart sem tampa e Sem bateria",
+            "Celular Smart Com Bateria Blindada",
+            "Celular Replicas blindado e sem Baterias",
             "Memórias Douradas",
             "Memória Prata",
             "Processadores Plástico Chapa A",
@@ -59,5 +60,19 @@ namespace ControleMateriais.Desktop
             "Raio X",
             "Desmanche Eletrônicos Consultar",
         };
+
+        /// <summary>
+        /// Mapeia nomenclaturas antigas para os nomes atuais do catálogo.
+        /// Usado para garantir retrocompatibilidade com recibos e tabelas de preços criados
+        /// antes da renomeação dos itens.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> LegacyNameMap =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Celular Smart sem Bateria Botão e Flip"]  = "Celular Sem tampa e bateria (Botão e Flip)",
+                ["Celular Smart Sem Bateria"]               = "Celular Smart sem tampa e Sem bateria",
+                ["Celular Smart Com Bateria"]               = "Celular Smart Com Bateria Blindada",
+                ["Celular Replicas com e sem Baterias"]     = "Celular Replicas blindado e sem Baterias",
+            };
     }
 }

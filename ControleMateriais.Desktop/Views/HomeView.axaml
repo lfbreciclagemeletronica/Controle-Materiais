@@ -80,7 +80,7 @@
                  Margin="0,0,0,6"/>
 
       <!-- Versão -->
-      <TextBlock Text="V5.0.3"
+      <TextBlock Text="V5.0.4"
                  FontSize="13"
                  HorizontalAlignment="Center"
                  Foreground="White"

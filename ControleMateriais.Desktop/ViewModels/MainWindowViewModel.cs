@@ -517,21 +517,7 @@ public class MainWindowViewModel : ViewModelBase
         }
 
         var recibosDir = GitHubService.RecibosRepoDir(RootDir);
-        var suggestedFolder = await topLevel.StorageProvider.TryGetFolderFromPathAsync(new Uri(recibosDir));
-        var file = await topLevel.StorageProvider.SaveFilePickerAsync(
-            new Avalonia.Platform.Storage.FilePickerSaveOptions
-            {
-                Title = "Salvar recibo em PDF",
-                SuggestedFileName = nomeArquivo,
-                SuggestedStartLocation = suggestedFolder,
-                FileTypeChoices = new[]
-                {
-                    new Avalonia.Platform.Storage.FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } }
-                }
-            });
-        var filePath = file?.TryGetLocalPath();
-        if (string.IsNullOrWhiteSpace(filePath))
-            return;
+        var filePath = Path.Combine(recibosDir, nomeArquivo);
 
         void AtualizarStatusTela(string msg, bool ok = true)
         {
@@ -629,21 +615,26 @@ public class MainWindowViewModel : ViewModelBase
 
         StatusExportacao = string.Empty;
 
-        // Se o usuário clicou em "+ Novo Recibo", limpa nome e pesos mas mantém preços
+        // Se o usuário clicou em "+ Novo Recibo", zera tudo e volta para a tela inicial
         if (dialog.NovoRecibo)
             LimparParaNovoRecibo();
     }
 
     private void LimparParaNovoRecibo()
     {
+        _pesagemAtiva = null;
         NomeCliente = string.Empty;
         foreach (var w in ItensEditaveis)
+        {
             w.ResetarPeso();
+            w.ResetarPreco();
+        }
         foreach (var custom in ItensPersonalizados)
-            custom.ResetarPeso();
+            custom.Zerar();
         ImpurezasPesoAtual = 0m;
         ImpurezasPesoTexto = "0,000";
         RecalcularTotalGeral();
+        CurrentPage = AppPage.Recibos;
     }
 
     private async Task MarcarPesagemConcluidaAsync(PesagemItem pesagem, string filePath, DateTime dataConclusao)
@@ -1128,6 +1119,14 @@ public class PesoWrapper : ViewModelBase
         _item.PesoAtual = 0m;
         _pesoTexto = "0,000";
         OnPropertyChanged(nameof(PesoTexto));
+    }
+
+    public void ResetarPreco()
+    {
+        _editandoPreco = false;
+        _item.PrecoPorKg = 0m;
+        _precoTexto = "R$ 0,00";
+        OnPropertyChanged(nameof(PrecoTexto));
     }
 
     public decimal PesoAtual => _item.PesoAtual;

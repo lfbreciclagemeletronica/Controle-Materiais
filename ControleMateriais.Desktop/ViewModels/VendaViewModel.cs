@@ -164,8 +164,8 @@ public class VendaViewModel : ViewModelBase
 
     public Func<Task<Window?>>? ObterJanelaCallback { get; set; }
 
-    // Callback: (filePath, nomeArquivo, progressoGit) => void
-    public Action<string, string, Func<Action<string>, Task>>? AbrirModalSucesso { get; set; }
+    // Callback: (filePath, nomeArquivo) => Task
+    public Func<string, string, Task>? AbrirModalSucesso { get; set; }
 
     public VendaViewModel(string rootDir, Action voltarCallback)
     {
@@ -361,32 +361,34 @@ public class VendaViewModel : ViewModelBase
             return;
         }
 
-        // 3. Abre modal de sucesso — Git roda dentro dele
+        // 3. Commita localmente (sem push — push ocorre ao fechar o app)
         Salvando = false;
         Status = string.Empty;
         var clienteSnapshot = NomeCliente;
         var vendaJsonNome   = $"venda-{data:dd-MM-yyyy}.json";
-        AbrirModalSucesso?.Invoke(filePathFinal, nomeArquivoFinal,
-            async progresso =>
+        if (GitHubService.CredenciaisExistem(_rootDir))
+        {
+            try
             {
-                if (!GitHubService.CredenciaisExistem(_rootDir)) return;
-                try
-                {
-                    await GitHubService.PublicarReciboVendaAsync(_rootDir, filePathFinal,
-                        $"Venda {clienteSnapshot} - {DateTime.Now:dd/MM/yyyy}",
-                        msg2 => Avalonia.Threading.Dispatcher.UIThread.Post(() => progresso(msg2)));
+                await GitHubService.CommitReciboVendaLocalAsync(_rootDir, filePathFinal,
+                    $"Venda {clienteSnapshot} - {DateTime.Now:dd/MM/yyyy}",
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg));
 
-                    var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
-                    var vendaJsonPath = Path.Combine(bancoDadosDir, vendaJsonNome);
-                    var vendaConteudo = await File.ReadAllTextAsync(vendaJsonPath);
-                    await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, vendaJsonNome, vendaConteudo,
-                        msg2 => Avalonia.Threading.Dispatcher.UIThread.Post(() => progresso(msg2)));
-                }
-                catch (Exception ex)
-                {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => progresso($"Erro Git: {ex.Message}"));
-                }
-            });
+                var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
+                var vendaJsonPath = Path.Combine(bancoDadosDir, vendaJsonNome);
+                var vendaConteudo = await File.ReadAllTextAsync(vendaJsonPath);
+                await GitHubService.CommitJsonBancoDadosAsync(_rootDir, vendaJsonNome, vendaConteudo,
+                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg));
+            }
+            catch (Exception ex)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = $"Aviso Git: {ex.Message}");
+            }
+        }
+
+        // 4. Abre modal de sucesso
+        if (AbrirModalSucesso is not null)
+            await AbrirModalSucesso(filePathFinal, nomeArquivoFinal);
         Limpar();
     }
 

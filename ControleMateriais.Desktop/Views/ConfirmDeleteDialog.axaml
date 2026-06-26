@@ -13,11 +13,11 @@
       <StackPanel Grid.Row="0" Spacing="10" VerticalAlignment="Center">
         <TextBlock Text="Confirmar exclusão"
                    FontSize="15" FontWeight="Bold"
-                   Foreground="{DynamicResource Brush.TextPrimary}"/>
+                   Foreground="White"/>
         <TextBlock Name="MensagemText"
                    TextWrapping="Wrap"
                    FontSize="12"
-                   Foreground="{DynamicResource Brush.TextSecondary}"/>
+                   Foreground="#CCCCCC"/>
       </StackPanel>
 
       <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right"

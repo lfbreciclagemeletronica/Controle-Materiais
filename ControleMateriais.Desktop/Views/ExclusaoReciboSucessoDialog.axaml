@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.ExclusaoReciboSucessoDialog"
+        Title="Recibo excluído"
+        Width="420" MinHeight="260"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="36,32" Background="{DynamicResource Brush.Surface}">
+    <StackPanel Spacing="14" HorizontalAlignment="Center" VerticalAlignment="Center">
+
+      <TextBlock Text="🗑"
+                 FontSize="44"
+                 HorizontalAlignment="Center"/>
+
+      <TextBlock Text="Recibo excluído com sucesso!"
+                 FontSize="15" FontWeight="Bold"
+                 Foreground="#4CAF50"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"/>
+
+      <ItemsControl x:Name="EtapasPanel"
+                    Margin="0,8,0,0">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3">
+              <TextBlock Text="✓"
+                         Foreground="#4CAF50"
+                         FontWeight="Bold"
+                         FontSize="14"
+                         VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding}"
+                         FontSize="13"
+                         Foreground="{DynamicResource Brush.Text}"
+                         VerticalAlignment="Center"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <Button x:Name="FecharBtn"
+              Content="Fechar"
+              Width="140"
+              Classes="primary"
+              HorizontalAlignment="Center"
+              Margin="0,12,0,0"
+              Click="Fechar_Click"/>
+
+    </StackPanel>
+  </Border>
+
+</Window>

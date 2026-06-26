@@ -473,7 +473,7 @@ public static class RelatorioExcelService
         ws.SheetView.Freeze(1, 1);
 
         wb.SaveAs(outputPath);
-        progresso?.Invoke($"Excel salvo: {Path.GetFileName(outputPath)}");
+        progresso?.Invoke($"Excel salvo: {Path.GetFileName(outputPath)}");  
     }
 
     private static decimal ExtrairDecimal(JsonNode? node)

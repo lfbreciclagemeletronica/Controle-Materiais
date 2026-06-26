@@ -23,6 +23,13 @@ public partial class EstoqueView : UserControl
                     await dlg.ShowDialog(topLevel);
                     return dlg.Confirmado;
                 };
+                vm.AbrirModalExclusaoCallback = async etapas =>
+                {
+                    var topLevel = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;
+                    if (topLevel is null) return;
+                    var dlg = new ExclusaoReciboSucessoDialog(etapas);
+                    await dlg.ShowDialog(topLevel);
+                };
             }
         };
     }

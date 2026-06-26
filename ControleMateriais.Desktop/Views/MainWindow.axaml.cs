@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using ControleMateriais.Desktop.Services;
 using ControleMateriais.Desktop.ViewModels;
+using System;
 using System.Threading.Tasks;
 
 namespace ControleMateriais.Desktop.Views;
@@ -15,6 +16,7 @@ public partial class MainWindow : Window
         vm.AbrirDialogoGitHubCallback = AbrirDialogoGitHubAsync;
         DataContext = vm;
         Opened += async (_, _) => await VerificarInicializacaoAsync(vm);
+        Closing += OnMainWindowClosing;
     }
 
     private async Task VerificarInicializacaoAsync(MainWindowViewModel vm)
@@ -41,6 +43,36 @@ public partial class MainWindow : Window
             if (DataContext is MainWindowViewModel vm)
                 vm.GitConfigurado = true;
         }
+    }
+
+    private bool _sincronizandoAoFechar = false;
+
+    private async void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_sincronizandoAoFechar) return;
+        if (!GitHubService.CredenciaisExistem(MainWindowViewModel.RootDirPublic)) return;
+
+        e.Cancel = true;
+        _sincronizandoAoFechar = true;
+
+        var dlg = new SincronizandoDialog();
+        _ = dlg.ShowDialog(this);
+
+        try
+        {
+            await GitHubService.SincronizarTudoAoFecharAsync(
+                MainWindowViewModel.RootDirPublic,
+                msg => dlg.AtualizarStatus(msg));
+            dlg.MarcarConcluido();
+        }
+        catch (Exception ex)
+        {
+            dlg.MarcarErro(ex.Message);
+            _sincronizandoAoFechar = false;
+            return;
+        }
+
+        Close();
     }
 
     private void PrecoTextBox_GotFocus(object? sender, GotFocusEventArgs e)

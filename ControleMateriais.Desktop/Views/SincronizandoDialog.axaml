@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.SincronizandoDialog"
+        Title="Sincronizando..."
+        Width="420" MinHeight="220"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="36,32" Background="{DynamicResource Brush.Surface}">
+    <StackPanel Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+
+      <TextBlock Text="Sincronizando com GitHub..."
+                 FontSize="15" FontWeight="Bold"
+                 Foreground="{DynamicResource Brush.Text}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"/>
+
+      <TextBlock x:Name="StatusText"
+                 FontSize="13"
+                 Foreground="{DynamicResource Brush.TextSecondary}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"
+                 TextWrapping="Wrap"
+                 MaxWidth="340"/>
+
+      <Button x:Name="FecharBtn"
+              Content="Fechar mesmo assim"
+              Width="180"
+              HorizontalAlignment="Center"
+              Margin="0,8,0,0"
+              IsVisible="False"
+              Click="Fechar_Click"/>
+
+    </StackPanel>
+  </Border>
+
+</Window>

@@ -1,7 +1,11 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace ControleMateriais.Desktop.Services;
@@ -206,6 +210,100 @@ public static class GitHubService
                 var branchAtual = await ObterBranchAtual(repoDir);
                 await RunAsync("git", $"push origin {branchAtual}", repoDir);
             }
+        }
+    }
+
+    /// <summary>
+    /// Remove um registro de compra ou venda do arquivo JSON do banco de dados.
+    /// Para compras: remove de compra-MM-YYYY.json onde nome == cliente
+    /// Para vendas: remove de venda-DD-MM-YYYY.json onde nome == cliente E data == data
+    /// Se o arquivo ficar vazio, deleta o arquivo JSON.
+    /// </summary>
+    public static bool RemoverRegistroDoJson(string rootDir, string tipo, string cliente, string data)
+    {
+        var dir = BancoDadosRepoDir(rootDir);
+        if (!Directory.Exists(dir)) return false;
+
+        string? jsonPath = null;
+        string? campoData = null;
+
+        if (tipo.Equals("compra", StringComparison.OrdinalIgnoreCase))
+        {
+            // Extrair mês/ano da data (dd/MM/yyyy -> MM-yyyy)
+            if (!DateTime.TryParseExact(data, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return false;
+            var mesAno = dt.ToString("MM-yyyy");
+            jsonPath = Path.Combine(dir, $"compra-{mesAno}.json");
+        }
+        else if (tipo.Equals("venda", StringComparison.OrdinalIgnoreCase))
+        {
+            // Converter data para formato dd-MM-yyyy
+            if (!DateTime.TryParseExact(data, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return false;
+            var dataChave = dt.ToString("dd-MM-yyyy");
+            jsonPath = Path.Combine(dir, $"venda-{dataChave}.json");
+            campoData = dataChave;
+        }
+
+        if (!File.Exists(jsonPath)) return false;
+
+        try
+        {
+            var jsonOpts = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+
+            var obj = JsonNode.Parse(File.ReadAllText(jsonPath))?.AsObject();
+            if (obj is null || !obj.ContainsKey("registros")) return false;
+
+            var registros = obj["registros"]!.AsArray();
+            var originalCount = registros.Count;
+
+            // Filtrar registros
+            var novosRegistros = new JsonArray();
+            foreach (var reg in registros)
+            {
+                if (reg is JsonObject regObj)
+                {
+                    var nome = regObj.ContainsKey("nome") ? regObj["nome"]!.GetValue<string>() : string.Empty;
+
+                    bool deveRemover = false;
+                    if (tipo.Equals("compra", StringComparison.OrdinalIgnoreCase))
+                    {
+                        deveRemover = nome.Equals(cliente, StringComparison.OrdinalIgnoreCase);
+                    }
+                    else if (tipo.Equals("venda", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var regData = regObj.ContainsKey("data") ? regObj["data"]!.GetValue<string>() : string.Empty;
+                        deveRemover = nome.Equals(cliente, StringComparison.OrdinalIgnoreCase) &&
+                                      regData.Equals(campoData, StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (!deveRemover)
+                        novosRegistros.Add(reg);
+                }
+            }
+
+            if (novosRegistros.Count == originalCount) return false; // Nenhum registro removido
+
+            if (novosRegistros.Count == 0)
+            {
+                // Deletar o arquivo JSON se ficar vazio
+                File.Delete(jsonPath);
+            }
+            else
+            {
+                obj["registros"] = novosRegistros;
+                File.WriteAllText(jsonPath, obj.ToJsonString(jsonOpts), Encoding.UTF8);
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

@@ -13,6 +13,7 @@ public partial class EstoqueView : UserControl
         {
             if (DataContext is EstoqueViewModel vm)
             {
+                vm.CarregarListaEstoquesIniciais();
                 vm.Recarregar();
                 vm.ConfirmarExclusaoCallback = async msg =>
                 {

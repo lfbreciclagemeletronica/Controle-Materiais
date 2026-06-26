@@ -1,0 +1,43 @@
+{
+  "data": "06/2026",
+  "registros": [
+    {
+      "nome": "Gabriel Fanto Stundner",
+      "materiais": [
+        {
+          "descricao": "Placa Notebook C",
+          "peso": 0.524
+        },
+        {
+          "descricao": "Placa Leve com Ponta",
+          "peso": 0.004
+        },
+        {
+          "descricao": "Placa Pesada",
+          "peso": 0.040
+        },
+        {
+          "descricao": "Placa Marrom",
+          "peso": 0.766
+        },
+        {
+          "descricao": "HD Completo",
+          "peso": 0.458
+        },
+        {
+          "descricao": "Memórias Douradas",
+          "peso": 0.008
+        }
+      ]
+    },
+    {
+      "nome": "Fulana da silva",
+      "materiais": [
+        {
+          "descricao": "Placa Mãe C",
+          "peso": 3.200
+        }
+      ]
+    }
+  ]
+}

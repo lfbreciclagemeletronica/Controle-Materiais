@@ -10,7 +10,10 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -81,6 +84,12 @@ public class VendaItemWrapper : ViewModelBase
 public class VendaViewModel : ViewModelBase
 {
     private static readonly CultureInfo PtBR = CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private readonly string _rootDir;
     private readonly Action _voltarCallback;
 
@@ -178,14 +187,34 @@ public class VendaViewModel : ViewModelBase
 
     public void CarregarItensExtras()
     {
-        var totais = EstoqueViewModel.LerEstoque(_rootDir);
+        var totais = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
+        var estoqueInicialPath = Path.Combine(bancoDadosDir, "estoque-inicial.json");
+
+        if (File.Exists(estoqueInicialPath))
+        {
+            try
+            {
+                var obj = JsonNode.Parse(File.ReadAllText(estoqueInicialPath))?.AsObject();
+                if (obj is not null)
+                {
+                    foreach (var kvp in obj)
+                    {
+                        if (kvp.Key.Equals("data", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (kvp.Value is JsonValue jv && jv.TryGetValue<decimal>(out var d))
+                            totais[kvp.Key] = d;
+                    }
+                }
+            }
+            catch { }
+        }
 
         var nomesExtrasEstoque = totais.Keys
             .Where(k => !ItemCatalog.OrderedItems.Contains(k, StringComparer.OrdinalIgnoreCase))
             .OrderBy(n => n)
             .ToList();
 
-        // Rebuild ItensExtras from scratch to reflect current estoque.json
+        // Rebuild ItensExtras from scratch to reflect current estoque
         // Remove from Itens any extra that is no longer in the estoque
         var extrasParaRemover = Itens
             .Where(i => !ItemCatalog.OrderedItems.Contains(i.Nome, StringComparer.OrdinalIgnoreCase)
@@ -257,9 +286,9 @@ public class VendaViewModel : ViewModelBase
         Status   = "Salvando venda...";
         var nomeArquivoFinal = string.Empty;
         var filePathFinal    = string.Empty;
+        var data = DateTime.Now;
         try
-        {
-            var data       = DateTime.Now;
+        { 
             var nomeSeguro = string.Concat(NomeCliente.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
             var nomeBase   = $"{nomeSeguro}_{data:dd-MM-yyyy}";
             nomeArquivoFinal = nomeBase + ".pdf";
@@ -272,27 +301,58 @@ public class VendaViewModel : ViewModelBase
             Status = "Gerando PDF da venda...";
             GerarPdfVenda(filePathFinal, itensSelecionados, _valorVendaRaw, data);
 
-            // 2. Subtrai itens do estoque.json local
-            Status = "Atualizando estoque...";
-            var totais = EstoqueViewModel.LerEstoque(_rootDir);
-            foreach (var item in itensSelecionados)
+            // 2. Cria/atualiza arquivo venda-DD-MM-YYYY.json no banco-de-dados
+            Status = "Salvando dados da venda...";
+            var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
+            Directory.CreateDirectory(bancoDadosDir);
+            var vendaJsonFile = $"venda-{data:dd-MM-yyyy}.json";
+            var vendaJsonPath = Path.Combine(bancoDadosDir, vendaJsonFile);
+
+            JsonObject root;
+            if (File.Exists(vendaJsonPath))
             {
-                if (totais.TryGetValue(item.Nome, out var atual))
-                    totais[item.Nome] = atual - item.PesoAtual;
+                root = JsonNode.Parse(File.ReadAllText(vendaJsonPath))?.AsObject() ?? new JsonObject();
             }
-            EstoqueViewModel.GravarEstoque(_rootDir, totais);
+            else
+            {
+                root = new JsonObject();
+                root["data"] = data.ToString("dd/MM/yyyy");
+            }
+
+            if (!root.ContainsKey("registros"))
+                root["registros"] = new JsonArray();
+
+            var registros = root["registros"]!.AsArray();
+            var reg = new JsonObject
+            {
+                ["nome"] = NomeCliente,
+                ["materiais"] = new JsonArray()
+            };
+
+            foreach (var item in itensSelecionados.OrderBy(i => i.Nome))
+            {
+                var mat = new JsonObject
+                {
+                    ["descricao"] = item.Nome,
+                    ["peso"] = JsonValue.Create(item.PesoAtual)
+                };
+                reg["materiais"]!.AsArray().Add(mat);
+            }
+            registros.Add(reg);
+
+            File.WriteAllText(vendaJsonPath, root.ToJsonString(JsonOpts), Encoding.UTF8);
 
             // 3. Salva metadados leves para leitura na aba de recibos
-            var meta = new System.Text.Json.Nodes.JsonObject
+            var meta = new JsonObject
             {
                 ["cliente"]    = NomeCliente,
-                ["pesoTotal"]  = System.Text.Json.Nodes.JsonValue.Create(itensSelecionados.Sum(i => i.PesoAtual)),
-                ["valorVenda"] = System.Text.Json.Nodes.JsonValue.Create(_valorVendaRaw),
+                ["pesoTotal"]  = JsonValue.Create(itensSelecionados.Sum(i => i.PesoAtual)),
+                ["valorVenda"] = JsonValue.Create(_valorVendaRaw),
                 ["data"]       = data.ToString("dd/MM/yyyy")
             };
             await File.WriteAllTextAsync(
                 filePathFinal + ".meta.json",
-                meta.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                meta.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception ex)
         {
@@ -303,8 +363,9 @@ public class VendaViewModel : ViewModelBase
 
         // 3. Abre modal de sucesso — Git roda dentro dele
         Salvando = false;
-        Status   = string.Empty;
+        Status = string.Empty;
         var clienteSnapshot = NomeCliente;
+        var vendaJsonNome   = $"venda-{data:dd-MM-yyyy}.json";
         AbrirModalSucesso?.Invoke(filePathFinal, nomeArquivoFinal,
             async progresso =>
             {
@@ -315,10 +376,10 @@ public class VendaViewModel : ViewModelBase
                         $"Venda {clienteSnapshot} - {DateTime.Now:dd/MM/yyyy}",
                         msg2 => Avalonia.Threading.Dispatcher.UIThread.Post(() => progresso(msg2)));
 
-                    var bancoDadosDir   = GitHubService.BancoDadosRepoDir(_rootDir);
-                    var estoqueConteudo = await File.ReadAllTextAsync(
-                        Path.Combine(bancoDadosDir, "estoque.json"));
-                    await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, "estoque.json", estoqueConteudo,
+                    var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
+                    var vendaJsonPath = Path.Combine(bancoDadosDir, vendaJsonNome);
+                    var vendaConteudo = await File.ReadAllTextAsync(vendaJsonPath);
+                    await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, vendaJsonNome, vendaConteudo,
                         msg2 => Avalonia.Threading.Dispatcher.UIThread.Post(() => progresso(msg2)));
                 }
                 catch (Exception ex)

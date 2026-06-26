@@ -123,6 +123,10 @@
           </Border>
         </Grid>
 
+        <!-- Painel ESTOQUE INICIAL -->
+        <views:EstoqueInicialView IsVisible="{Binding $parent[Window].DataContext.IsEstoqueInicialPage}"
+                                  DataContext="{Binding $parent[Window].DataContext.EstoqueInicialVM}"/>
+
         <!-- Painel TABELA DE PREÇOS -->
         <Grid IsVisible="{Binding IsGerindoTabela}"
               x:DataType="vm:MainWindowViewModel">

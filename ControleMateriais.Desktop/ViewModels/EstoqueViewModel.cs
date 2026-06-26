@@ -5,6 +5,8 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -35,14 +37,35 @@ public class EstoqueItem
 
 public class EstoqueViewModel : ViewModelBase
 {
-    private const string EstoqueFileName = "estoque.json";
-    private static readonly string[] CamposReservados = { "data", "status" };
+    private static readonly JsonSerializerOptions _jsonOpts = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     private readonly string _rootDir;
     public string RootDir => _rootDir;
 
     public ObservableCollection<EstoqueItem>    Itens        { get; } = new();
     public ObservableCollection<ReciboVendaItem> RecibosVenda { get; } = new();
+    public ObservableCollection<string> EstoquesIniciaisDisponiveis { get; } = new();
+
+    private string _estoqueInicialSelecionado = string.Empty;
+    private bool _recarregando = false;
+    public string EstoqueInicialSelecionado
+    {
+        get => _estoqueInicialSelecionado;
+        set
+        {
+            if (value != _estoqueInicialSelecionado)
+            {
+                _estoqueInicialSelecionado = value;
+                OnPropertyChanged();
+                if (!_recarregando)
+                    Recarregar();
+            }
+        }
+    }
 
     private bool _recibosVendaVazia = true;
     public bool RecibosVendaVazia
@@ -65,7 +88,16 @@ public class EstoqueViewModel : ViewModelBase
         set { if (value != _filtroMes) { _filtroMes = value; OnPropertyChanged(); CarregarRecibosVenda(); } }
     }
 
+    private bool _migrando;
+    public bool Migrando
+    {
+        get => _migrando;
+        private set { if (value != _migrando) { _migrando = value; OnPropertyChanged(); } }
+    }
+
     public ICommand AtualizarCommand       { get; }
+    public ICommand MigrarVendasCommand    { get; }
+    public ICommand AtualizarEstoqueCommand { get; }
     public ICommand AbrirReciboVendaCommand { get; }
     public ICommand ExcluirReciboVendaCommand { get; }
 
@@ -94,15 +126,19 @@ public class EstoqueViewModel : ViewModelBase
         private set { if (value != _atualizando) { _atualizando = value; OnPropertyChanged(); } }
     }
 
-    public ICommand SincronizarGitCommand { get; }
-    public ICommand IrParaVendaCommand    { get; }
+    public ICommand SincronizarGitCommand        { get; }
+    public ICommand IrParaVendaCommand           { get; }
+    public ICommand IrParaEstoqueInicialCommand  { get; }
 
-    public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null)
+    public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null, Action? irParaEstoqueInicialAction = null)
     {
         _rootDir = rootDir;
-        SincronizarGitCommand     = new DelegateCommand(() => _ = SincronizarGitAsync());
-        IrParaVendaCommand        = new DelegateCommand(() => irParaVendaAction?.Invoke());
+        SincronizarGitCommand        = new DelegateCommand(() => _ = SincronizarGitAsync());
+        IrParaVendaCommand           = new DelegateCommand(() => irParaVendaAction?.Invoke());
+        IrParaEstoqueInicialCommand  = new DelegateCommand(() => irParaEstoqueInicialAction?.Invoke());
         AtualizarCommand          = new DelegateCommand(() => _ = AtualizarAsync());
+        MigrarVendasCommand       = new DelegateCommand(() => _ = MigrarVendasAsync());
+        AtualizarEstoqueCommand    = new DelegateCommand(Recarregar);
         AbrirReciboVendaCommand   = new DelegateCommand<ReciboVendaItem?>(AbrirReciboVenda);
         ExcluirReciboVendaCommand = new DelegateCommand<ReciboVendaItem?>(r => _ = ExcluirReciboVendaAsync(r));
     }
@@ -112,6 +148,27 @@ public class EstoqueViewModel : ViewModelBase
         if (item is null || !File.Exists(item.CaminhoCompleto)) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(item.CaminhoCompleto) { UseShellExecute = true }); }
         catch { }
+    }
+
+    private async Task MigrarVendasAsync()
+    {
+        if (Migrando) return;
+        Migrando = true;
+        Status = "Migrando vendas...";
+        try
+        {
+            await Task.Run(() => MigrarVendasParaJson.Migrar(_rootDir, msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg)));
+            Status = "Migração concluída.";
+            Recarregar();
+        }
+        catch (Exception ex)
+        {
+            Status = $"Erro na migração: {ex.Message}";
+        }
+        finally
+        {
+            Migrando = false;
+        }
     }
 
     private async Task ExcluirReciboVendaAsync(ReciboVendaItem? item)
@@ -124,45 +181,220 @@ public class EstoqueViewModel : ViewModelBase
         }
         try
         {
+            // Extrair dados do meta.json antes de deletar
+            string cliente = item.NomeCliente;
+            string data = item.DataCriacao;
+            var metaPath = item.CaminhoCompleto + ".meta.json";
+            if (File.Exists(metaPath))
+            {
+                try
+                {
+                    var node = JsonNode.Parse(File.ReadAllText(metaPath));
+                    if (node?["cliente"] is JsonNode nc) cliente = nc.GetValue<string>();
+                    if (node?["data"] is JsonNode nd) data = nd.GetValue<string>();
+                }
+                catch { }
+            }
+
+            // Remover registro do JSON de vendas
+            bool jsonModificado = GitHubService.RemoverRegistroDoJson(_rootDir, "venda", cliente, data);
+
+            // Sincronizar JSON modificado com GitHub
+            if (jsonModificado && GitHubService.CredenciaisExistem(_rootDir))
+            {
+                var mesAno = DateTime.ParseExact(data, "dd/MM/yyyy", CultureInfo.InvariantCulture).ToString("dd-MM-yyyy");
+                var nomeJson = $"venda-{mesAno}.json";
+                await GitHubService.RemoverJsonBancoDadosAsync(_rootDir, nomeJson, msg => Status = msg);
+            }
+
+            // Deletar PDF e meta.json
             if (File.Exists(item.CaminhoCompleto)) File.Delete(item.CaminhoCompleto);
-            var meta = item.CaminhoCompleto + ".meta.json";
-            if (File.Exists(meta)) File.Delete(meta);
-            CarregarRecibosVenda();
+            if (File.Exists(metaPath)) File.Delete(metaPath);
+
+            // Recarregar para recalcular estoque
+            Recarregar();
         }
         catch (Exception ex) { Status = $"Erro ao excluir: {ex.Message}"; }
     }
 
-    // ── Caminho do estoque.json ───────────────────────────────────────────
-    private string EstoquePath => Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), EstoqueFileName);
-
-    // ── Lê o estoque.json atual (ou dicionário vazio) ─────────────────────
-    public static Dictionary<string, decimal> LerEstoque(string rootDir)
+    // ── Caminho do estoque-inicial-MM-YYYY.json (dinâmico baseado na seleção) ──
+    private string EstoqueInicialPath
     {
-        var path = Path.Combine(GitHubService.BancoDadosRepoDir(rootDir), EstoqueFileName);
-        if (!File.Exists(path)) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        get
+        {
+            if (string.IsNullOrEmpty(EstoqueInicialSelecionado))
+                return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), "estoque-inicial.json");
+            return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), $"{EstoqueInicialSelecionado}.json");
+        }
+    }
+
+    // ── Carrega lista de estoques iniciais disponíveis ───────────────────────
+    private void CarregarEstoquesIniciaisDisponiveis()
+    {
+        EstoquesIniciaisDisponiveis.Clear();
+        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
+        if (!Directory.Exists(dir)) return;
+
+        var arquivos = Directory.GetFiles(dir, "estoque-inicial-*.json")
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(f => !string.IsNullOrEmpty(f))
+            .OrderByDescending(f => f)
+            .ToList();
+
+        foreach (var arquivo in arquivos)
+            if (arquivo is not null)
+                EstoquesIniciaisDisponiveis.Add(arquivo);
+
+        // Auto-selecionar apenas se ainda não foi selecionado nada
+        if (string.IsNullOrEmpty(EstoqueInicialSelecionado) && EstoquesIniciaisDisponiveis.Any())
+        {
+            var mesAtual = DateTime.Now.ToString("estoque-inicial-MM-yyyy");
+            if (EstoquesIniciaisDisponiveis.Contains(mesAtual))
+                EstoqueInicialSelecionado = mesAtual;
+            else
+                EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
+        }
+    }
+
+    // Método público para carregar a lista de estoques iniciais (chamado pela View)
+    public void CarregarListaEstoquesIniciais()
+    {
+        CarregarEstoquesIniciaisDisponiveis();
+    }
+
+    // ── Lê estoque-inicial-MM-YYYY.json ────────────────────────────────────────
+    private Dictionary<string, decimal> LerEstoqueInicial()
+    {
+        if (!File.Exists(EstoqueInicialPath))
+        {
+            if (!string.IsNullOrEmpty(EstoqueInicialSelecionado))
+                Status = "Não existe estoque inicial para o mês/ano selecionado.";
+            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        }
         try
         {
-            var obj = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
+            var obj = JsonNode.Parse(File.ReadAllText(EstoqueInicialPath))?.AsObject();
             if (obj is null) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in obj)
+            {
+                if (kvp.Key.Equals("data", StringComparison.OrdinalIgnoreCase)) continue;
                 dic[kvp.Key] = ExtrairDecimal(kvp.Value);
+            }
             return dic;
         }
         catch { return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase); }
     }
 
-    // ── Grava o estoque.json ──────────────────────────────────────────────
-    public static void GravarEstoque(string rootDir, Dictionary<string, decimal> totais)
+    // ── Lê arquivo mensal compra-MM-YYYY.json (apenas mês atual ou especificado) ───────────────
+    private Dictionary<string, decimal> LerMesAtual(string? mesAno = null)
     {
-        var dir = GitHubService.BancoDadosRepoDir(rootDir);
-        Directory.CreateDirectory(dir);
-        var obj = new JsonObject();
-        foreach (var kv in totais.OrderBy(k => k.Key))
-            obj[kv.Key] = JsonValue.Create(kv.Value);
-        File.WriteAllText(
-            Path.Combine(dir, EstoqueFileName),
-            obj.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
+        if (!Directory.Exists(dir)) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+        var chave = mesAno ?? DateTime.Now.ToString("MM-yyyy"); // ex: "06-2026"
+        var path = Path.Combine(dir, $"compra-{chave}.json");
+
+        if (!File.Exists(path)) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var obj = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
+            if (obj is null || !obj.ContainsKey("registros")) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+            var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            var registros = obj["registros"]!.AsArray();
+            foreach (var reg in registros)
+            {
+                if (reg is JsonObject regObj && regObj.ContainsKey("materiais"))
+                {
+                    var materiais = regObj["materiais"]!.AsArray();
+                    foreach (var mat in materiais)
+                    {
+                        if (mat is JsonObject matObj && matObj.ContainsKey("descricao") && matObj.ContainsKey("peso"))
+                        {
+                            var nome = matObj["descricao"]!.GetValue<string>();
+                            var peso = ExtrairDecimal(matObj["peso"]);
+                            dic[nome] = dic.TryGetValue(nome, out var atual) ? atual + peso : peso;
+                        }
+                    }
+                }
+            }
+            return dic;
+        }
+        catch { return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase); }
+    }
+
+    // ── Lê todos os arquivos venda-DD-MM-YYYY.json (ou filtra por mês/ano específico) ─────────────────────────
+    private Dictionary<string, decimal> LerVendas(string? mesAno = null)
+    {
+        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
+        if (!Directory.Exists(dir)) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+        var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        var pattern = string.IsNullOrEmpty(mesAno) ? "venda-*.json" : $"venda-*-{mesAno}.json";
+        foreach (var file in Directory.GetFiles(dir, pattern, SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                var obj = JsonNode.Parse(File.ReadAllText(file))?.AsObject();
+                if (obj is null || !obj.ContainsKey("registros")) continue;
+
+                var registros = obj["registros"]!.AsArray();
+                foreach (var reg in registros)
+                {
+                    if (reg is JsonObject regObj && regObj.ContainsKey("materiais"))
+                    {
+                        var materiais = regObj["materiais"]!.AsArray();
+                        foreach (var mat in materiais)
+                        {
+                            if (mat is JsonObject matObj && matObj.ContainsKey("descricao") && matObj.ContainsKey("peso"))
+                            {
+                                var nome = matObj["descricao"]!.GetValue<string>();
+                                var peso = ExtrairDecimal(matObj["peso"]);
+                                dic[nome] = dic.TryGetValue(nome, out var atual) ? atual + peso : peso;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+        return dic;
+    }
+
+    // ── Calcula estoque atual: vendas - (compras + estoque inicial) ───────────────────
+    private Dictionary<string, decimal> CalcularEstoqueAtual()
+    {
+        // Extrair mês/ano do estoque inicial selecionado
+        string mesAno = "01-2026"; // padrão
+        if (!string.IsNullOrEmpty(EstoqueInicialSelecionado) &&
+            EstoqueInicialSelecionado.StartsWith("estoque-inicial-"))
+        {
+            mesAno = EstoqueInicialSelecionado.Replace("estoque-inicial-", "");
+        }
+
+        // Começa com vendas (positivo)
+        var totais = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        var vendas = LerVendas(mesAno);
+        foreach (var kv in vendas)
+            totais[kv.Key] = kv.Value;
+
+        // Subtrai compras do mesmo mês
+        var mesAtual = LerMesAtual(mesAno);
+        foreach (var kv in mesAtual)
+            totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
+
+        // Subtrai estoque inicial
+        var inicial = LerEstoqueInicial();
+        foreach (var kv in inicial)
+            totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
+
+        // Remove itens com zero
+        foreach (var key in totais.Keys.ToList())
+            if (totais[key] == 0m) totais.Remove(key);
+
+        return totais;
     }
 
     // ── Extrai decimal de um JsonNode (suporta número ou string) ─────────
@@ -178,90 +410,10 @@ public class EstoqueViewModel : ViewModelBase
         return 0m;
     }
 
-    // ── Lê itens de peso de um JSON de recibo (ignora campos reservados) ──
-    public static Dictionary<string, decimal> LerItensJson(string filePath)
-    {
-        var result = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            var obj = JsonNode.Parse(File.ReadAllText(filePath))?.AsObject();
-            if (obj is null) return result;
-            foreach (var kvp in obj)
-            {
-                if (CamposReservados.Contains(kvp.Key, StringComparer.OrdinalIgnoreCase)) continue;
-                var peso = ExtrairDecimal(kvp.Value);
-                if (peso > 0) result[kvp.Key] = peso;
-            }
-        }
-        catch { }
-        return result;
-    }
-
-    // ── Marca um JSON de recibo como "Adicionado ao estoque" ─────────────
-    public static void MarcarComoAdicionado(string filePath)
-    {
-        try
-        {
-            var obj = JsonNode.Parse(File.ReadAllText(filePath))?.AsObject() ?? new JsonObject();
-            obj["status"] = "Adicionado ao estoque";
-            File.WriteAllText(filePath, obj.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch { }
-    }
-
-    // ── Processa JSONs novos (sem status) → soma no estoque.json ─────────
-    public int ProcessarNovosJsons()
-    {
-        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
-        if (!Directory.Exists(dir)) return 0;
-
-        var totais   = LerEstoque(_rootDir);
-        var contador = 0;
-
-        foreach (var file in Directory.GetFiles(dir, "*.json", SearchOption.TopDirectoryOnly))
-        {
-            var nome = Path.GetFileName(file);
-            if (nome.Equals(EstoqueFileName, StringComparison.OrdinalIgnoreCase)) continue;
-
-            try
-            {
-                var obj = JsonNode.Parse(File.ReadAllText(file))?.AsObject();
-                if (obj is null) continue;
-
-                // Pula se já foi processado
-                if (obj.TryGetPropertyValue("status", out var st) &&
-                    st?.GetValue<string>()?.Equals("Adicionado ao estoque", StringComparison.OrdinalIgnoreCase) == true)
-                    continue;
-
-                // Soma os itens
-                var itens = LerItensJson(file);
-                foreach (var kv in itens)
-                    totais[kv.Key] = (totais.TryGetValue(kv.Key, out var atual) ? atual : 0m) + kv.Value;
-
-                // Marca como processado
-                MarcarComoAdicionado(file);
-                contador++;
-            }
-            catch { }
-        }
-
-        if (contador > 0)
-            GravarEstoque(_rootDir, totais);
-
-        return contador;
-    }
-
-    // ── Recarrega a UI a partir do estoque.json ───────────────────────────
+    // ── Recarrega a UI usando o novo cálculo de estoque ───────────────────
     public void Recarregar()
     {
-        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
-        Directory.CreateDirectory(dir);
-
-        // Processa JSONs novos antes de exibir
-        ProcessarNovosJsons();
-
-        // Lê estoque.json e constrói a lista com TODOS os itens do catálogo
-        var totais = LerEstoque(_rootDir);
+        var totais = CalcularEstoqueAtual();
 
         Itens.Clear();
         foreach (var nome in ItemCatalog.OrderedItems)
@@ -403,15 +555,7 @@ public class EstoqueViewModel : ViewModelBase
 
             // Sincroniza repositório banco-de-dados
             await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
-            var novos = ProcessarNovosJsons();
-            Status = novos > 0
-                ? $"Sincronizado — {novos} recibo(s) novos processados."
-                : "Sincronizado — estoque já atualizado.";
-
-            // Publica estoque.json atualizado
-            var conteudo = File.Exists(EstoquePath) ? await File.ReadAllTextAsync(EstoquePath) : "{}";
-            await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, EstoqueFileName, conteudo,
-                msg => Status = msg);
+            Status = "Sincronizado — estoque atualizado.";
 
             Recarregar();
         }

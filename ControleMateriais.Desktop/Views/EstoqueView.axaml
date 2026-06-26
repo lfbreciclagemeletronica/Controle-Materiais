@@ -5,7 +5,7 @@
              x:Class="ControleMateriais.Desktop.Views.EstoqueView"
              x:DataType="vm:EstoqueViewModel">
 
-  <Grid RowDefinitions="Auto,Auto,*">
+  <Grid RowDefinitions="Auto,Auto,Auto,*">
 
     <!-- Cabeçalho -->
     <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,4">
@@ -17,13 +17,23 @@
                    VerticalAlignment="Center"/>
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Content="&#x1F4E6; Estoque Inicial"
+                Command="{Binding IrParaEstoqueInicialCommand}"
+                ToolTip.Tip="Definir o estoque inicial do mês"/>
         <Button Content="&#x1F4B0; Venda"
                 Command="{Binding IrParaVendaCommand}"
                 ToolTip.Tip="Registrar uma venda e subtrair do estoque"/>
+        <Button Content="&#x1F4C8; Migrar Vendas"
+                Command="{Binding MigrarVendasCommand}"
+                IsEnabled="{Binding !Migrando}"
+                ToolTip.Tip="Gerar arquivos venda-DD-MM-YYYY.json a partir dos PDFs existentes"/>
         <Button Content="&#8679; Sincronizar"
                 Command="{Binding SincronizarGitCommand}"
                 IsEnabled="{Binding !Sincronizando}"
-                ToolTip.Tip="Pull do repositório banco-de-dados e publica estoque.json atualizado"/>
+                ToolTip.Tip="Pull do repositório banco-de-dados"/>
+        <Button Content="&#x27F3; Atualizar Estoque"
+                Command="{Binding AtualizarEstoqueCommand}"
+                ToolTip.Tip="Recalcular estoque a partir dos arquivos atuais"/>
       </StackPanel>
     </Grid>
 
@@ -35,69 +45,22 @@
                FontSize="12" Foreground="#4CAF50"
                Margin="0,4,0,4"/>
 
-    <!-- Abas: Estoque | Recibos de Venda -->
-    <TabControl Grid.Row="2" x:Name="MainTabControl">
+    <!-- Seletor de Estoque Inicial -->
+    <Grid Grid.Row="2" Margin="0,4,0,4" ColumnDefinitions="Auto,Auto,*">
+      <TextBlock Grid.Column="0" Text="Estoque Inicial:"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource Brush.TextPrimary}"
+                 Margin="0,0,8,0"/>
+      <ComboBox Grid.Column="1"
+                ItemsSource="{Binding EstoquesIniciaisDisponiveis}"
+                SelectedItem="{Binding EstoqueInicialSelecionado}"
+                Width="200"
+                HorizontalAlignment="Left"
+                ToolTip.Tip="Selecione o estoque inicial do mês/ano desejado"/>
+    </Grid>
 
-      <!-- ── ABA ESTOQUE ─────────────────────────────────────────── -->
-      <TabItem Header="Estoque">
-        <Border Background="{DynamicResource Brush.SurfaceAlt}"
-                BorderBrush="{DynamicResource Brush.Border}"
-                BorderThickness="1" CornerRadius="0,10,10,10" Padding="0">
-          <Grid RowDefinitions="Auto,*">
-            <Border Grid.Row="0" Background="#1A3B82F6"
-                    CornerRadius="0,10,0,0" Padding="20,12">
-              <Grid ColumnDefinitions="*,200">
-                <TextBlock Grid.Column="0" Text="Material"
-                           FontSize="12" FontWeight="Bold"
-                           Foreground="{DynamicResource Brush.TextPrimary}"/>
-                <TextBlock Grid.Column="1" Text="Total em Estoque"
-                           FontSize="12" FontWeight="Bold"
-                           Foreground="{DynamicResource Brush.TextPrimary}"
-                           HorizontalAlignment="Right"/>
-              </Grid>
-            </Border>
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding Itens}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EstoqueItem">
-                    <Border BorderBrush="{DynamicResource Brush.Border}"
-                            BorderThickness="0,0,0,1" Padding="20,9">
-                      <Border.Styles>
-                        <Style Selector="Border:pointerover">
-                          <Setter Property="Background" Value="#0F3B82F6"/>
-                        </Style>
-                      </Border.Styles>
-                      <Grid ColumnDefinitions="*,200">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                          <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center">
-                            <Border.Background>
-                              <SolidColorBrush Color="{Binding TotalKg, Converter={x:Static conv:DecimalToColorConverter.Instance}}"/>
-                            </Border.Background>
-                          </Border>
-                          <TextBlock Text="{Binding Material}" FontSize="12"
-                                     Foreground="{DynamicResource Brush.TextPrimary}"
-                                     VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <Border Grid.Column="1" CornerRadius="6" Padding="12,3"
-                                HorizontalAlignment="Right" VerticalAlignment="Center"
-                                Background="#0F555555" BorderBrush="#33555555" BorderThickness="1">
-                          <TextBlock Text="{Binding TotalKgStr}"
-                                     FontSize="12" FontWeight="SemiBold"
-                                     HorizontalAlignment="Center">
-                            <TextBlock.Foreground>
-                              <SolidColorBrush Color="{Binding TotalKg, Converter={x:Static conv:DecimalToColorConverter.Instance}}"/>
-                            </TextBlock.Foreground>
-                          </TextBlock>
-                        </Border>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </ScrollViewer>
-          </Grid>
-        </Border>
-      </TabItem>
+    <!-- Abas: Recibos de Venda | Estoque -->
+    <TabControl Grid.Row="3" x:Name="MainTabControl">
 
       <!-- ── ABA RECIBOS DE VENDA ────────────────────────────────── -->
       <TabItem Header="Recibos de Venda">
@@ -230,6 +193,67 @@
               </ScrollViewer>
             </Grid>
 
+          </Grid>
+        </Border>
+      </TabItem>
+
+      <!-- ── ABA ESTOQUE ─────────────────────────────────────────── -->
+      <TabItem Header="Estoque">
+        <Border Background="{DynamicResource Brush.SurfaceAlt}"
+                BorderBrush="{DynamicResource Brush.Border}"
+                BorderThickness="1" CornerRadius="0,10,10,10" Padding="0">
+          <Grid RowDefinitions="Auto,*">
+            <Border Grid.Row="0" Background="#1A3B82F6"
+                    CornerRadius="0,10,0,0" Padding="20,12">
+              <Grid ColumnDefinitions="*,200">
+                <TextBlock Grid.Column="0" Text="Material"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="Total em Estoque"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="{DynamicResource Brush.TextPrimary}"
+                           HorizontalAlignment="Right"/>
+              </Grid>
+            </Border>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Itens}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EstoqueItem">
+                    <Border BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="0,0,0,1" Padding="20,9">
+                      <Border.Styles>
+                        <Style Selector="Border:pointerover">
+                          <Setter Property="Background" Value="#0F3B82F6"/>
+                        </Style>
+                      </Border.Styles>
+                      <Grid ColumnDefinitions="*,200">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                          <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center">
+                            <Border.Background>
+                              <SolidColorBrush Color="{Binding TotalKg, Converter={x:Static conv:DecimalToColorConverter.Instance}}"/>
+                            </Border.Background>
+                          </Border>
+                          <TextBlock Text="{Binding Material}" FontSize="12"
+                                     Foreground="{DynamicResource Brush.TextPrimary}"
+                                     VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" CornerRadius="6" Padding="12,3"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Background="#0F555555" BorderBrush="#33555555" BorderThickness="1">
+                          <TextBlock Text="{Binding TotalKgStr}"
+                                     FontSize="12" FontWeight="SemiBold"
+                                     HorizontalAlignment="Center">
+                            <TextBlock.Foreground>
+                              <SolidColorBrush Color="{Binding TotalKg, Converter={x:Static conv:DecimalToColorConverter.Instance}}"/>
+                            </TextBlock.Foreground>
+                          </TextBlock>
+                        </Border>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
           </Grid>
         </Border>
       </TabItem>

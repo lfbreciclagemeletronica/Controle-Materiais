@@ -51,10 +51,20 @@ public class EstoqueViewModel : ViewModelBase
     public ObservableCollection<string> EstoquesIniciaisDisponiveis { get; } = new();
 
     private string _estoqueInicialSelecionado = string.Empty;
+    private bool _recarregando = false;
     public string EstoqueInicialSelecionado
     {
         get => _estoqueInicialSelecionado;
-        set { if (value != _estoqueInicialSelecionado) { _estoqueInicialSelecionado = value; OnPropertyChanged(); Recarregar(); } }
+        set
+        {
+            if (value != _estoqueInicialSelecionado)
+            {
+                _estoqueInicialSelecionado = value;
+                OnPropertyChanged();
+                if (!_recarregando)
+                    Recarregar();
+            }
+        }
     }
 
     private bool _recibosVendaVazia = true;
@@ -235,12 +245,21 @@ public class EstoqueViewModel : ViewModelBase
             if (arquivo is not null)
                 EstoquesIniciaisDisponiveis.Add(arquivo);
 
-        // Selecionar mês atual se disponível
-        var mesAtual = DateTime.Now.ToString("estoque-inicial-MM-yyyy");
-        if (EstoquesIniciaisDisponiveis.Contains(mesAtual))
-            EstoqueInicialSelecionado = mesAtual;
-        else if (EstoquesIniciaisDisponiveis.Any())
-            EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
+        // Auto-selecionar apenas se ainda não foi selecionado nada
+        if (string.IsNullOrEmpty(EstoqueInicialSelecionado) && EstoquesIniciaisDisponiveis.Any())
+        {
+            var mesAtual = DateTime.Now.ToString("estoque-inicial-MM-yyyy");
+            if (EstoquesIniciaisDisponiveis.Contains(mesAtual))
+                EstoqueInicialSelecionado = mesAtual;
+            else
+                EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
+        }
+    }
+
+    // Método público para carregar a lista de estoques iniciais (chamado pela View)
+    public void CarregarListaEstoquesIniciais()
+    {
+        CarregarEstoquesIniciaisDisponiveis();
     }
 
     // ── Lê estoque-inicial-MM-YYYY.json ────────────────────────────────────────
@@ -344,11 +363,9 @@ public class EstoqueViewModel : ViewModelBase
         return dic;
     }
 
-    // ── Calcula estoque atual: inicial + compras do mês - vendas do mês ───────────────────
+    // ── Calcula estoque atual: vendas - (compras + estoque inicial) ───────────────────
     private Dictionary<string, decimal> CalcularEstoqueAtual()
     {
-        var totais = LerEstoqueInicial();
-
         // Extrair mês/ano do estoque inicial selecionado
         string mesAno = "01-2026"; // padrão
         if (!string.IsNullOrEmpty(EstoqueInicialSelecionado) &&
@@ -357,14 +374,20 @@ public class EstoqueViewModel : ViewModelBase
             mesAno = EstoqueInicialSelecionado.Replace("estoque-inicial-", "");
         }
 
-        // Ler compras apenas do mesmo mês
-        var mesAtual = LerMesAtual(mesAno);
-        foreach (var kv in mesAtual)
-            totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual + kv.Value : kv.Value;
-
-        // Ler vendas apenas do mesmo mês
+        // Começa com vendas (positivo)
+        var totais = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         var vendas = LerVendas(mesAno);
         foreach (var kv in vendas)
+            totais[kv.Key] = kv.Value;
+
+        // Subtrai compras do mesmo mês
+        var mesAtual = LerMesAtual(mesAno);
+        foreach (var kv in mesAtual)
+            totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
+
+        // Subtrai estoque inicial
+        var inicial = LerEstoqueInicial();
+        foreach (var kv in inicial)
             totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
 
         // Remove itens com zero
@@ -390,7 +413,6 @@ public class EstoqueViewModel : ViewModelBase
     // ── Recarrega a UI usando o novo cálculo de estoque ───────────────────
     public void Recarregar()
     {
-        CarregarEstoquesIniciaisDisponiveis();
         var totais = CalcularEstoqueAtual();
 
         Itens.Clear();

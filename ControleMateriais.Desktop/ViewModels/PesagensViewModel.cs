@@ -686,18 +686,24 @@ public class PesagensViewModel : ViewModelBase
 
         try
         {
-            var recibosDir = GitHubService.RecibosRepoDir(RootDir);
-            if (!Directory.Exists(recibosDir))
+            var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
+            if (!Directory.Exists(bancoDadosDir))
             {
-                MostrarStatusRecibos("Diretório de recibos não encontrado. Sincronize primeiro.", ok: false);
+                MostrarStatusRecibos("Diretório banco-de-dados não encontrado. Sincronize primeiro.", ok: false);
                 return;
             }
+
+            // Determinar mês/ano: usa o filtro selecionado na aba Recibos, ou mês atual
+            var mes = _filtroReciboMes;
+            var mesAno = mes is not null
+                ? $"{mes.Mes:D2}-{mes.Ano}"
+                : DateTime.Today.ToString("MM-yyyy");
 
             var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                             Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
             if (topLevel is null) return;
 
-            var suggestedName = $"Relatorio_Pesagens_{DateTime.Now:dd-MM-yyyy}.xlsx";
+            var suggestedName = $"Relatorio_Pesagens_{mesAno}.xlsx";
             var file = await topLevel.StorageProvider.SaveFilePickerAsync(
                 new Avalonia.Platform.Storage.FilePickerSaveOptions
                 {
@@ -713,8 +719,9 @@ public class PesagensViewModel : ViewModelBase
             var outputPath = file?.TryGetLocalPath();
             if (string.IsNullOrWhiteSpace(outputPath)) { MostrarStatusRecibos(string.Empty, ok: true); return; }
 
+            var mesAnoCapture = mesAno;
             await Task.Run(() =>
-                RelatorioExcelService.Gerar(recibosDir, outputPath,
+                RelatorioExcelService.Gerar(bancoDadosDir, mesAnoCapture, outputPath,
                     msg => Avalonia.Threading.Dispatcher.UIThread.Post(
                         () => MostrarStatusRecibos(msg, ok: true))));
 

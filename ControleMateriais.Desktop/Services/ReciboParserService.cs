@@ -47,6 +47,76 @@ public static class ReciboParserService
             ["Desmanche Eletrônicos Consultar"]                  = ["Desmanche Eletronicos Consultar", "Desmanche Eletrônicos Consultar Itens", "Desmanche Eletronicos"],
         };
 
+    // Regex para valor monetário: R$ 2.046,52 → captura "2.046,52"
+    private static readonly Regex _reValor = new(
+        @"R\$\s*([\d\.]+,\d{2})",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Regex para data DD/MM/YYYY no cabeçalho
+    private static readonly Regex _reDataCabecalho = new(
+        @"\b(\d{2}/\d{2}/\d{4})\b",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Extrai data e valor total do cabeçalho do PDF de pesagem.
+    /// </summary>
+    /// <returns>(DataRecibo no formato "DD-MM-YYYY", Valor como string "2.046,52") — strings vazias se não encontrado</returns>
+    public static (string DataRecibo, string Valor) ExtrairCabecalho(string filePath)
+    {
+        // Não aplicar CorrigirEspacosEntreDigitos aqui: ela une dígitos separados por espaço
+        // e pode colapsar o espaço entre o valor monetário e a data, corrompendo ambos.
+        var linhas = ExtrairLinhasPdf(filePath);
+
+        string dataRecibo = string.Empty;
+        string valor      = string.Empty;
+
+        // Varrer todas as linhas do PDF — o cabeçalho pode estar em qualquer posição.
+        foreach (var linha in linhas)
+        {
+            // Extrair DATA: DD/MM/YYYY — regex sem \b para não depender de word boundary
+            if (string.IsNullOrEmpty(dataRecibo))
+            {
+                var mData = _reDataCabecalho.Match(linha);
+                if (mData.Success &&
+                    DateTime.TryParseExact(mData.Groups[1].Value, "dd/MM/yyyy",
+                        CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                {
+                    dataRecibo = dt.ToString("dd-MM-yyyy");
+                }
+            }
+
+            // Extrair VALOR: pega o maior valor R$ na linha (o valor total do recibo,
+            // não o VALOR/KG de itens individuais que são menores)
+            if (string.IsNullOrEmpty(valor))
+            {
+                decimal melhor = 0;
+                string melhorStr = string.Empty;
+                var m = _reValor.Match(linha);
+                while (m.Success)
+                {
+                    var raw = m.Groups[1].Value
+                        .Replace(".", "")
+                        .Replace(",", ".");
+                    if (decimal.TryParse(raw, System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var v)
+                        && v > melhor)
+                    {
+                        melhor    = v;
+                        melhorStr = m.Groups[1].Value;
+                    }
+                    m = m.NextMatch();
+                }
+                if (!string.IsNullOrEmpty(melhorStr))
+                    valor = melhorStr;
+            }
+
+            if (!string.IsNullOrEmpty(dataRecibo) && !string.IsNullOrEmpty(valor))
+                break;
+        }
+
+        return (dataRecibo, valor);
+    }
+
     /// <summary>
     /// Lê o PDF e retorna {nomeMaterial → peso em kg}.
     /// Inclui itens do catálogo E itens extras (não catalogados) encontrados no PDF.
@@ -110,7 +180,7 @@ public static class ReciboParserService
         // Procura linhas não consumidas que parecem ser nomes seguidos de um peso N3
         // Heurística: linha de texto puro (sem dígitos) + linha seguinte com peso N3
         var nomesExtraEncontrados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < linhas.Count - 1; i++)
+        for (int i = 0; i < linhas.Count; i++)
         {
             if (linhasConsumidas.Contains(i)) continue;
 

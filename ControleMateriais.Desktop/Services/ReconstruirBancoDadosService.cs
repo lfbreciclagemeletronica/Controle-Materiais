@@ -66,8 +66,8 @@ public static class ReconstruirBancoDadosService
         progresso?.Invoke($"Processando {pdfs.Count} recibos de pesagem...");
 
         // ── 3. Montar dicionário em memória: "MM-YYYY" → array de registros (compras) ───
-        // registros: List<(nome, List<(descricao, peso)>)>
-        var mensais = new Dictionary<string, List<(string Nome, Dictionary<string, decimal> Itens)>>(
+        // registros: List<(nome, dataRecibo, valor, itens)>
+        var mensais = new Dictionary<string, List<(string Nome, string DataRecibo, string Valor, Dictionary<string, decimal> Itens)>>(
             StringComparer.OrdinalIgnoreCase);
 
         // Dicionário para vendas: "DD-MM-YYYY" → array de registros
@@ -93,12 +93,17 @@ public static class ReconstruirBancoDadosService
             var chave       = data.ToString("MM-yyyy");   // ex: "06-2026"
             var dataLabel   = data.ToString("MM/yyyy");   // ex: "06/2026"
 
+            string dataRecibo, valorRecibo;
+            try { (dataRecibo, valorRecibo) = ReciboParserService.ExtrairCabecalho(pdf); }
+            catch { dataRecibo = string.Empty; valorRecibo = string.Empty; }
+            progresso?.Invoke($"  cabeçalho: data={dataRecibo}, valor={valorRecibo}");
+
             if (!mensais.TryGetValue(chave, out var registros))
             {
-                registros = new List<(string, Dictionary<string, decimal>)>();
+                registros = new List<(string, string, string, Dictionary<string, decimal>)>();
                 mensais[chave] = registros;
             }
-            registros.Add((nomeCliente, itens));
+            registros.Add((nomeCliente, dataRecibo, valorRecibo, itens));
 
             // Acumular no total de pesagem
             foreach (var kv in itens)
@@ -166,13 +171,21 @@ public static class ReconstruirBancoDadosService
             root["mes"] = chave; // "06-2026"
 
             var registrosArr = new JsonArray();
-            foreach (var (nome, itens) in kv.Value)
+            foreach (var (nome, dataRec, valorRec, itens) in kv.Value)
             {
                 var reg = new JsonObject();
                 reg["nome"] = nome;
+                if (!string.IsNullOrEmpty(dataRec))   reg["data-recibo"] = dataRec;
+                if (!string.IsNullOrEmpty(valorRec))  reg["valor"]       = valorRec;
+
+                var catalogoIdx = ItemCatalog.OrderedItems
+                    .Select((n, idx) => (n, idx))
+                    .ToDictionary(x => x.n, x => x.idx, StringComparer.InvariantCultureIgnoreCase);
 
                 var materiaisArr = new JsonArray();
-                foreach (var item in itens.OrderBy(x => x.Key))
+                foreach (var item in itens
+                    .OrderBy(x => catalogoIdx.TryGetValue(x.Key, out var idx) ? idx : int.MaxValue)
+                    .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
                 {
                     var mat = new JsonObject();
                     mat["descricao"] = item.Key;

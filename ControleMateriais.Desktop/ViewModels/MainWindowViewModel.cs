@@ -121,8 +121,9 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand IrParaHomeCommand { get; }
     public ICommand IrParaCalculadoraPesosCommand { get; }
     public ICommand IrParaRecibosCommand { get; }
-    public ICommand IrParaEstoqueCommand { get; }
-    public ICommand IrParaVendaCommand   { get; }
+    public ICommand IrParaEstoqueCommand        { get; }
+    public ICommand IrParaEstoqueInicialCommand  { get; }
+    public ICommand IrParaVendaCommand           { get; }
     public ICommand VoltarParaPesagensCommand { get; }
     public ICommand ConfigurarGitHubCommand { get; }
     public ICommand SincronizarRecibosCommand { get; }
@@ -172,6 +173,7 @@ public class MainWindowViewModel : ViewModelBase
     public PesagensViewModel PesagensVM { get; }
     public EstoqueViewModel EstoqueVM { get; }
     public VendaViewModel    VendaVM   { get; }
+    public EstoqueInicialViewModel EstoqueInicialVM { get; }
 
     private PesagemItem? _pesagemAtiva;
 
@@ -199,15 +201,17 @@ public class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsCalculadoraPage));
                 OnPropertyChanged(nameof(IsEstoquePage));
                 OnPropertyChanged(nameof(IsVendaPage));
+                OnPropertyChanged(nameof(IsEstoqueInicialPage));
             }
         }
     }
-    public bool IsHomePage          => _currentPage == AppPage.Home;
-    public bool IsPesagensPage       => _currentPage == AppPage.Pesagens;
-    public bool IsRecibosPage        => _currentPage == AppPage.Recibos;
-    public bool IsCalculadoraPage    => _currentPage == AppPage.Calculadora;
-    public bool IsEstoquePage        => _currentPage == AppPage.Estoque;
-    public bool IsVendaPage          => _currentPage == AppPage.Venda;
+    public bool IsHomePage              => _currentPage == AppPage.Home;
+    public bool IsPesagensPage           => _currentPage == AppPage.Pesagens;
+    public bool IsRecibosPage            => _currentPage == AppPage.Recibos;
+    public bool IsCalculadoraPage        => _currentPage == AppPage.Calculadora;
+    public bool IsEstoquePage            => _currentPage == AppPage.Estoque;
+    public bool IsVendaPage              => _currentPage == AppPage.Venda;
+    public bool IsEstoqueInicialPage     => _currentPage == AppPage.EstoqueInicial;
 
     public decimal TotalGeral
     {
@@ -263,6 +267,7 @@ public class MainWindowViewModel : ViewModelBase
         IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Pesagens; });
         IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
         IrParaEstoqueCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
+        IrParaEstoqueInicialCommand  = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.EstoqueInicial; EstoqueInicialVM.Carregar(); });
         IrParaVendaCommand           = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
         VoltarParaPesagensCommand    = new DelegateCommand(VoltarParaPesagens);
         ConfigurarGitHubCommand      = new DelegateCommand(async () => await AbrirConfigGitHubAsync());
@@ -314,10 +319,13 @@ public class MainWindowViewModel : ViewModelBase
             IsGerindoTabela = true;
         });
 
-        CalculadoraVM = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
-        PesagensVM    = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
-        EstoqueVM     = new EstoqueViewModel(RootDir, () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
-        VendaVM       = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
+        CalculadoraVM    = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        PesagensVM       = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
+        EstoqueInicialVM = new EstoqueInicialViewModel(RootDir, () => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
+        EstoqueVM        = new EstoqueViewModel(RootDir,
+            irParaVendaAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); },
+            irParaEstoqueInicialAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.EstoqueInicial; EstoqueInicialVM.Carregar(); });
+        VendaVM          = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
         PesagensVM.AbrirReciboCallback        = AbrirReciboDetalhe;
         PesagensVM.CriarNovoReciboCallback    = CriarNovoRecibo;
         PesagensVM.EstoqueRecarregarCallback  = () => EstoqueVM.Recarregar();
@@ -559,46 +567,72 @@ public class MainWindowViewModel : ViewModelBase
             AtualizarStatusTela($"Aviso: não foi possível sincronizar — {ex.Message}", ok: false);
         }
 
-        // Salva .json no banco-de-dados e atualiza estoque.json
+        // Salva .json no banco-de-dados agregado por mês (compra-MM-YYYY.json)
         try
         {
             var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
             Directory.CreateDirectory(bancoDadosDir);
 
-            var nomeJson  = Path.GetFileNameWithoutExtension(Path.GetFileName(filePath)) + ".json";
-            var jsonPath  = Path.Combine(bancoDadosDir, nomeJson);
+            // Determina nome do arquivo mensal
+            var mesAno = data.ToString("MM-yyyy");
+            var compraJsonFile = $"compra-{mesAno}.json";
+            var compraJsonPath = Path.Combine(bancoDadosDir, compraJsonFile);
 
-            // Cria JSON do recibo com decimais nativos + status já marcado
-            var jsonObj = new System.Text.Json.Nodes.JsonObject();
-            jsonObj["data"] = data.ToString("dd/MM/yyyy");
+            // Lê ou cria estrutura JSON
+            JsonObject root;
+            if (File.Exists(compraJsonPath))
+            {
+                var existingContent = await File.ReadAllTextAsync(compraJsonPath);
+                root = JsonNode.Parse(existingContent)?.AsObject() ?? new JsonObject();
+            }
+            else
+            {
+                root = new JsonObject();
+                root["mes"] = mesAno;
+            }
+
+            // Garante array de registros
+            if (!root.ContainsKey("registros"))
+                root["registros"] = new JsonArray();
+
+            var registros = root["registros"]!.AsArray();
+
+            // Cria novo registro
+            var reg = new JsonObject
+            {
+                ["nome"] = NomeCliente,
+                ["data"] = data.ToString("dd-MM-yyyy"),
+                ["materiais"] = new JsonArray()
+            };
+
+            // Adiciona materiais ao registro
             foreach (var (nome, peso) in itensEstoque)
-                jsonObj[nome] = JsonValue.Create(peso);
-            jsonObj["status"] = "Adicionado ao estoque";
+            {
+                var mat = new JsonObject
+                {
+                    ["descricao"] = nome,
+                    ["peso"] = JsonValue.Create(peso)
+                };
+                reg["materiais"]!.AsArray().Add(mat);
+            }
 
-            var conteudo = jsonObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-            await System.IO.File.WriteAllTextAsync(jsonPath, conteudo);
+            registros.Add(reg);
+
+            // Salva arquivo atualizado
+            var jsonOpts = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+            var conteudo = root.ToJsonString(jsonOpts);
+            await File.WriteAllTextAsync(compraJsonPath, conteudo);
 
             // Valida que o JSON foi criado corretamente
-            if (!System.IO.File.Exists(jsonPath) || new System.IO.FileInfo(jsonPath).Length == 0)
-                throw new InvalidOperationException($"Falha ao criar o arquivo JSON do recibo no banco de dados: {jsonPath}");
-
-            // Soma diretamente no estoque.json
-            AtualizarStatusTela("Atualizando estoque...");
-            var totaisEstoque = EstoqueViewModel.LerEstoque(RootDir);
-            foreach (var (nome, peso) in itensEstoque)
-                totaisEstoque[nome] = (totaisEstoque.TryGetValue(nome, out var ant) ? ant : 0m) + peso;
-            EstoqueViewModel.GravarEstoque(RootDir, totaisEstoque);
+            if (!File.Exists(compraJsonPath) || new FileInfo(compraJsonPath).Length == 0)
+                throw new InvalidOperationException($"Falha ao criar o arquivo JSON do recibo no banco de dados: {compraJsonPath}");
 
             // Publica via Git se repo clonado
             var bancoDadosGit = Path.Combine(bancoDadosDir, ".git");
             if (Directory.Exists(bancoDadosGit))
             {
                 AtualizarStatusTela("Enviando banco-de-dados ao GitHub...");
-                await GitHubService.PublicarJsonBancoDadosAsync(RootDir, nomeJson, conteudo,
-                    msg => AtualizarStatusTela(msg));
-                var estoqueConteudo = await System.IO.File.ReadAllTextAsync(
-                    Path.Combine(bancoDadosDir, "estoque.json"));
-                await GitHubService.PublicarJsonBancoDadosAsync(RootDir, "estoque.json", estoqueConteudo,
+                await GitHubService.PublicarJsonBancoDadosAsync(RootDir, compraJsonFile, conteudo,
                     msg => AtualizarStatusTela(msg));
             }
 
@@ -1306,6 +1340,7 @@ public enum AppPage
     Recibos,
     Calculadora,
     Estoque,
-    Venda
+    Venda,
+    EstoqueInicial
 }
 

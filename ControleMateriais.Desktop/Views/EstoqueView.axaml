@@ -17,13 +17,23 @@
                    VerticalAlignment="Center"/>
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Content="&#x1F4E6; Estoque Inicial"
+                Command="{Binding IrParaEstoqueInicialCommand}"
+                ToolTip.Tip="Definir o estoque inicial do mês"/>
         <Button Content="&#x1F4B0; Venda"
                 Command="{Binding IrParaVendaCommand}"
                 ToolTip.Tip="Registrar uma venda e subtrair do estoque"/>
+        <Button Content="&#x1F4C8; Migrar Vendas"
+                Command="{Binding MigrarVendasCommand}"
+                IsEnabled="{Binding !Migrando}"
+                ToolTip.Tip="Gerar arquivos venda-DD-MM-YYYY.json a partir dos PDFs existentes"/>
         <Button Content="&#8679; Sincronizar"
                 Command="{Binding SincronizarGitCommand}"
                 IsEnabled="{Binding !Sincronizando}"
-                ToolTip.Tip="Pull do repositório banco-de-dados e publica estoque.json atualizado"/>
+                ToolTip.Tip="Pull do repositório banco-de-dados"/>
+        <Button Content="&#x27F3; Atualizar Estoque"
+                Command="{Binding AtualizarEstoqueCommand}"
+                ToolTip.Tip="Recalcular estoque a partir dos arquivos atuais"/>
       </StackPanel>
     </Grid>
 
@@ -35,8 +45,22 @@
                FontSize="12" Foreground="#4CAF50"
                Margin="0,4,0,4"/>
 
+    <!-- Seletor de Estoque Inicial -->
+    <Grid Grid.Row="2" Margin="0,0,0,8" ColumnDefinitions="Auto,Auto,*">
+      <TextBlock Grid.Column="0" Text="Estoque Inicial:"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource Brush.TextPrimary}"
+                 Margin="0,0,8,0"/>
+      <ComboBox Grid.Column="1"
+                ItemsSource="{Binding EstoquesIniciaisDisponiveis}"
+                SelectedItem="{Binding EstoqueInicialSelecionado}"
+                Width="200"
+                HorizontalAlignment="Left"
+                ToolTip.Tip="Selecione o estoque inicial do mês/ano desejado"/>
+    </Grid>
+
     <!-- Abas: Estoque | Recibos de Venda -->
-    <TabControl Grid.Row="2" x:Name="MainTabControl">
+    <TabControl Grid.Row="3" x:Name="MainTabControl">
 
       <!-- ── ABA ESTOQUE ─────────────────────────────────────────── -->
       <TabItem Header="Estoque">

@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Windows.Input;
+using System.Text.Json.Nodes;
 
 namespace ControleMateriais.Desktop.ViewModels;
 
@@ -497,30 +498,44 @@ public class PesagensViewModel : ViewModelBase
     {
         try
         {
-            var nomeArquivoPdf  = Path.GetFileName(item.CaminhoCompleto);
-            var nomeArquivoJson = Path.GetFileNameWithoutExtension(nomeArquivoPdf) + ".json";
-            var bancoDadosDir   = GitHubService.BancoDadosRepoDir(RootDir);
-            var jsonPath        = Path.Combine(bancoDadosDir, nomeArquivoJson);
+            var nomeArquivoPdf = Path.GetFileName(item.CaminhoCompleto);
 
-            // Subtrai do estoque.json os valores desse recibo antes de remover
-            if (File.Exists(jsonPath))
+            // Extrair dados do .meta.json se existir, ou usar dados do item
+            string cliente = item.NomeArquivo;
+            string data = item.DataCriacao; // Formato dd/MM/yyyy
+            var metaPath = item.CaminhoCompleto + ".meta.json";
+            if (File.Exists(metaPath))
             {
-                var itens         = EstoqueViewModel.LerItensJson(jsonPath);
-                var totaisEstoque = EstoqueViewModel.LerEstoque(RootDir);
-                foreach (var kv in itens)
+                try
                 {
-                    if (totaisEstoque.TryGetValue(kv.Key, out var atual))
-                        totaisEstoque[kv.Key] = atual - kv.Value;
+                    var node = JsonNode.Parse(File.ReadAllText(metaPath));
+                    if (node?["cliente"] is JsonNode nc) cliente = nc.GetValue<string>();
+                    if (node?["data"] is JsonNode nd) data = nd.GetValue<string>();
                 }
-                EstoqueViewModel.GravarEstoque(RootDir, totaisEstoque);
+                catch { }
+            }
+
+            // Remover registro do JSON de compras
+            bool jsonModificado = GitHubService.RemoverRegistroDoJson(RootDir, "compra", cliente, data);
+
+            // Sincronizar JSON modificado com GitHub
+            if (jsonModificado && GitHubService.CredenciaisExistem(RootDir))
+            {
+                var mesAno = DateTime.ParseExact(data, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture).ToString("MM-yyyy");
+                var nomeJson = $"compra-{mesAno}.json";
+                MostrarStatusRecibos("Removendo dados do banco-de-dados...", ok: true);
+                await GitHubService.RemoverJsonBancoDadosAsync(RootDir,
+                    nomeJson,
+                    msg => MostrarStatusRecibos(msg, ok: true));
             }
 
             // Remove arquivo PDF local
             if (File.Exists(item.CaminhoCompleto))
                 File.Delete(item.CaminhoCompleto);
 
-            // Remove .json do banco-de-dados local
-            if (File.Exists(jsonPath)) File.Delete(jsonPath);
+            // Remove .meta.json se existir
+            if (File.Exists(metaPath))
+                File.Delete(metaPath);
 
             // Remove do Git e faz push
             if (GitHubService.CredenciaisExistem(RootDir))
@@ -529,14 +544,11 @@ public class PesagensViewModel : ViewModelBase
                 await GitHubService.RemoverReciboAsync(RootDir,
                     nomeArquivoPdf,
                     msg => MostrarStatusRecibos(msg, ok: true));
-
-                MostrarStatusRecibos("Removendo dados do banco-de-dados...", ok: true);
-                await GitHubService.RemoverJsonBancoDadosAsync(RootDir,
-                    nomeArquivoJson,
-                    msg => MostrarStatusRecibos(msg, ok: true));
-
                 MostrarStatusRecibos(string.Empty, ok: true);
             }
+
+            // Recalcular estoque
+            EstoqueRecarregarCallback?.Invoke();
         }
         catch (Exception ex)
         {
@@ -732,8 +744,9 @@ public class PesagensViewModel : ViewModelBase
         if (ConfirmarReconstruirBancoDadosCallback is not null)
         {
             var ok = await ConfirmarReconstruirBancoDadosCallback(
-                "Esta ação irá apagar todos os JSONs em banco-de-dados/ e recriá-los a partir dos PDFs de recibos.\n\n" +
-                "O estoque.json será recalculado somando todas as pesagens e subtraindo as vendas.\n\n" +
+                "Esta ação irá apagar todos os arquivos compra-MM-YYYY.json e venda-DD-MM-YYYY.json em banco-de-dados/\n" +
+                "mantendo apenas estoque-inicial-MM-YYYY.json.\n\n" +
+                "Os arquivos serão recriados a partir dos PDFs de recibos usando a nova estrutura.\n\n" +
                 "Deseja continuar?");
             if (!ok) return;
         }

@@ -1016,7 +1016,7 @@ public static class GitHubService
     public static async Task<List<(string Arquivo, string Cliente, string Data)>> PullBancoDadosAsync(
         string rootDir, Action<string> progresso)
     {
-        var novos = new List<(string, string, string)>();
+        var novos = new List<(string Arquivo, string Cliente, string Data)>();
         if (!CredenciaisExistem(rootDir)) return novos;
         var creds = CarregarCredenciais(rootDir)!;
         if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return novos;
@@ -1058,14 +1058,14 @@ public static class GitHubService
             {
                 var json = JsonNode.Parse(await File.ReadAllTextAsync(fullPath));
                 var registros = json?["registros"]?.AsArray();
-                if (registros is null) { novos.Add((Arquivo: arquivo, Cliente: "", Data: "")); continue; }
+                if (registros is null) { novos.Add((arquivo, "", "")); continue; }
                 foreach (var reg in registros)
                 {
                     var nome = reg?["nome"]?.GetValue<string>() ?? "";
                     var data = reg?["data-recibo"]?.GetValue<string>()
                             ?? reg?["data"]?.GetValue<string>()
                             ?? "";
-                    novos.Add((Arquivo: arquivo, Cliente: nome, Data: data));
+                    novos.Add((arquivo, nome, data));
                 }
             }
             catch { novos.Add((arquivo, "", "")); }

@@ -55,22 +55,12 @@ public partial class MainWindow : Window
         e.Cancel = true;
         _sincronizandoAoFechar = true;
 
-        var dlg = new SincronizandoDialog();
-        _ = dlg.ShowDialog(this);
-
         try
         {
-            await GitHubService.SincronizarTudoAoFecharAsync(
-                MainWindowViewModel.RootDirPublic,
-                msg => dlg.AtualizarStatus(msg));
-            dlg.MarcarConcluido();
+            var dialog = new SincronizandoFechamentoDialog(MainWindowViewModel.RootDirPublic);
+            await dialog.ShowDialog(this);
         }
-        catch (Exception ex)
-        {
-            dlg.MarcarErro(ex.Message);
-            _sincronizandoAoFechar = false;
-            return;
-        }
+        catch { }
 
         Close();
     }

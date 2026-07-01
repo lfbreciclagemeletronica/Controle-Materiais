@@ -17,15 +17,12 @@ public partial class VendaView : UserControl
     {
         if (DataContext is VendaViewModel vm)
         {
-            vm.AbrirModalSucesso = async (filePath, nomeArquivo, gitCallback) =>
+            vm.AbrirModalSucesso = async (filePath, nomeArquivo) =>
             {
                 var topLevel = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;
                 if (topLevel is null) return;
-
                 var dialog = new VendaSucessoDialog(nomeArquivo, filePath);
-                var gitTask = dialog.ExecutarGitAsync(gitCallback);
-                _ = dialog.ShowDialog(topLevel);
-                await gitTask;
+                await dialog.ShowDialog(topLevel);
             };
         }
     }

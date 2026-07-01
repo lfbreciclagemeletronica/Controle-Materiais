@@ -49,6 +49,7 @@ public class EstoqueViewModel : ViewModelBase
     public ObservableCollection<EstoqueItem>    Itens        { get; } = new();
     public ObservableCollection<ReciboVendaItem> RecibosVenda { get; } = new();
     public ObservableCollection<string> EstoquesIniciaisDisponiveis { get; } = new();
+    public bool SemEstoqueInicial => EstoquesIniciaisDisponiveis.Count == 0;
 
     private string _estoqueInicialSelecionado = string.Empty;
     private bool _recarregando = false;
@@ -103,6 +104,9 @@ public class EstoqueViewModel : ViewModelBase
 
     // Callback para confirmar exclusão
     public Func<string, Task<bool>>? ConfirmarExclusaoCallback { get; set; }
+
+    // Callback para exibir modal de etapas concluídas
+    public Func<List<string>, Task>? AbrirModalExclusaoCallback { get; set; }
 
     private string _status = string.Empty;
     public string Status
@@ -179,9 +183,10 @@ public class EstoqueViewModel : ViewModelBase
             var ok = await ConfirmarExclusaoCallback($"Excluir recibo \"{item.NomeArquivo}\"?");
             if (!ok) return;
         }
+        var etapas = new List<string>();
         try
         {
-            // Extrair dados do meta.json antes de deletar
+            // 1. Extrair dados do meta.json
             string cliente = item.NomeCliente;
             string data = item.DataCriacao;
             var metaPath = item.CaminhoCompleto + ".meta.json";
@@ -196,23 +201,51 @@ public class EstoqueViewModel : ViewModelBase
                 catch { }
             }
 
-            // Remover registro do JSON de vendas
+            // 2. Remover registro do JSON de vendas (operação local)
+            Status = $"Buscando: cliente='{cliente}', data='{data}'";
             bool jsonModificado = GitHubService.RemoverRegistroDoJson(_rootDir, "venda", cliente, data);
 
-            // Sincronizar JSON modificado com GitHub
-            if (jsonModificado && GitHubService.CredenciaisExistem(_rootDir))
+            if (jsonModificado)
             {
-                var mesAno = DateTime.ParseExact(data, "dd/MM/yyyy", CultureInfo.InvariantCulture).ToString("dd-MM-yyyy");
-                var nomeJson = $"venda-{mesAno}.json";
-                await GitHubService.RemoverJsonBancoDadosAsync(_rootDir, nomeJson, msg => Status = msg);
+                var dataFmt = DateTime.ParseExact(data, "dd/MM/yyyy", CultureInfo.InvariantCulture).ToString("dd-MM-yyyy");
+                var nomeJson = $"venda-{dataFmt}.json";
+                var jsonPath = Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), nomeJson);
+
+                if (File.Exists(jsonPath))
+                {
+                    // Arquivo ainda tem outros registros → commit com versão atualizada
+                    var conteudo = await File.ReadAllTextAsync(jsonPath);
+                    await GitHubService.CommitJsonBancoDadosAsync(_rootDir, nomeJson, conteudo, msg => Status = msg);
+                    etapas.Add("Registro removido do banco de dados");
+                    etapas.Add("Banco de dados atualizado localmente");
+                }
+                else
+                {
+                    // Era o único registro → commit de remoção
+                    await GitHubService.CommitRemoverJsonBancoDadosAsync(_rootDir, nomeJson, msg => Status = msg);
+                    etapas.Add("Registro removido do banco de dados");
+                    etapas.Add("Arquivo do banco de dados removido localmente");
+                }
+            }
+            else
+            {
+                etapas.Add("Nenhum registro encontrado no banco de dados");
             }
 
-            // Deletar PDF e meta.json
+            // 3. Deletar PDF e meta.json
             if (File.Exists(item.CaminhoCompleto)) File.Delete(item.CaminhoCompleto);
             if (File.Exists(metaPath)) File.Delete(metaPath);
+            etapas.Add("Recibo PDF excluído");
 
-            // Recarregar para recalcular estoque
+            // 4. Recarregar para recalcular estoque
             Recarregar();
+            etapas.Add("Estoque recalculado");
+
+            Status = string.Empty;
+
+            // 5. Abrir modal com etapas concluídas
+            if (AbrirModalExclusaoCallback is not null)
+                await AbrirModalExclusaoCallback(etapas);
         }
         catch (Exception ex) { Status = $"Erro ao excluir: {ex.Message}"; }
     }
@@ -223,7 +256,7 @@ public class EstoqueViewModel : ViewModelBase
         get
         {
             if (string.IsNullOrEmpty(EstoqueInicialSelecionado))
-                return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), "estoque-inicial.json");
+                return string.Empty;
             return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), $"{EstoqueInicialSelecionado}.json");
         }
     }
@@ -254,6 +287,8 @@ public class EstoqueViewModel : ViewModelBase
             else
                 EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
         }
+
+        OnPropertyChanged(nameof(SemEstoqueInicial));
     }
 
     // Método público para carregar a lista de estoques iniciais (chamado pela View)
@@ -265,15 +300,20 @@ public class EstoqueViewModel : ViewModelBase
     // ── Lê estoque-inicial-MM-YYYY.json ────────────────────────────────────────
     private Dictionary<string, decimal> LerEstoqueInicial()
     {
-        if (!File.Exists(EstoqueInicialPath))
+        var path = EstoqueInicialPath;
+        if (string.IsNullOrEmpty(path))
         {
-            if (!string.IsNullOrEmpty(EstoqueInicialSelecionado))
-                Status = "Não existe estoque inicial para o mês/ano selecionado.";
+            Status = "Nenhum estoque inicial encontrado. Clique em Sincronizar ou acesse Estoque Inicial.";
+            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        }
+        if (!File.Exists(path))
+        {
+            Status = "Não existe estoque inicial para o mês/ano selecionado.";
             return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         }
         try
         {
-            var obj = JsonNode.Parse(File.ReadAllText(EstoqueInicialPath))?.AsObject();
+            var obj = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
             if (obj is null) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in obj)
@@ -542,7 +582,7 @@ public class EstoqueViewModel : ViewModelBase
     }
 
     // ── Pull Git + processa novos JSONs remotos ────────────────────────────
-    private async Task SincronizarGitAsync()
+    public async Task SincronizarGitAsync()
     {
         if (Sincronizando) return;
         Sincronizando = true;
@@ -557,6 +597,7 @@ public class EstoqueViewModel : ViewModelBase
             await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             Status = "Sincronizado — estoque atualizado.";
 
+            CarregarListaEstoquesIniciais();
             Recarregar();
         }
         catch (Exception ex)

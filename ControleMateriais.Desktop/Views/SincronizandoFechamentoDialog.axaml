@@ -1,0 +1,134 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
+        x:Class="ControleMateriais.Desktop.Views.SincronizandoFechamentoDialog"
+        x:DataType="vm:SincronizandoFechamentoViewModel"
+        Title="Sincronizando..."
+        Width="500"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="32,28" Background="{DynamicResource Brush.Surface}">
+    <StackPanel Spacing="20">
+
+      <!-- Título -->
+      <TextBlock Text="Sincronizando repositórios"
+                 FontSize="16" FontWeight="Bold"
+                 Foreground="{DynamicResource Brush.TextPrimary}"
+                 HorizontalAlignment="Center"/>
+
+      <TextBlock Text="Aguarde enquanto os dados são enviados ao GitHub..."
+                 FontSize="12"
+                 Foreground="{DynamicResource Brush.TextSecondary}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"/>
+
+      <!-- Cards dos repositórios -->
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+
+        <!-- Recibos -->
+        <Border Background="#111111"
+                BorderBrush="#4CAF50"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="14,10"
+                MinWidth="130">
+          <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="22,*">
+              <ProgressBar Grid.Column="0"
+                           IsVisible="{Binding SyncRecibos.IsLoading}"
+                           IsIndeterminate="True"
+                           Width="14" Height="14"
+                           Foreground="#4CAF50"
+                           VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="0" IsVisible="{Binding SyncRecibos.IsOk}"
+                         Text="✓" Foreground="#4CAF50" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="0" IsVisible="{Binding SyncRecibos.IsError}"
+                         Text="✗" Foreground="#F44336" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1"
+                         Text="{Binding SyncRecibos.Label}"
+                         Foreground="White" FontSize="12" FontWeight="SemiBold"
+                         VerticalAlignment="Center" Margin="5,0,0,0"/>
+            </Grid>
+            <TextBlock Text="{Binding SyncRecibos.Mensagem}"
+                       Foreground="#66BB6A" FontSize="10" TextWrapping="Wrap"
+                       Margin="22,0,0,0"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Pesagens -->
+        <Border Background="#111111"
+                BorderBrush="#2196F3"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="14,10"
+                MinWidth="130">
+          <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="22,*">
+              <ProgressBar Grid.Column="0"
+                           IsVisible="{Binding SyncPesagens.IsLoading}"
+                           IsIndeterminate="True"
+                           Width="14" Height="14"
+                           Foreground="#2196F3"
+                           VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="0" IsVisible="{Binding SyncPesagens.IsOk}"
+                         Text="✓" Foreground="#4CAF50" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="0" IsVisible="{Binding SyncPesagens.IsError}"
+                         Text="✗" Foreground="#F44336" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1"
+                         Text="{Binding SyncPesagens.Label}"
+                         Foreground="White" FontSize="12" FontWeight="SemiBold"
+                         VerticalAlignment="Center" Margin="5,0,0,0"/>
+            </Grid>
+            <TextBlock Text="{Binding SyncPesagens.Mensagem}"
+                       Foreground="#64B5F6" FontSize="10" TextWrapping="Wrap"
+                       Margin="22,0,0,0"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Banco de Dados -->
+        <Border Background="#111111"
+                BorderBrush="#FF9800"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="14,10"
+                MinWidth="130">
+          <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="22,*">
+              <ProgressBar Grid.Column="0"
+                           IsVisible="{Binding SyncBancoDados.IsLoading}"
+                           IsIndeterminate="True"
+                           Width="14" Height="14"
+                           Foreground="#FF9800"
+                           VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="0" IsVisible="{Binding SyncBancoDados.IsOk}"
+                         Text="✓" Foreground="#4CAF50" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="0" IsVisible="{Binding SyncBancoDados.IsError}"
+                         Text="✗" Foreground="#F44336" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1"
+                         Text="{Binding SyncBancoDados.Label}"
+                         Foreground="White" FontSize="12" FontWeight="SemiBold"
+                         VerticalAlignment="Center" Margin="5,0,0,0"/>
+            </Grid>
+            <TextBlock Text="{Binding SyncBancoDados.Mensagem}"
+                       Foreground="#FFCC80" FontSize="10" TextWrapping="Wrap"
+                       Margin="22,0,0,0"/>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+
+      <!-- Botão fechar (habilitado após concluir) -->
+      <Button x:Name="FecharBtn"
+              Content="Fechar"
+              HorizontalAlignment="Center"
+              Width="120"
+              IsVisible="{Binding Concluido}"
+              Click="Fechar_Click"/>
+
+    </StackPanel>
+  </Border>
+
+</Window>

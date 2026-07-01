@@ -13,8 +13,7 @@ public partial class EstoqueView : UserControl
         {
             if (DataContext is EstoqueViewModel vm)
             {
-                vm.CarregarListaEstoquesIniciais();
-                vm.Recarregar();
+                _ = vm.SincronizarGitAsync();
                 vm.ConfirmarExclusaoCallback = async msg =>
                 {
                     var topLevel = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;
@@ -22,6 +21,13 @@ public partial class EstoqueView : UserControl
                     var dlg = new ConfirmDeleteDialog(msg);
                     await dlg.ShowDialog(topLevel);
                     return dlg.Confirmado;
+                };
+                vm.AbrirModalExclusaoCallback = async etapas =>
+                {
+                    var topLevel = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;
+                    if (topLevel is null) return;
+                    var dlg = new ExclusaoReciboSucessoDialog(etapas);
+                    await dlg.ShowDialog(topLevel);
                 };
             }
         };

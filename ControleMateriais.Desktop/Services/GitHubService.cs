@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -276,9 +278,7 @@ public static class GitHubService
                     }
                     else if (tipo.Equals("venda", StringComparison.OrdinalIgnoreCase))
                     {
-                        var regData = regObj.ContainsKey("data") ? regObj["data"]!.GetValue<string>() : string.Empty;
-                        deveRemover = nome.Equals(cliente, StringComparison.OrdinalIgnoreCase) &&
-                                      regData.Equals(campoData, StringComparison.OrdinalIgnoreCase);
+                        deveRemover = nome.Equals(cliente, StringComparison.OrdinalIgnoreCase);
                     }
 
                     if (!deveRemover)
@@ -898,6 +898,428 @@ public static class GitHubService
 
     public static Task<(int exitCode, string stdout, string stderr)> RunGit(string args, string workDir) =>
         RunAsync("git", args, workDir);
+
+    /// <summary>
+    /// Pull simples do repo Recibos. Retorna lista de (NomeCliente, Data) dos PDFs novos
+    /// detectados via git diff após o rebase.
+    /// </summary>
+    public static async Task<List<(string Nome, string Data)>> PullRecibosAsync(
+        string rootDir, Action<string> progresso)
+    {
+        var novos = new List<(string, string)>();
+        if (!CredenciaisExistem(rootDir)) return novos;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return novos;
+
+        var repoDir   = RecibosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+        var remoteUrl = InjetarToken(creds.UrlRecibos, creds.Token);
+
+        if (!Directory.Exists(gitDir))
+        {
+            progresso("Clonando repositório de Recibos...");
+            Directory.CreateDirectory(repoDir);
+            var cloneR = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (cloneR.exitCode != 0)
+                throw new Exception(ClassificarErroGit(cloneR.stderr, "clone de Recibos"));
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+            return novos;
+        }
+
+        progresso("Buscando novos recibos...");
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+        // Salva HEAD antes do pull para poder diff depois
+        var headAntes = await RunAsync("git", "rev-parse HEAD", repoDir);
+        var stash = await RunAsync("git", "stash --include-untracked", repoDir);
+        var temStash = stash.exitCode == 0 && !stash.stdout.Contains("No local changes");
+        var fetchR = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetchR.exitCode != 0)
+            throw new Exception(ClassificarErroGit(fetchR.stderr, "fetch de Recibos"));
+        var rebaseR = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebaseR.exitCode != 0)
+            throw new Exception(ClassificarErroGit(rebaseR.stderr, "rebase de Recibos"));
+        if (temStash) await RunAsync("git", "stash pop", repoDir);
+
+        // Detectar arquivos novos
+        var shaAntes = headAntes.exitCode == 0 ? headAntes.stdout.Trim() : string.Empty;
+        if (!string.IsNullOrEmpty(shaAntes))
+        {
+            var diff = await RunAsync("git", $"diff --name-only --diff-filter=A {shaAntes} HEAD", repoDir);
+            foreach (var line in diff.stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var arquivo = line.Trim();
+                if (!arquivo.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) continue;
+                // Nome do arquivo: NomeCliente_dd-MM-yyyy.pdf
+                var semExt = Path.GetFileNameWithoutExtension(arquivo);
+                var m1 = System.Text.RegularExpressions.Regex.Match(semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4})(_\d{2}-\d{2})?$");
+                if (m1.Success)
+                    novos.Add((m1.Groups[1].Value.Replace("_", " "), m1.Groups[2].Value));
+                else
+                    novos.Add((semExt, ""));
+            }
+        }
+        return novos;
+    }
+
+    /// <summary>
+    /// Pull simples do repo Pesagens. Retorna lista de (NomeCliente, Data) dos JSONs novos.
+    /// </summary>
+    public static async Task<List<(string Nome, string Data)>> PullPesagensAsync(
+        string rootDir, Action<string> progresso)
+    {
+        var novos = new List<(string, string)>();
+        if (!CredenciaisExistem(rootDir)) return novos;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlPesagens)) return novos;
+
+        var repoDir   = RepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+        var remoteUrl = InjetarToken(creds.UrlPesagens, creds.Token);
+
+        if (!Directory.Exists(gitDir))
+        {
+            progresso("Clonando repositório de Pesagens...");
+            Directory.CreateDirectory(repoDir);
+            var cloneP = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (cloneP.exitCode != 0)
+                throw new Exception(ClassificarErroGit(cloneP.stderr, "clone de Pesagens"));
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+            return novos;
+        }
+
+        progresso("Buscando novas pesagens...");
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+        var headAntes = await RunAsync("git", "rev-parse HEAD", repoDir);
+        var fetchP = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetchP.exitCode != 0)
+            throw new Exception(ClassificarErroGit(fetchP.stderr, "fetch de Pesagens"));
+        var rebaseP = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebaseP.exitCode != 0)
+            throw new Exception(ClassificarErroGit(rebaseP.stderr, "rebase de Pesagens"));
+
+        var shaAntes = headAntes.exitCode == 0 ? headAntes.stdout.Trim() : string.Empty;
+        if (!string.IsNullOrEmpty(shaAntes))
+        {
+            var diff = await RunAsync("git", $"diff --name-only --diff-filter=A {shaAntes} HEAD", repoDir);
+            foreach (var line in diff.stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var arquivo = line.Trim();
+                if (!arquivo.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
+                var semExt = Path.GetFileNameWithoutExtension(arquivo);
+                var m1 = System.Text.RegularExpressions.Regex.Match(semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4})(_\d{2}-\d{2})?$");
+                if (m1.Success)
+                    novos.Add((m1.Groups[1].Value.Replace("_", " "), m1.Groups[2].Value));
+                else
+                    novos.Add((semExt, ""));
+            }
+        }
+        return novos;
+    }
+
+    /// <summary>
+    /// Pull simples do repo BancoDados. Retorna lista de (Arquivo, Cliente, Data) de registros novos.
+    /// </summary>
+    public static async Task<List<(string Arquivo, string Cliente, string Data)>> PullBancoDadosAsync(
+        string rootDir, Action<string> progresso)
+    {
+        var novos = new List<(string Arquivo, string Cliente, string Data)>();
+        if (!CredenciaisExistem(rootDir)) return novos;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return novos;
+
+        var repoDir   = BancoDadosRepoDir(rootDir);
+        var gitDir    = Path.Combine(repoDir, ".git");
+        var remoteUrl = InjetarToken(creds.UrlBancoDados, creds.Token);
+
+        if (!Directory.Exists(gitDir))
+        {
+            progresso("Clonando repositório banco-de-dados...");
+            Directory.CreateDirectory(repoDir);
+            var cloneB = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (cloneB.exitCode != 0)
+                throw new Exception(ClassificarErroGit(cloneB.stderr, "clone de Banco de Dados"));
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+            return novos;
+        }
+
+        progresso("Buscando novos registros...");
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+        var headAntes = await RunAsync("git", "rev-parse HEAD", repoDir);
+        var fetchB = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetchB.exitCode != 0)
+            throw new Exception(ClassificarErroGit(fetchB.stderr, "fetch de Banco de Dados"));
+        var rebaseB = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebaseB.exitCode != 0)
+            throw new Exception(ClassificarErroGit(rebaseB.stderr, "rebase de Banco de Dados"));
+
+        var shaAntes = headAntes.exitCode == 0 ? headAntes.stdout.Trim() : string.Empty;
+        if (string.IsNullOrEmpty(shaAntes)) return novos;
+
+        // Arquivos modificados ou adicionados
+        var diff = await RunAsync("git", $"diff --name-only --diff-filter=AM {shaAntes} HEAD", repoDir);
+        foreach (var line in diff.stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var arquivo = line.Trim();
+            if (!arquivo.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
+            var fullPath = Path.Combine(repoDir, arquivo);
+            if (!File.Exists(fullPath)) continue;
+            try
+            {
+                var json = JsonNode.Parse(await File.ReadAllTextAsync(fullPath));
+                var registros = json?["registros"]?.AsArray();
+                if (registros is null) { novos.Add((arquivo, "", "")); continue; }
+                foreach (var reg in registros)
+                {
+                    var nome = reg?["nome"]?.GetValue<string>() ?? "";
+                    var data = reg?["data-recibo"]?.GetValue<string>()
+                            ?? reg?["data"]?.GetValue<string>()
+                            ?? "";
+                    novos.Add((arquivo, nome, data));
+                }
+            }
+            catch { novos.Add((arquivo, "", "")); }
+        }
+        return novos;
+    }
+
+    /// <summary>
+    /// Commita o .json no repo banco-de-dados SEM fetch/rebase e SEM push.
+    /// Use durante a sessão; o push ocorre ao fechar o app.
+    /// </summary>
+    public static async Task CommitJsonBancoDadosAsync(string rootDir, string nomeArquivo, string conteudoJson,
+                                                        Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return;
+
+        var repoDir = BancoDadosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        var destino = Path.Combine(repoDir, nomeArquivo);
+        await System.IO.File.WriteAllTextAsync(destino, conteudoJson);
+
+        progresso?.Invoke("Salvando registro no banco de dados...");
+        await RunAsync("git", $"add \"{nomeArquivo}\"", repoDir);
+        await RunAsync("git", $"commit -m \"Atualizar dados {nomeArquivo}\"", repoDir);
+        progresso?.Invoke("Registro salvo localmente.");
+    }
+
+    /// <summary>
+    /// Remove o .json do repo banco-de-dados via git rm SEM fetch/rebase e SEM push.
+    /// Use durante a sessão; o push ocorre ao fechar o app.
+    /// </summary>
+    public static async Task CommitRemoverJsonBancoDadosAsync(string rootDir, string nomeArquivo,
+                                                               Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+
+        var repoDir = BancoDadosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+
+        if (!Directory.Exists(gitDir))
+        {
+            var localPath = Path.Combine(repoDir, nomeArquivo);
+            if (System.IO.File.Exists(localPath)) System.IO.File.Delete(localPath);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return;
+
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Removendo registro do banco de dados...");
+        var rm = await RunAsync("git", $"rm --ignore-unmatch \"{nomeArquivo}\"", repoDir);
+
+        var filePath = Path.Combine(repoDir, nomeArquivo);
+        if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
+
+        if (rm.exitCode == 0 && !string.IsNullOrWhiteSpace(rm.stdout))
+        {
+            await RunAsync("git", $"commit -m \"Excluir dados {nomeArquivo}\"", repoDir);
+            progresso?.Invoke("Registro removido localmente.");
+        }
+    }
+
+    /// <summary>
+    /// Copia PDF + .meta.json para Recibos_Venda e commita SEM fetch/rebase e SEM push.
+    /// Use durante a sessão; o push ocorre ao fechar o app.
+    /// </summary>
+    public static async Task CommitReciboVendaLocalAsync(string rootDir, string filePath, string mensagemCommit,
+                                                          Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlRecibos)) return;
+
+        var repoDir = RecibosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        var subDir = Path.Combine(repoDir, "Recibos_Venda");
+        Directory.CreateDirectory(subDir);
+
+        var destPdf = Path.Combine(subDir, Path.GetFileName(filePath));
+        File.Copy(filePath, destPdf, overwrite: true);
+        var relPdf = Path.Combine("Recibos_Venda", Path.GetFileName(filePath)).Replace('\\', '/');
+
+        var metaOrigem = filePath + ".meta.json";
+        var metaNome   = Path.GetFileName(filePath) + ".meta.json";
+        var relMeta    = Path.Combine("Recibos_Venda", metaNome).Replace('\\', '/');
+        if (File.Exists(metaOrigem))
+            File.Copy(metaOrigem, Path.Combine(subDir, metaNome), overwrite: true);
+
+        progresso?.Invoke("Adicionando recibo ao repositório local...");
+        await RunAsync("git", $"add \"{relPdf}\"", repoDir);
+        if (File.Exists(metaOrigem))
+            await RunAsync("git", $"add \"{relMeta}\"", repoDir);
+
+        await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
+        progresso?.Invoke("Recibo registrado localmente.");
+    }
+
+    /// <summary>
+    /// Faz fetch + rebase + push de todos os repositórios com commits pendentes.
+    /// Chamado apenas ao fechar o aplicativo.
+    /// </summary>
+    public static async Task SincronizarTudoAoFecharAsync(string rootDir, Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+
+        async Task SincronizarRepo(string repoDir, string remoteUrl, string nomeRepo)
+        {
+            var gitDir = Path.Combine(repoDir, ".git");
+            if (!Directory.Exists(gitDir)) return;
+
+            progresso?.Invoke($"Sincronizando {nomeRepo}...");
+            await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+            await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+            await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+            await RunAsync("git", "fetch origin main", repoDir);
+            await RunAsync("git", "rebase origin/main", repoDir);
+
+            var status = await RunAsync("git", "status --porcelain", repoDir);
+            if (!string.IsNullOrWhiteSpace(status.stdout))
+            {
+                await RunAsync("git", "add .", repoDir);
+                await RunAsync("git", $"commit -m \"Sincronização automática ao fechar\"", repoDir);
+            }
+
+            var log = await RunAsync("git", "log origin/main..HEAD --oneline", repoDir);
+            if (!string.IsNullOrWhiteSpace(log.stdout))
+            {
+                progresso?.Invoke($"Enviando {nomeRepo} ao GitHub...");
+                var branch = await ObterBranchAtual(repoDir);
+                await RunAsync("git", $"push origin {branch}", repoDir);
+                progresso?.Invoke($"{nomeRepo} sincronizado.");
+            }
+            else
+            {
+                progresso?.Invoke($"{nomeRepo} já atualizado.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(creds.UrlBancoDados))
+        {
+            try
+            {
+                await SincronizarRepo(
+                    BancoDadosRepoDir(rootDir),
+                    InjetarToken(creds.UrlBancoDados, creds.Token),
+                    "Banco de Dados");
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Banco de Dados] {ClassificarErroGit(ex.Message, "sincronização de Banco de Dados")}");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(creds.UrlRecibos))
+        {
+            try
+            {
+                await SincronizarRepo(
+                    RecibosRepoDir(rootDir),
+                    InjetarToken(creds.UrlRecibos, creds.Token),
+                    "Recibos");
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Recibos] {ClassificarErroGit(ex.Message, "sincronização de Recibos")}");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(creds.UrlPesagens))
+        {
+            try
+            {
+                await SincronizarRepo(
+                    RepoDir(rootDir),
+                    InjetarToken(creds.UrlPesagens, creds.Token),
+                    "Pesagens");
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Pesagens] {ClassificarErroGit(ex.Message, "sincronização de Pesagens")}");
+            }
+        }
+
+        progresso?.Invoke("Sincronização concluída.");
+    }
+
+    /// <summary>
+    /// Classifica o stderr de um comando git e retorna uma mensagem orientativa.
+    /// </summary>
+    internal static string ClassificarErroGit(string stderr, string operacao)
+    {
+        var s = stderr?.ToLowerInvariant() ?? string.Empty;
+
+        if (s.Contains("authentication failed") || s.Contains("invalid username or password")
+            || s.Contains("bad credentials") || s.Contains("401"))
+            return $"Falha de autenticação em '{operacao}': token inválido ou expirado. " +
+                   "Reconfigure as credenciais do GitHub nas configurações.";
+
+        if (s.Contains("repository not found") || s.Contains("not found") || s.Contains("404")
+            || s.Contains("does not exist"))
+            return $"Repositório não encontrado em '{operacao}'. " +
+                   "Verifique a URL do repositório nas configurações do GitHub.";
+
+        if (s.Contains("unable to connect") || s.Contains("could not resolve host")
+            || s.Contains("network") || s.Contains("failed to connect") || s.Contains("timeout"))
+            return $"Sem conexão em '{operacao}': não foi possível alcançar o GitHub. " +
+                   "Verifique sua conexão com a internet e tente novamente.";
+
+        if (s.Contains("permission denied") || s.Contains("403"))
+            return $"Permissão negada em '{operacao}'. " +
+                   "O token pode não ter acesso a este repositório.";
+
+        if (s.Contains("conflict") || s.Contains("merge conflict"))
+            return $"Conflito de merge em '{operacao}'. " +
+                   "Execute 'git rebase --abort' na pasta do repositório e sincronize novamente.";
+
+        var detalhe = string.IsNullOrWhiteSpace(stderr) ? string.Empty : $"\nDetalhe: {stderr.Trim()}";
+        return $"Erro na operação '{operacao}'.{detalhe}\nTente reiniciar o aplicativo.";
+    }
 
     private static async Task<(int exitCode, string stdout, string stderr)> RunAsync(
         string exe, string args, string? workDir)

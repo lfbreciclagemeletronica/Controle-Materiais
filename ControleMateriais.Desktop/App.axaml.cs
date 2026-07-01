@@ -27,10 +27,7 @@ public partial class App : Application
 
             splash.StartAndShow(() =>
             {
-                var main = new MainWindow
-                {
-                    DataContext = new MainWindowViewModel(),
-                };
+                var main = new MainWindow();
                 desktop.MainWindow = main;
                 main.Show();
             });

@@ -100,30 +100,72 @@
                         Background="#E65100"
                         Foreground="White"
                         ToolTip.Tip="Apaga todos os JSONs e reconstrói o banco-de-dados a partir dos PDFs de recibos"/>
-                <Button Content="⟳ Sincronizar"
-                        IsEnabled="{Binding !SincronizandoRecibos}"
-                        Command="{Binding SincronizarRecibosCommand}"
-                        ToolTip.Tip="Sincronizar recibos com repositório GitHub"/>
               </StackPanel>
             </Grid>
 
             <!-- Mensagem de status (sincronização / erros) -->
-            <TextBlock Grid.Row="1"
-                       Text="{Binding StatusRecibos}"
-                       IsVisible="{Binding StatusRecibosVisivel}"
-                       HorizontalAlignment="Center"
-                       FontSize="12"
-                       Margin="0,2,0,2"
-                       Foreground="{Binding StatusRecibosOk, Converter={StaticResource SyncStatusBrush}}"/>
-
-            <!-- Última sincronização -->
-            <TextBlock Grid.Row="2"
-                       Text="{Binding UltimaSincRecibos}"
-                       IsVisible="{Binding UltimaSincRecibosVisivel}"
-                       HorizontalAlignment="Center"
-                       FontSize="11"
-                       Foreground="#4CAF50"
-                       Margin="0,0,0,4"/>
+            <Border Grid.Row="1"
+                    IsVisible="{Binding SyncRecibos.IsDone}"
+                    Background="#111111"
+                    BorderBrush="#4CAF50"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="14,10"
+                    Margin="0,2,0,4">
+              <StackPanel Spacing="3">
+                <Grid ColumnDefinitions="28,*">
+                  <ProgressBar Grid.Column="0"
+                               IsVisible="{Binding SyncRecibos.IsLoading}"
+                               IsIndeterminate="True"
+                               Width="16" Height="16"
+                               Foreground="#4CAF50"
+                               VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="0"
+                             IsVisible="{Binding SyncRecibos.IsOk}"
+                             Text="✓"
+                             Foreground="#4CAF50"
+                             FontSize="16"
+                             FontWeight="Bold"
+                             VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="0"
+                             IsVisible="{Binding SyncRecibos.IsWarn}"
+                             Text="⚠"
+                             Foreground="#FFC107"
+                             FontSize="15"
+                             VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="0"
+                             IsVisible="{Binding SyncRecibos.IsError}"
+                             Text="✗"
+                             Foreground="#F44336"
+                             FontSize="15"
+                             FontWeight="Bold"
+                             VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1"
+                             Text="{Binding SyncRecibos.Label}"
+                             Foreground="White"
+                             FontSize="13"
+                             FontWeight="SemiBold"
+                             VerticalAlignment="Center"
+                             Margin="6,0,0,0"/>
+                </Grid>
+                <TextBlock Text="{Binding SyncRecibos.Mensagem}"
+                           Foreground="#4CAF50"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="28,0,0,0"/>
+                <ItemsControl ItemsSource="{Binding SyncRecibos.Detalhes}"
+                              Margin="28,1,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding}"
+                                 Foreground="#66BB6A"
+                                 FontSize="10"
+                                 TextWrapping="Wrap"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
 
             <!-- Corpo -->
             <Grid Grid.Row="3">
@@ -137,10 +179,6 @@
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource Brush.TextSecondary}"
                            FontSize="13"/>
-                <Button Content="⟳ Sincronizar agora"
-                        HorizontalAlignment="Center"
-                        IsEnabled="{Binding !SincronizandoRecibos}"
-                        Command="{Binding SincronizarRecibosCommand}"/>
               </StackPanel>
 
               <!-- Lista vazia de PDFs -->
@@ -249,26 +287,71 @@
                               Tag="falhou"
                               Click="FiltroButton_Click"/>
               </StackPanel>
-              <Button Grid.Column="1"
-                      Content="⟳ Sincronizar"
-                      IsEnabled="{Binding !Sincronizando}"
-                      Command="{Binding SincronizarCommand}"
-                      ToolTip.Tip="Sincronizar pesagens com repositório GitHub"/>
             </Grid>
 
             <!-- Status sincronização pesagens -->
-            <StackPanel Grid.Row="1" Margin="0,0,0,6" Spacing="2">
-              <TextBlock Text="{Binding Status}"
-                         IsVisible="{Binding StatusVisivel}"
-                         HorizontalAlignment="Center"
-                         FontSize="12"
-                         Foreground="{Binding StatusOk, Converter={StaticResource SyncStatusBrush}}"/>
-              <TextBlock Text="{Binding UltimaSincPesagens}"
-                         IsVisible="{Binding UltimaSincPesagensVisivel}"
-                         HorizontalAlignment="Center"
-                         FontSize="11"
-                         Foreground="#4CAF50"/>
-            </StackPanel>
+            <Border Grid.Row="1"
+                    IsVisible="{Binding SyncPesagens.IsDone}"
+                    Background="#111111"
+                    BorderBrush="#2196F3"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="14,10"
+                    Margin="0,0,0,6">
+              <StackPanel Spacing="3">
+                <Grid ColumnDefinitions="28,*">
+                  <ProgressBar Grid.Column="0"
+                               IsVisible="{Binding SyncPesagens.IsLoading}"
+                               IsIndeterminate="True"
+                               Width="16" Height="16"
+                               Foreground="#2196F3"
+                               VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="0"
+                             IsVisible="{Binding SyncPesagens.IsOk}"
+                             Text="✓"
+                             Foreground="#4CAF50"
+                             FontSize="16"
+                             FontWeight="Bold"
+                             VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="0"
+                             IsVisible="{Binding SyncPesagens.IsWarn}"
+                             Text="⚠"
+                             Foreground="#FFC107"
+                             FontSize="15"
+                             VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="0"
+                             IsVisible="{Binding SyncPesagens.IsError}"
+                             Text="✗"
+                             Foreground="#F44336"
+                             FontSize="15"
+                             FontWeight="Bold"
+                             VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1"
+                             Text="{Binding SyncPesagens.Label}"
+                             Foreground="White"
+                             FontSize="13"
+                             FontWeight="SemiBold"
+                             VerticalAlignment="Center"
+                             Margin="6,0,0,0"/>
+                </Grid>
+                <TextBlock Text="{Binding SyncPesagens.Mensagem}"
+                           Foreground="#64B5F6"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="28,0,0,0"/>
+                <ItemsControl ItemsSource="{Binding SyncPesagens.Detalhes}"
+                              Margin="28,1,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding}"
+                                 Foreground="#90CAF9"
+                                 FontSize="10"
+                                 TextWrapping="Wrap"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
 
             <!-- Sem repositório local -->
             <StackPanel Grid.Row="2"
@@ -280,10 +363,6 @@
                          HorizontalAlignment="Center"
                          Foreground="{DynamicResource Brush.TextSecondary}"
                          FontSize="13"/>
-              <Button Content="⟳ Sincronizar agora"
-                      HorizontalAlignment="Center"
-                      IsEnabled="{Binding !Sincronizando}"
-                      Command="{Binding SincronizarCommand}"/>
             </StackPanel>
 
             <!-- Lista pesagens -->

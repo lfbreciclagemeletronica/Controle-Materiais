@@ -17,6 +17,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using IContainer = QuestPDF.Infrastructure.IContainer;
@@ -40,6 +41,18 @@ public class MainWindowViewModel : ViewModelBase
     public ObservableCollection<CustomItemWrapper> ItensPersonalizados { get; } = new();
     private decimal _totalGeral;
     private decimal _pesoTotal;
+
+    public SyncItem SyncRecibosStatus   { get; } = new() { Label = "Recibos" };
+    public SyncItem SyncPesagensStatus  { get; } = new() { Label = "Pesagens" };
+    public SyncItem SyncBancoDadosStatus{ get; } = new() { Label = "Banco de Dados" };
+
+    private bool _sincronizandoTudo;
+    public bool SincronizandoTudo
+    {
+        get => _sincronizandoTudo;
+        private set { if (value != _sincronizandoTudo) { _sincronizandoTudo = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusBarVisivel)); } }
+    }
+    public bool StatusBarVisivel => SincronizandoTudo || SyncRecibosStatus.IsDone || SyncPesagensStatus.IsDone || SyncBancoDadosStatus.IsDone;
 
     private decimal _impurezasPesoAtual;
     public decimal ImpurezasPesoAtual
@@ -127,6 +140,8 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand VoltarParaPesagensCommand { get; }
     public ICommand ConfigurarGitHubCommand { get; }
     public ICommand SincronizarRecibosCommand { get; }
+    public ICommand AdicionarCustomItemCommand { get; }
+    public ICommand RemoverCustomItemCommand { get; }
 
     private bool _sincronizandoRecibos;
     public bool SincronizandoRecibos
@@ -300,6 +315,8 @@ public class MainWindowViewModel : ViewModelBase
         RecalcularTotalGeral();
 
         ExportarCommand = new DelegateCommand(async () => await ExportarAsync());
+        AdicionarCustomItemCommand = new DelegateCommand(AdicionarCustomItem);
+        RemoverCustomItemCommand = new DelegateCommand<CustomItemWrapper>(RemoverCustomItem);
 
         TabelaVM = new PriceTableManagerViewModel(Itens);
         TabelaVM.CloseRequested += (_, __) => IsGerindoTabela = false;
@@ -333,6 +350,85 @@ public class MainWindowViewModel : ViewModelBase
         _ = CarregarPrecosNaInicializacaoAsync();
     }
 
+    public async Task SincronizarTudoAsync()
+    {
+        if (!GitConfigurado) return;
+        if (SincronizandoTudo) return;
+        SincronizandoTudo = true;
+
+        SyncRecibosStatus.Status    = SyncStatus.Loading; SyncRecibosStatus.Mensagem    = string.Empty; SyncRecibosStatus.Detalhes.Clear();
+        SyncPesagensStatus.Status   = SyncStatus.Loading; SyncPesagensStatus.Mensagem   = string.Empty; SyncPesagensStatus.Detalhes.Clear();
+        SyncBancoDadosStatus.Status = SyncStatus.Loading; SyncBancoDadosStatus.Mensagem = string.Empty; SyncBancoDadosStatus.Detalhes.Clear();
+
+        await Task.WhenAll(
+            SyncRecibosAsync(),
+            SyncPesagensLocalAsync(),
+            SyncBancoDadosLocalAsync());
+
+        SincronizandoTudo = false;
+        OnPropertyChanged(nameof(StatusBarVisivel));
+    }
+
+    private async Task SyncRecibosAsync()
+    {
+        try
+        {
+            var novos = await GitHubService.PullRecibosAsync(RootDir, msg => { });
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                SyncRecibosStatus.Status = SyncStatus.Ok;
+                SyncRecibosStatus.Mensagem = novos.Count > 0 ? $"{novos.Count} novo(s) recibo(s)" : "Recibos atualizados";
+                foreach (var it in novos) SyncRecibosStatus.Detalhes.Add($"• {it.Nome}");
+            });
+        }
+        catch (Exception ex)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            { SyncRecibosStatus.Status = SyncStatus.Error; SyncRecibosStatus.Mensagem = $"Erro: {ex.Message}"; });
+        }
+    }
+
+    private async Task SyncPesagensLocalAsync()
+    {
+        try
+        {
+            var novos = await GitHubService.PullPesagensAsync(RootDir, msg => { });
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                SyncPesagensStatus.Status = SyncStatus.Ok;
+                SyncPesagensStatus.Mensagem = novos.Count > 0 ? $"{novos.Count} nova(s) pesagem(ns)" : "Pesagens atualizadas";
+                foreach (var it in novos) SyncPesagensStatus.Detalhes.Add($"• {it.Nome}");
+            });
+        }
+        catch (Exception ex)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            { SyncPesagensStatus.Status = SyncStatus.Error; SyncPesagensStatus.Mensagem = $"Erro: {ex.Message}"; });
+        }
+    }
+
+    private async Task SyncBancoDadosLocalAsync()
+    {
+        try
+        {
+            var novos = await GitHubService.PullBancoDadosAsync(RootDir, msg => { });
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                SyncBancoDadosStatus.Status = SyncStatus.Ok;
+                SyncBancoDadosStatus.Mensagem = novos.Count > 0 ? $"{novos.Count} novo(s) registro(s)" : "Banco de dados atualizado";
+            });
+        }
+        catch (Exception ex)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            { SyncBancoDadosStatus.Status = SyncStatus.Error; SyncBancoDadosStatus.Mensagem = $"Erro: {ex.Message}"; });
+        }
+    }
+
+    public void Dispose()
+    {
+    }
+
     private void AbrirReciboDetalhe(PesagemItem pesagem)
     {
         _pesagemAtiva = pesagem;
@@ -343,8 +439,7 @@ public class MainWindowViewModel : ViewModelBase
         // Zera todos os itens e preenche os que vieram da pesagem
         foreach (var it in Itens)
             it.PesoAtual = 0m;
-        foreach (var c in ItensPersonalizados)
-            c.Zerar();
+        ResetItensPersonalizados();
         ImpurezasPesoAtual = 0m;
         ImpurezasPesoTexto = "0,000";
 
@@ -414,8 +509,7 @@ public class MainWindowViewModel : ViewModelBase
         NomeCliente = string.Empty;
         foreach (var it in Itens)
             it.PesoAtual = 0m;
-        foreach (var c in ItensPersonalizados)
-            c.Zerar();
+        ResetItensPersonalizados();
         ImpurezasPesoAtual = 0m;
         ImpurezasPesoTexto = "0,000";
         foreach (var w in ItensEditaveis)
@@ -485,6 +579,39 @@ public class MainWindowViewModel : ViewModelBase
         peso += _impurezasPesoAtual;
         TotalGeral = soma;
         PesoTotal = peso;
+    }
+
+    private void ResetItensPersonalizados()
+    {
+        // Remove all existing custom items and unsubscribe from events
+        foreach (var custom in ItensPersonalizados)
+            custom.TotalChanged -= (_, __) => RecalcularTotalGeral();
+        ItensPersonalizados.Clear();
+
+        // Add exactly 4 new custom items
+        for (int i = 0; i < 4; i++)
+        {
+            var custom = new CustomItemWrapper();
+            custom.TotalChanged += (_, __) => RecalcularTotalGeral();
+            ItensPersonalizados.Add(custom);
+        }
+    }
+
+    private void AdicionarCustomItem()
+    {
+        var custom = new CustomItemWrapper();
+        custom.TotalChanged += (_, __) => RecalcularTotalGeral();
+        ItensPersonalizados.Add(custom);
+    }
+
+    private void RemoverCustomItem(CustomItemWrapper item)
+    {
+        if (ItensPersonalizados.Contains(item))
+        {
+            item.TotalChanged -= (_, __) => RecalcularTotalGeral();
+            ItensPersonalizados.Remove(item);
+            RecalcularTotalGeral();
+        }
     }
 
 
@@ -663,8 +790,7 @@ public class MainWindowViewModel : ViewModelBase
             w.ResetarPeso();
             w.ResetarPreco();
         }
-        foreach (var custom in ItensPersonalizados)
-            custom.Zerar();
+        ResetItensPersonalizados();
         ImpurezasPesoAtual = 0m;
         ImpurezasPesoTexto = "0,000";
         RecalcularTotalGeral();

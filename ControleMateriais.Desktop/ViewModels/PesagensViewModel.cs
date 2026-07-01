@@ -117,20 +117,9 @@ public class PesagensViewModel : ViewModelBase
         OnPropertyChanged(nameof(LabelFalhou));
     }
 
-    private string _status = string.Empty;
-    public string Status
-    {
-        get => _status;
-        private set { if (value != _status) { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusVisivel)); } }
-    }
-    public bool StatusVisivel => !string.IsNullOrEmpty(_status);
-
-    private bool _statusOk = true;
-    public bool StatusOk
-    {
-        get => _statusOk;
-        private set { if (value != _statusOk) { _statusOk = value; OnPropertyChanged(); } }
-    }
+    // ── Sincronização com SyncItem ─────────────────────────────────
+    public SyncItem SyncPesagens { get; } = new() { Label = "Atualizando pesagens do sistema remoto..." };
+    public SyncItem SyncRecibos { get; } = new() { Label = "Atualizando recibos do sistema remoto..." };
 
     private bool _sincronizando;
     public bool Sincronizando
@@ -148,37 +137,6 @@ public class PesagensViewModel : ViewModelBase
         get => _sincronizandoRecibos;
         private set { if (value != _sincronizandoRecibos) { _sincronizandoRecibos = value; OnPropertyChanged(); } }
     }
-
-    private string _statusRecibos = string.Empty;
-    public string StatusRecibos
-    {
-        get => _statusRecibos;
-        private set { if (value != _statusRecibos) { _statusRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusRecibosVisivel)); } }
-    }
-    public bool StatusRecibosVisivel => !string.IsNullOrEmpty(_statusRecibos);
-
-    private bool _statusRecibosOk = true;
-    public bool StatusRecibosOk
-    {
-        get => _statusRecibosOk;
-        private set { if (value != _statusRecibosOk) { _statusRecibosOk = value; OnPropertyChanged(); } }
-    }
-
-    private string _ultimaSincPesagens = string.Empty;
-    public string UltimaSincPesagens
-    {
-        get => _ultimaSincPesagens;
-        private set { if (value != _ultimaSincPesagens) { _ultimaSincPesagens = value; OnPropertyChanged(); OnPropertyChanged(nameof(UltimaSincPesagensVisivel)); } }
-    }
-    public bool UltimaSincPesagensVisivel => !string.IsNullOrEmpty(_ultimaSincPesagens);
-
-    private string _ultimaSincRecibos = string.Empty;
-    public string UltimaSincRecibos
-    {
-        get => _ultimaSincRecibos;
-        private set { if (value != _ultimaSincRecibos) { _ultimaSincRecibos = value; OnPropertyChanged(); OnPropertyChanged(nameof(UltimaSincRecibosVisivel)); } }
-    }
-    public bool UltimaSincRecibosVisivel => !string.IsNullOrEmpty(_ultimaSincRecibos);
 
     public bool RepoPresenteLocal => Directory.Exists(Path.Combine(GitHubService.RepoDir(RootDir), ".git"));
     public bool ListaVazia => RepoPresenteLocal && PesagensFiltradas.Count == 0;
@@ -360,22 +318,24 @@ public class PesagensViewModel : ViewModelBase
     {
         if (Sincronizando) return;
         Sincronizando = true;
-        Status = string.Empty;
+        SyncPesagens.Status = SyncStatus.Loading;
+        SyncPesagens.Mensagem = string.Empty;
+        SyncPesagens.Detalhes.Clear();
 
         try
         {
             // 1. Verificar credenciais
             if (!GitHubService.CredenciaisExistem(RootDir))
             {
-                MostrarStatus("Configure as credenciais do GitHub na tela inicial.", ok: false);
+                SyncPesagens.Status = SyncStatus.Error;
+                SyncPesagens.Mensagem = "GitHub não configurado";
                 return;
             }
 
             // 2. Verificar/instalar git
-            MostrarStatus("Verificando Git...", ok: true);
             if (!await GitHubService.GitDisponivel())
             {
-                await GitHubService.InstalarGitAsync(msg => MostrarStatus(msg, ok: true));
+                await GitHubService.InstalarGitAsync(msg => { });
             }
 
             var repoDir   = GitHubService.RepoDir(RootDir);
@@ -388,15 +348,12 @@ public class PesagensViewModel : ViewModelBase
             // 3. Clone ou pull
             if (!Directory.Exists(gitDir))
             {
-                MostrarStatus("Clonando repositório...", ok: true);
                 Directory.CreateDirectory(repoDir);
                 var r = await GitHubService.RunGit($"clone {remoteUrl} .", repoDir);
                 if (r.exitCode != 0) throw new Exception($"Clone falhou: {r.stderr}");
-                MostrarStatus("Clone concluído.", ok: true);
             }
             else
             {
-                MostrarStatus("Atualizando repositório (pull)...", ok: true);
                 await GitHubService.RunGit($"remote set-url origin {remoteUrl}", repoDir);
                 await GitHubService.RunGit("fetch origin main", repoDir);
                 var r = await GitHubService.RunGit("rebase origin/main", repoDir);
@@ -440,26 +397,26 @@ public class PesagensViewModel : ViewModelBase
             {
                 foreach (var (novoNome, cliente) in renomeados)
                 {
-                    MostrarStatus($"Commitando: {novoNome}...", ok: true);
                     var msgCommit = string.IsNullOrWhiteSpace(cliente)
                         ? $"Pesagem concluída: {novoNome}"
                         : $"{cliente} - pesagem concluída";
                     await GitHubService.RunGit($"add \"{novoNome}\"", repoDir);
                     await GitHubService.RunGit($"commit -m \"{msgCommit}\"", repoDir);
+                    SyncPesagens.Detalhes.Add($"• {novoNome}");
                 }
-                MostrarStatus("Enviando alterações ao GitHub...", ok: true);
                 await GitHubService.RunGit("push origin main", repoDir);
             }
 
             OnPropertyChanged(nameof(RepoPresenteLocal));
             CarregarPesagens();
 
-            UltimaSincPesagens = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
-            MostrarStatus(string.Empty, ok: true);
+            SyncPesagens.Status = SyncStatus.Ok;
+            SyncPesagens.Mensagem = renomeados.Count > 0 ? $"{renomeados.Count} pesagem(ns) sincronizada(s)" : "Nenhuma nova pesagem para sincronizar";
         }
         catch (Exception ex)
         {
-            MostrarStatus($"Erro: {ex.Message}", ok: false);
+            SyncPesagens.Status = SyncStatus.Error;
+            SyncPesagens.Mensagem = $"Erro: {ex.Message}";
         }
         finally
         {
@@ -630,28 +587,47 @@ public class PesagensViewModel : ViewModelBase
     {
         if (SincronizandoRecibos) return;
         SincronizandoRecibos = true;
-        MostrarStatusRecibos("Verificando Git...", ok: true);
+        SyncRecibos.Status = SyncStatus.Loading;
+        SyncRecibos.Mensagem = string.Empty;
+        SyncRecibos.Detalhes.Clear();
 
         try
         {
             if (!GitHubService.CredenciaisExistem(RootDir))
             {
-                MostrarStatusRecibos("Configure as credenciais do GitHub na tela inicial.", ok: false);
+                SyncRecibos.Status = SyncStatus.Error;
+                SyncRecibos.Mensagem = "GitHub não configurado";
                 return;
             }
 
             if (!await GitHubService.GitDisponivel())
-                await GitHubService.InstalarGitAsync(msg => MostrarStatusRecibos(msg, ok: true));
+                await GitHubService.InstalarGitAsync(msg => { });
 
-            await GitHubService.SincronizarRecibosAsync(RootDir, msg => MostrarStatusRecibos(msg, ok: true));
+            var novos = await GitHubService.PullRecibosAsync(RootDir, msg => { });
 
             CarregarRecibos();
-            UltimaSincRecibos = $"Última sincronização: {DateTime.Now:dd/MM/yyyy HH:mm}";
-            MostrarStatusRecibos(string.Empty, ok: true);
+
+            SyncRecibos.Status = SyncStatus.Ok;
+            if (novos.Count == 0)
+            {
+                SyncRecibos.Mensagem = "Recibos locais já atualizados, sem novos recibos";
+            }
+            else
+            {
+                SyncRecibos.Mensagem = $"{novos.Count} novo(s) recibo(s) recebido(s)";
+                foreach (var item in novos)
+                {
+                    var dataFmt = FormatarData(item.Data);
+                    SyncRecibos.Detalhes.Add(string.IsNullOrEmpty(dataFmt)
+                        ? $"• {item.Nome}"
+                        : $"• {item.Nome} — {dataFmt}");
+                }
+            }
         }
         catch (Exception ex)
         {
-            MostrarStatusRecibos($"Erro: {ex.Message}", ok: false);
+            SyncRecibos.Status = SyncStatus.Error;
+            SyncRecibos.Mensagem = $"Erro: {ex.Message}";
         }
         finally
         {
@@ -659,16 +635,51 @@ public class PesagensViewModel : ViewModelBase
         }
     }
 
+    private static string FormatarData(string data)
+    {
+        if (string.IsNullOrWhiteSpace(data)) return string.Empty;
+        // dd-MM-yyyy → dd/MM/yyyy
+        return data.Replace("-", "/");
+    }
+
     private void MostrarStatus(string mensagem, bool ok)
     {
-        Status   = mensagem;
-        StatusOk = ok;
+        // Used for delete operations, updates SyncPesagens
+        if (string.IsNullOrEmpty(mensagem))
+        {
+            SyncPesagens.Status = SyncStatus.Ok;
+            SyncPesagens.Mensagem = string.Empty;
+        }
+        else if (ok)
+        {
+            SyncPesagens.Status = SyncStatus.Ok;
+            SyncPesagens.Mensagem = mensagem;
+        }
+        else
+        {
+            SyncPesagens.Status = SyncStatus.Error;
+            SyncPesagens.Mensagem = mensagem;
+        }
     }
 
     private void MostrarStatusRecibos(string mensagem, bool ok)
     {
-        StatusRecibos    = mensagem;
-        StatusRecibosOk  = ok;
+        // Used for receipt operations, updates SyncRecibos
+        if (string.IsNullOrEmpty(mensagem))
+        {
+            SyncRecibos.Status = SyncStatus.Ok;
+            SyncRecibos.Mensagem = string.Empty;
+        }
+        else if (ok)
+        {
+            SyncRecibos.Status = SyncStatus.Ok;
+            SyncRecibos.Mensagem = mensagem;
+        }
+        else
+        {
+            SyncRecibos.Status = SyncStatus.Error;
+            SyncRecibos.Mensagem = mensagem;
+        }
     }
 
     private bool _exportandoExcel;

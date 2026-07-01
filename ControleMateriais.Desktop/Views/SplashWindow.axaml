@@ -1,54 +1,383 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
         x:Class="ControleMateriais.Desktop.Views.SplashWindow"
-        Width="560" Height="620"
+        x:DataType="vm:SplashViewModel"
+        Width="920" Height="500"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         SystemDecorations="None"
         TransparencyLevelHint="Transparent"
         Background="Transparent"
-        Icon="avares://ControleMateriais.Desktop/Assets/avalonia-logo.ico">
+        Icon="avares://ControleMateriais.Desktop/Assets/icon.ico">
 
-    <!-- Fundo escuro da janela -->
-    <Border Background="#1A1A2E"
-            CornerRadius="0">
+  <!-- Outer border: app color scheme — black bg, green border, rounded rect -->
+  <Border Background="#0D0D0D"
+          BorderBrush="#4CAF50"
+          BorderThickness="2"
+          CornerRadius="16">
+    <Grid ColumnDefinitions="300,*" Margin="0">
 
-        <!-- Card centralizado com borda roxa -->
-        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-            <Border Background="#1E1E2E"
-                    BorderBrush="#7C3AED"
-                    BorderThickness="2"
-                    CornerRadius="20"
-                    Padding="48,44"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Width="420">
+      <!-- LEFT PANEL: Logo + título + subtítulo + aviso sem credenciais -->
+      <Border Grid.Column="0"
+              Background="#111111"
+              CornerRadius="14,0,0,14"
+              Padding="36,40">
+        <StackPanel VerticalAlignment="Center" Spacing="0">
 
-                <StackPanel Spacing="0" HorizontalAlignment="Center">
+          <Image Source="avares://ControleMateriais.Desktop/Assets/lfb-logo.png"
+                 Width="110" Height="110"
+                 Stretch="Uniform"
+                 HorizontalAlignment="Center"
+                 Margin="0,0,0,20"/>
 
-                    <!-- Logo -->
-                    <Image Source="avares://ControleMateriais.Desktop/Assets/lfb-logo.png"
-                           Width="200" Height="200"
-                           Stretch="Uniform"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,28"/>
+          <TextBlock Text="LFB RECICLAGEM"
+                     FontSize="18"
+                     FontWeight="Bold"
+                     Foreground="#4CAF50"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Margin="0,0,0,2"/>
 
-                    <!-- Bem-vindo -->
-                    <TextBlock Text="Bem-vindo!"
-                               FontSize="28"
+          <TextBlock Text="ELETRÔNICA"
+                     FontSize="18"
+                     FontWeight="Bold"
+                     Foreground="#4CAF50"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Margin="0,0,0,16"/>
+
+          <TextBlock Text="Sincronizando com o"
+                     FontSize="12"
+                     Foreground="#888888"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Margin="0,0,0,2"/>
+
+          <TextBlock Text="sistema remoto..."
+                     FontSize="12"
+                     Foreground="#888888"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Margin="0,0,0,24"/>
+
+          <!-- Aviso sem credenciais -->
+          <Border IsVisible="{Binding SemCredenciais}"
+                  Background="#1A0000"
+                  BorderBrush="#F44336"
+                  BorderThickness="1"
+                  CornerRadius="8"
+                  Padding="12,10"
+                  Margin="0,0,0,0">
+            <StackPanel Spacing="6">
+              <TextBlock Text="⚠  GitHub não configurado"
+                         Foreground="#F44336"
+                         FontSize="12"
+                         FontWeight="SemiBold"/>
+              <TextBlock Text="Configure as credenciais para sincronizar."
+                         Foreground="#EF9A9A"
+                         FontSize="11"
+                         TextWrapping="Wrap"/>
+              <Button Content="Configurar GitHub →"
+                      Name="BtnConfigurar"
+                      Background="#4CAF50"
+                      Foreground="White"
+                      Padding="10,5"
+                      CornerRadius="6"
+                      Cursor="Hand"
+                      HorizontalAlignment="Left"
+                      Margin="0,4,0,0"/>
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </Border>
+
+      <!-- RIGHT PANEL: Status cards + botão continuar -->
+      <Border Grid.Column="1"
+              Background="#0D0D0D"
+              Padding="32,32,32,28">
+        <Grid RowDefinitions="*,Auto">
+
+          <!-- Status cards -->
+          <ScrollViewer Grid.Row="0"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="10">
+
+              <!-- Recibos — green accent -->
+              <Border Background="#111111"
+                      BorderBrush="#4CAF50"
+                      BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="14,10">
+                <StackPanel Spacing="3">
+                  <Grid ColumnDefinitions="28,*">
+                    <ProgressBar Grid.Column="0"
+                                 IsVisible="{Binding ItemRecibos.IsLoading}"
+                                 IsIndeterminate="True"
+                                 Width="16" Height="16"
+                                 Foreground="#4CAF50"
+                                 VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemRecibos.IsOk}"
+                               Text="✓"
+                               Foreground="#4CAF50"
+                               FontSize="16"
                                FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemRecibos.IsWarn}"
+                               Text="⚠"
+                               Foreground="#FFC107"
+                               FontSize="15"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemRecibos.IsError}"
+                               Text="✗"
+                               Foreground="#F44336"
+                               FontSize="15"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ItemRecibos.Label}"
                                Foreground="White"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,8"/>
-
-                    <!-- Subtítulo -->
-                    <TextBlock Text="LFB Reciclagem Eletrônica"
-                               FontSize="14"
-                               Foreground="#A0A0C0"
-                               HorizontalAlignment="Center"/>
-
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="6,0,0,0"/>
+                  </Grid>
+                  <TextBlock Text="{Binding ItemRecibos.Mensagem}"
+                             IsVisible="{Binding ItemRecibos.IsDone}"
+                             Foreground="#4CAF50"
+                             FontSize="11"
+                             TextWrapping="Wrap"
+                             Margin="28,0,0,0"/>
+                  <ItemsControl ItemsSource="{Binding ItemRecibos.Detalhes}"
+                                IsVisible="{Binding ItemRecibos.IsDone}"
+                                Margin="28,1,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="#66BB6A"
+                                   FontSize="10"
+                                   TextWrapping="Wrap"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
                 </StackPanel>
-            </Border>
+              </Border>
+
+              <!-- Pesagens — blue accent -->
+              <Border Background="#111111"
+                      BorderBrush="#2196F3"
+                      BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="14,10">
+                <StackPanel Spacing="3">
+                  <Grid ColumnDefinitions="28,*">
+                    <ProgressBar Grid.Column="0"
+                                 IsVisible="{Binding ItemPesagens.IsLoading}"
+                                 IsIndeterminate="True"
+                                 Width="16" Height="16"
+                                 Foreground="#2196F3"
+                                 VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemPesagens.IsOk}"
+                               Text="✓"
+                               Foreground="#4CAF50"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemPesagens.IsWarn}"
+                               Text="⚠"
+                               Foreground="#FFC107"
+                               FontSize="15"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemPesagens.IsError}"
+                               Text="✗"
+                               Foreground="#F44336"
+                               FontSize="15"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ItemPesagens.Label}"
+                               Foreground="White"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="6,0,0,0"/>
+                  </Grid>
+                  <TextBlock Text="{Binding ItemPesagens.Mensagem}"
+                             IsVisible="{Binding ItemPesagens.IsDone}"
+                             Foreground="#64B5F6"
+                             FontSize="11"
+                             TextWrapping="Wrap"
+                             Margin="28,0,0,0"/>
+                  <ItemsControl ItemsSource="{Binding ItemPesagens.Detalhes}"
+                                IsVisible="{Binding ItemPesagens.IsDone}"
+                                Margin="28,1,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="#90CAF9"
+                                   FontSize="10"
+                                   TextWrapping="Wrap"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+
+              <!-- Banco de Dados — orange accent -->
+              <Border Background="#111111"
+                      BorderBrush="#FF9800"
+                      BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="14,10">
+                <StackPanel Spacing="3">
+                  <Grid ColumnDefinitions="28,*">
+                    <ProgressBar Grid.Column="0"
+                                 IsVisible="{Binding ItemBancoDados.IsLoading}"
+                                 IsIndeterminate="True"
+                                 Width="16" Height="16"
+                                 Foreground="#FF9800"
+                                 VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemBancoDados.IsOk}"
+                               Text="✓"
+                               Foreground="#4CAF50"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemBancoDados.IsWarn}"
+                               Text="⚠"
+                               Foreground="#FFC107"
+                               FontSize="15"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemBancoDados.IsError}"
+                               Text="✗"
+                               Foreground="#F44336"
+                               FontSize="15"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ItemBancoDados.Label}"
+                               Foreground="White"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="6,0,0,0"/>
+                  </Grid>
+                  <TextBlock Text="{Binding ItemBancoDados.Mensagem}"
+                             IsVisible="{Binding ItemBancoDados.IsDone}"
+                             Foreground="#FFB74D"
+                             FontSize="11"
+                             TextWrapping="Wrap"
+                             Margin="28,0,0,0"/>
+                  <ItemsControl ItemsSource="{Binding ItemBancoDados.Detalhes}"
+                                IsVisible="{Binding ItemBancoDados.IsDone}"
+                                Margin="28,1,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="#FFCC80"
+                                   FontSize="10"
+                                   TextWrapping="Wrap"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+
+              <!-- Vendas — yellow/amber accent -->
+              <Border Background="#111111"
+                      BorderBrush="#FFC107"
+                      BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="14,10">
+                <StackPanel Spacing="3">
+                  <Grid ColumnDefinitions="28,*">
+                    <ProgressBar Grid.Column="0"
+                                 IsVisible="{Binding ItemVendas.IsLoading}"
+                                 IsIndeterminate="True"
+                                 Width="16" Height="16"
+                                 Foreground="#FFC107"
+                                 VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemVendas.IsOk}"
+                               Text="✓"
+                               Foreground="#4CAF50"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemVendas.IsWarn}"
+                               Text="⚠"
+                               Foreground="#FFC107"
+                               FontSize="15"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0"
+                               IsVisible="{Binding ItemVendas.IsError}"
+                               Text="✗"
+                               Foreground="#F44336"
+                               FontSize="15"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ItemVendas.Label}"
+                               Foreground="White"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="6,0,0,0"/>
+                  </Grid>
+                  <TextBlock Text="{Binding ItemVendas.Mensagem}"
+                             IsVisible="{Binding ItemVendas.IsDone}"
+                             Foreground="#FFD54F"
+                             FontSize="11"
+                             TextWrapping="Wrap"
+                             Margin="28,0,0,0"/>
+                  <ItemsControl ItemsSource="{Binding ItemVendas.Detalhes}"
+                                IsVisible="{Binding ItemVendas.IsDone}"
+                                Margin="28,1,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="#FFE082"
+                                   FontSize="10"
+                                   TextWrapping="Wrap"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- Botão continuar -->
+          <Button Grid.Row="1"
+                  Content="Continuar  →"
+                  Name="BtnContinuar"
+                  IsEnabled="{Binding PodeContinuar}"
+                  Background="#4CAF50"
+                  Foreground="White"
+                  FontSize="14"
+                  FontWeight="SemiBold"
+                  Padding="28,10"
+                  CornerRadius="10"
+                  HorizontalAlignment="Center"
+                  Cursor="Hand"
+                  Margin="0,16,0,0"/>
+
         </Grid>
-    </Border>
+      </Border>
+
+    </Grid>
+  </Border>
 </Window>

@@ -136,7 +136,8 @@ public class SplashViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            UI(() => { ItemRecibos.Status = SyncStatus.Error; ItemRecibos.Mensagem = $"Erro: {ex.Message}"; });
+            var msg = GitHubService.ClassificarErroGit(ex.Message, "pull de Recibos");
+            UI(() => { ItemRecibos.Status = SyncStatus.Error; ItemRecibos.Mensagem = msg; });
         }
     }
 
@@ -170,7 +171,8 @@ public class SplashViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            UI(() => { ItemPesagens.Status = SyncStatus.Error; ItemPesagens.Mensagem = $"Erro: {ex.Message}"; });
+            var msg = GitHubService.ClassificarErroGit(ex.Message, "pull de Pesagens");
+            UI(() => { ItemPesagens.Status = SyncStatus.Error; ItemPesagens.Mensagem = msg; });
         }
     }
 
@@ -207,7 +209,8 @@ public class SplashViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            UI(() => { ItemBancoDados.Status = SyncStatus.Error; ItemBancoDados.Mensagem = $"Erro: {ex.Message}"; });
+            var msg = GitHubService.ClassificarErroGit(ex.Message, "pull de Banco de Dados");
+            UI(() => { ItemBancoDados.Status = SyncStatus.Error; ItemBancoDados.Mensagem = msg; });
         }
     }
 

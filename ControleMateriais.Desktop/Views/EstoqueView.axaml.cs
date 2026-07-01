@@ -13,8 +13,7 @@ public partial class EstoqueView : UserControl
         {
             if (DataContext is EstoqueViewModel vm)
             {
-                vm.CarregarListaEstoquesIniciais();
-                vm.Recarregar();
+                _ = vm.SincronizarGitAsync();
                 vm.ConfirmarExclusaoCallback = async msg =>
                 {
                     var topLevel = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;

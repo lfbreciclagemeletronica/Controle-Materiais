@@ -49,6 +49,7 @@ public class EstoqueViewModel : ViewModelBase
     public ObservableCollection<EstoqueItem>    Itens        { get; } = new();
     public ObservableCollection<ReciboVendaItem> RecibosVenda { get; } = new();
     public ObservableCollection<string> EstoquesIniciaisDisponiveis { get; } = new();
+    public bool SemEstoqueInicial => EstoquesIniciaisDisponiveis.Count == 0;
 
     private string _estoqueInicialSelecionado = string.Empty;
     private bool _recarregando = false;
@@ -255,7 +256,7 @@ public class EstoqueViewModel : ViewModelBase
         get
         {
             if (string.IsNullOrEmpty(EstoqueInicialSelecionado))
-                return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), "estoque-inicial.json");
+                return string.Empty;
             return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), $"{EstoqueInicialSelecionado}.json");
         }
     }
@@ -286,6 +287,8 @@ public class EstoqueViewModel : ViewModelBase
             else
                 EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
         }
+
+        OnPropertyChanged(nameof(SemEstoqueInicial));
     }
 
     // Método público para carregar a lista de estoques iniciais (chamado pela View)
@@ -297,15 +300,20 @@ public class EstoqueViewModel : ViewModelBase
     // ── Lê estoque-inicial-MM-YYYY.json ────────────────────────────────────────
     private Dictionary<string, decimal> LerEstoqueInicial()
     {
-        if (!File.Exists(EstoqueInicialPath))
+        var path = EstoqueInicialPath;
+        if (string.IsNullOrEmpty(path))
         {
-            if (!string.IsNullOrEmpty(EstoqueInicialSelecionado))
-                Status = "Não existe estoque inicial para o mês/ano selecionado.";
+            Status = "Nenhum estoque inicial encontrado. Clique em Sincronizar ou acesse Estoque Inicial.";
+            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        }
+        if (!File.Exists(path))
+        {
+            Status = "Não existe estoque inicial para o mês/ano selecionado.";
             return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         }
         try
         {
-            var obj = JsonNode.Parse(File.ReadAllText(EstoqueInicialPath))?.AsObject();
+            var obj = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
             if (obj is null) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in obj)
@@ -574,7 +582,7 @@ public class EstoqueViewModel : ViewModelBase
     }
 
     // ── Pull Git + processa novos JSONs remotos ────────────────────────────
-    private async Task SincronizarGitAsync()
+    public async Task SincronizarGitAsync()
     {
         if (Sincronizando) return;
         Sincronizando = true;
@@ -589,6 +597,7 @@ public class EstoqueViewModel : ViewModelBase
             await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             Status = "Sincronizado — estoque atualizado.";
 
+            CarregarListaEstoquesIniciais();
             Recarregar();
         }
         catch (Exception ex)

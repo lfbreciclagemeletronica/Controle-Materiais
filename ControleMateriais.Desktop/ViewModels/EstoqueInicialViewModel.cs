@@ -372,9 +372,9 @@ public class EstoqueInicialViewModel : ViewModelBase
             // Snapshot do estoque atual (inicial + mês atual - vendas)
             var estoqueAtual = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
-            var estoqueInicialPath = Path.Combine(bancoDadosDir, "estoque-inicial.json");
+            var estoqueInicialPath = EstoqueInicialPath;
 
-            // Lê estoque-inicial.json
+            // Lê estoque-inicial-MM-AAAA.json
             if (File.Exists(estoqueInicialPath))
             {
                 try

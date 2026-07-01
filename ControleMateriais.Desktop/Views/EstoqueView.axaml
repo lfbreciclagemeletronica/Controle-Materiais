@@ -27,13 +27,6 @@
                 Command="{Binding MigrarVendasCommand}"
                 IsEnabled="{Binding !Migrando}"
                 ToolTip.Tip="Gerar arquivos venda-DD-MM-YYYY.json a partir dos PDFs existentes"/>
-        <Button Content="&#8679; Sincronizar"
-                Command="{Binding SincronizarGitCommand}"
-                IsEnabled="{Binding !Sincronizando}"
-                ToolTip.Tip="Pull do repositório banco-de-dados"/>
-        <Button Content="&#x27F3; Atualizar Estoque"
-                Command="{Binding AtualizarEstoqueCommand}"
-                ToolTip.Tip="Recalcular estoque a partir dos arquivos atuais"/>
       </StackPanel>
     </Grid>
 
@@ -46,17 +39,25 @@
                Margin="0,4,0,4"/>
 
     <!-- Seletor de Estoque Inicial -->
-    <Grid Grid.Row="2" Margin="0,4,0,4" ColumnDefinitions="Auto,Auto,*">
+    <Grid Grid.Row="2" Margin="0,4,0,4" ColumnDefinitions="Auto,Auto,Auto,*">
       <TextBlock Grid.Column="0" Text="Estoque Inicial:"
                  VerticalAlignment="Center"
                  Foreground="{DynamicResource Brush.TextPrimary}"
                  Margin="0,0,8,0"/>
       <ComboBox Grid.Column="1"
+                IsVisible="{Binding !SemEstoqueInicial}"
                 ItemsSource="{Binding EstoquesIniciaisDisponiveis}"
                 SelectedItem="{Binding EstoqueInicialSelecionado}"
                 Width="200"
                 HorizontalAlignment="Left"
                 ToolTip.Tip="Selecione o estoque inicial do mês/ano desejado"/>
+      <TextBlock Grid.Column="2"
+                 IsVisible="{Binding SemEstoqueInicial}"
+                 Text="Nenhum estoque inicial encontrado. Acesse Estoque Inicial para criar um."
+                 VerticalAlignment="Center"
+                 FontSize="12"
+                 Foreground="#FF9800"
+                 Margin="0,0,8,0"/>
     </Grid>
 
     <!-- Abas: Recibos de Venda | Estoque -->

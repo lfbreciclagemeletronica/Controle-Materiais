@@ -919,7 +919,9 @@ public static class GitHubService
         {
             progresso("Clonando repositório de Recibos...");
             Directory.CreateDirectory(repoDir);
-            await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            var cloneR = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (cloneR.exitCode != 0)
+                throw new Exception(ClassificarErroGit(cloneR.stderr, "clone de Recibos"));
             await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
             await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
             return novos;
@@ -933,8 +935,12 @@ public static class GitHubService
         var headAntes = await RunAsync("git", "rev-parse HEAD", repoDir);
         var stash = await RunAsync("git", "stash --include-untracked", repoDir);
         var temStash = stash.exitCode == 0 && !stash.stdout.Contains("No local changes");
-        await RunAsync("git", "fetch origin main", repoDir);
-        await RunAsync("git", "rebase origin/main", repoDir);
+        var fetchR = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetchR.exitCode != 0)
+            throw new Exception(ClassificarErroGit(fetchR.stderr, "fetch de Recibos"));
+        var rebaseR = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebaseR.exitCode != 0)
+            throw new Exception(ClassificarErroGit(rebaseR.stderr, "rebase de Recibos"));
         if (temStash) await RunAsync("git", "stash pop", repoDir);
 
         // Detectar arquivos novos
@@ -977,7 +983,9 @@ public static class GitHubService
         {
             progresso("Clonando repositório de Pesagens...");
             Directory.CreateDirectory(repoDir);
-            await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            var cloneP = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (cloneP.exitCode != 0)
+                throw new Exception(ClassificarErroGit(cloneP.stderr, "clone de Pesagens"));
             await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
             await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
             return novos;
@@ -988,8 +996,12 @@ public static class GitHubService
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
         var headAntes = await RunAsync("git", "rev-parse HEAD", repoDir);
-        await RunAsync("git", "fetch origin main", repoDir);
-        await RunAsync("git", "rebase origin/main", repoDir);
+        var fetchP = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetchP.exitCode != 0)
+            throw new Exception(ClassificarErroGit(fetchP.stderr, "fetch de Pesagens"));
+        var rebaseP = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebaseP.exitCode != 0)
+            throw new Exception(ClassificarErroGit(rebaseP.stderr, "rebase de Pesagens"));
 
         var shaAntes = headAntes.exitCode == 0 ? headAntes.stdout.Trim() : string.Empty;
         if (!string.IsNullOrEmpty(shaAntes))
@@ -1029,7 +1041,9 @@ public static class GitHubService
         {
             progresso("Clonando repositório banco-de-dados...");
             Directory.CreateDirectory(repoDir);
-            await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            var cloneB = await RunAsync("git", $"clone {remoteUrl} .", repoDir);
+            if (cloneB.exitCode != 0)
+                throw new Exception(ClassificarErroGit(cloneB.stderr, "clone de Banco de Dados"));
             await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
             await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
             return novos;
@@ -1040,8 +1054,12 @@ public static class GitHubService
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
         var headAntes = await RunAsync("git", "rev-parse HEAD", repoDir);
-        await RunAsync("git", "fetch origin main", repoDir);
-        await RunAsync("git", "rebase origin/main", repoDir);
+        var fetchB = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetchB.exitCode != 0)
+            throw new Exception(ClassificarErroGit(fetchB.stderr, "fetch de Banco de Dados"));
+        var rebaseB = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebaseB.exitCode != 0)
+            throw new Exception(ClassificarErroGit(rebaseB.stderr, "rebase de Banco de Dados"));
 
         var shaAntes = headAntes.exitCode == 0 ? headAntes.stdout.Trim() : string.Empty;
         if (string.IsNullOrEmpty(shaAntes)) return novos;
@@ -1222,24 +1240,85 @@ public static class GitHubService
         }
 
         if (!string.IsNullOrWhiteSpace(creds.UrlBancoDados))
-            await SincronizarRepo(
-                BancoDadosRepoDir(rootDir),
-                InjetarToken(creds.UrlBancoDados, creds.Token),
-                "Banco de Dados");
+        {
+            try
+            {
+                await SincronizarRepo(
+                    BancoDadosRepoDir(rootDir),
+                    InjetarToken(creds.UrlBancoDados, creds.Token),
+                    "Banco de Dados");
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Banco de Dados] {ClassificarErroGit(ex.Message, "sincronização de Banco de Dados")}");
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(creds.UrlRecibos))
-            await SincronizarRepo(
-                RecibosRepoDir(rootDir),
-                InjetarToken(creds.UrlRecibos, creds.Token),
-                "Recibos");
+        {
+            try
+            {
+                await SincronizarRepo(
+                    RecibosRepoDir(rootDir),
+                    InjetarToken(creds.UrlRecibos, creds.Token),
+                    "Recibos");
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Recibos] {ClassificarErroGit(ex.Message, "sincronização de Recibos")}");
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(creds.UrlPesagens))
-            await SincronizarRepo(
-                RepoDir(rootDir),
-                InjetarToken(creds.UrlPesagens, creds.Token),
-                "Pesagens");
+        {
+            try
+            {
+                await SincronizarRepo(
+                    RepoDir(rootDir),
+                    InjetarToken(creds.UrlPesagens, creds.Token),
+                    "Pesagens");
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Pesagens] {ClassificarErroGit(ex.Message, "sincronização de Pesagens")}");
+            }
+        }
 
         progresso?.Invoke("Sincronização concluída.");
+    }
+
+    /// <summary>
+    /// Classifica o stderr de um comando git e retorna uma mensagem orientativa.
+    /// </summary>
+    internal static string ClassificarErroGit(string stderr, string operacao)
+    {
+        var s = stderr?.ToLowerInvariant() ?? string.Empty;
+
+        if (s.Contains("authentication failed") || s.Contains("invalid username or password")
+            || s.Contains("bad credentials") || s.Contains("401"))
+            return $"Falha de autenticação em '{operacao}': token inválido ou expirado. " +
+                   "Reconfigure as credenciais do GitHub nas configurações.";
+
+        if (s.Contains("repository not found") || s.Contains("not found") || s.Contains("404")
+            || s.Contains("does not exist"))
+            return $"Repositório não encontrado em '{operacao}'. " +
+                   "Verifique a URL do repositório nas configurações do GitHub.";
+
+        if (s.Contains("unable to connect") || s.Contains("could not resolve host")
+            || s.Contains("network") || s.Contains("failed to connect") || s.Contains("timeout"))
+            return $"Sem conexão em '{operacao}': não foi possível alcançar o GitHub. " +
+                   "Verifique sua conexão com a internet e tente novamente.";
+
+        if (s.Contains("permission denied") || s.Contains("403"))
+            return $"Permissão negada em '{operacao}'. " +
+                   "O token pode não ter acesso a este repositório.";
+
+        if (s.Contains("conflict") || s.Contains("merge conflict"))
+            return $"Conflito de merge em '{operacao}'. " +
+                   "Execute 'git rebase --abort' na pasta do repositório e sincronize novamente.";
+
+        var detalhe = string.IsNullOrWhiteSpace(stderr) ? string.Empty : $"\nDetalhe: {stderr.Trim()}";
+        return $"Erro na operação '{operacao}'.{detalhe}\nTente reiniciar o aplicativo.";
     }
 
     private static async Task<(int exitCode, string stdout, string stderr)> RunAsync(

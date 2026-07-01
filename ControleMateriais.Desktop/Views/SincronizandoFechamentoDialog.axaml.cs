@@ -58,6 +58,14 @@ public partial class SincronizandoFechamentoDialog : Window
         {
             if (!msg.Contains(repo)) continue;
 
+            // Mensagens de erro no formato "[Repo] texto erro"
+            if (msg.StartsWith($"[{repo}]"))
+            {
+                var detalhe = msg.Substring($"[{repo}]".Length).Trim();
+                _vm.MarcarRepoErro(repo, detalhe);
+                return;
+            }
+
             if (msg.EndsWith("sincronizado.") || msg.EndsWith("já atualizado."))
                 _vm.MarcarRepoOk(repo, msg.EndsWith("atualizado.") ? "Já atualizado" : "Enviado ao GitHub");
             return;
@@ -66,8 +74,8 @@ public partial class SincronizandoFechamentoDialog : Window
 
     private void EnsureAllDone()
     {
-        if (_vm.SyncRecibos.IsLoading)    _vm.MarcarRepoOk("Recibos", "Concluído");
-        if (_vm.SyncPesagens.IsLoading)   _vm.MarcarRepoOk("Pesagens", "Concluído");
+        if (_vm.SyncRecibos.IsLoading)    _vm.MarcarRepoOk("Recibos",        "Concluído");
+        if (_vm.SyncPesagens.IsLoading)   _vm.MarcarRepoOk("Pesagens",       "Concluído");
         if (_vm.SyncBancoDados.IsLoading) _vm.MarcarRepoOk("Banco de Dados", "Concluído");
     }
 

@@ -1239,20 +1239,22 @@ public static class GitHubService
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(creds.UrlBancoDados))
-        {
-            try
-            {
-                await SincronizarRepo(
-                    BancoDadosRepoDir(rootDir),
-                    InjetarToken(creds.UrlBancoDados, creds.Token),
-                    "Banco de Dados");
-            }
-            catch (Exception ex)
-            {
-                progresso?.Invoke($"[Banco de Dados] {ClassificarErroGit(ex.Message, "sincronização de Banco de Dados")}");
-            }
-        }
+        // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
+        // if (!string.IsNullOrWhiteSpace(creds.UrlBancoDados))
+        // {
+        //     try
+        //     {
+        //         await SincronizarRepo(
+        //             BancoDadosRepoDir(rootDir),
+        //             InjetarToken(creds.UrlBancoDados, creds.Token),
+        //             "Banco de Dados");
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         progresso?.Invoke($"[Banco de Dados] {ClassificarErroGit(ex.Message, "sincronização de Banco de Dados")}");
+        //     }
+        // }
+        progresso?.Invoke("Banco de Dados: sincronização pausada (Em Desenvolvimento).");
 
         if (!string.IsNullOrWhiteSpace(creds.UrlRecibos))
         {

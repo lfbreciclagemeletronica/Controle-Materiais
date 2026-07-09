@@ -246,16 +246,21 @@ public static class ReconstruirBancoDadosService
         progresso?.Invoke($"Concluído. {gerados} arquivo(s) de compra e {vendasGeradas} arquivo(s) de venda gerados.");
     }
 
-    // Extrai nome do cliente do nome do arquivo PDF (padrão NomeCliente_dd-MM-yyyy[_HH-mm].pdf)
+    // Extrai nome do cliente do nome do arquivo PDF
+    // Padrões suportados: NomeCliente_ddMMyyyyHHmmss (novo), NomeCliente_dd-MM-yyyy[_HH-mm] (antigo)
     private static string ExtrairNomeCliente(string filePath)
     {
         var semExt = Path.GetFileNameWithoutExtension(filePath);
 
-        // Padrão com hora: NomeCliente_dd-MM-yyyy_HH-mm
+        // Padrão novo: NomeCliente_ddMMyyyyHHmmss (14 dígitos)
+        var m0 = System.Text.RegularExpressions.Regex.Match(semExt, @"^(.+?)_\d{14}$");
+        if (m0.Success) return m0.Groups[1].Value.Replace("_", " ");
+
+        // Padrão antigo com hora: NomeCliente_dd-MM-yyyy_HH-mm
         var m1 = System.Text.RegularExpressions.Regex.Match(semExt, @"^(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}$");
         if (m1.Success) return m1.Groups[1].Value.Replace("_", " ");
 
-        // Padrão sem hora: NomeCliente_dd-MM-yyyy
+        // Padrão antigo sem hora: NomeCliente_dd-MM-yyyy
         var m2 = System.Text.RegularExpressions.Regex.Match(semExt, @"^(.+?)_\d{2}-\d{2}-\d{4}$");
         if (m2.Success) return m2.Groups[1].Value.Replace("_", " ");
 
@@ -263,14 +268,22 @@ public static class ReconstruirBancoDadosService
     }
 
     // Extrai a data do nome do arquivo PDF
+    // Padrões suportados: NomeCliente_ddMMyyyyHHmmss (novo), NomeCliente_dd-MM-yyyy[_HH-mm] (antigo)
     private static DateTime ExtrairData(string filePath)
     {
         var semExt = Path.GetFileNameWithoutExtension(filePath);
 
+        // Padrão novo: 14 dígitos ddMMyyyyHHmmss
+        var m0 = System.Text.RegularExpressions.Regex.Match(semExt, @"_(\d{14})$");
+        if (m0.Success && DateTime.TryParseExact(m0.Groups[1].Value, "ddMMyyyyHHmmss",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt0)) return dt0;
+
+        // Padrão antigo com hora
         var m1 = System.Text.RegularExpressions.Regex.Match(semExt, @"_(\d{2}-\d{2}-\d{4})_\d{2}-\d{2}$");
         if (m1.Success && DateTime.TryParseExact(m1.Groups[1].Value, "dd-MM-yyyy",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt1)) return dt1;
 
+        // Padrão antigo sem hora
         var m2 = System.Text.RegularExpressions.Regex.Match(semExt, @"_(\d{2}-\d{2}-\d{4})");
         if (m2.Success && DateTime.TryParseExact(m2.Groups[1].Value, "dd-MM-yyyy",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt2)) return dt2;

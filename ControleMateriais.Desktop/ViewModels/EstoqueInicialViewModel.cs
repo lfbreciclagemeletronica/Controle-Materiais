@@ -339,14 +339,14 @@ public class EstoqueInicialViewModel : ViewModelBase
             GravarEstoqueInicialLocal();
             AppendLog("Salvar estoque-inicial");
 
-            await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
-            var conteudo = await File.ReadAllTextAsync(EstoqueInicialPath);
-            var nomeArquivo = Path.GetFileName(EstoqueInicialPath);
-            await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, nomeArquivo, conteudo, msg => Status = msg);
+            // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
+            // await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
+            // var conteudo = await File.ReadAllTextAsync(EstoqueInicialPath);
+            // var nomeArquivo = Path.GetFileName(EstoqueInicialPath);
+            // await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, nomeArquivo, conteudo, msg => Status = msg);
+            // await PublicarLog();
 
-            await PublicarLog();
-
-            Status = "Estoque inicial salvo com sucesso.";
+            Status = "Estoque inicial salvo localmente. (Sync GitHub: Em Desenvolvimento)";
         }
         catch (Exception ex)
         {
@@ -465,11 +465,11 @@ public class EstoqueInicialViewModel : ViewModelBase
                 objFinal[kv.Key] = JsonValue.Create(kv.Value);
             var conteudoFinal = objFinal.ToJsonString(JsonOpts);
 
-            await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
-
+            // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
+            // await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             var pathFinal = Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), nomeFinal);
             await File.WriteAllTextAsync(pathFinal, conteudoFinal);
-            await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, nomeFinal, conteudoFinal, msg => Status = msg);
+            // await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, nomeFinal, conteudoFinal, msg => Status = msg);
 
             AppendLog($"Registrar estoque-final-{mes:D2}-{ano}");
 
@@ -487,11 +487,11 @@ public class EstoqueInicialViewModel : ViewModelBase
             GravarEstoqueInicialLocal();
             AppendLog("Novo estoque-inicial criado a partir do estoque atual");
 
-            var novoConteudo = await File.ReadAllTextAsync(EstoqueInicialPath);
-            var nomeArquivo = Path.GetFileName(EstoqueInicialPath);
-            await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, nomeArquivo, novoConteudo, msg => Status = msg);
-
-            await PublicarLog();
+            // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
+            // var novoConteudo = await File.ReadAllTextAsync(EstoqueInicialPath);
+            // var nomeArquivo = Path.GetFileName(EstoqueInicialPath);
+            // await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, nomeArquivo, novoConteudo, msg => Status = msg);
+            // await PublicarLog();
 
             Status = $"Estoque final {mes:D2}/{ano} registrado e novo estoque inicial criado.";
         }
@@ -545,13 +545,15 @@ public class EstoqueInicialViewModel : ViewModelBase
 
     private async Task PublicarLog()
     {
-        try
-        {
-            if (!File.Exists(LogPath)) return;
-            var conteudo = await File.ReadAllTextAsync(LogPath);
-            await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, LogFileName, conteudo);
-        }
-        catch { }
+        // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
+        await Task.CompletedTask;
+        // try
+        // {
+        //     if (!File.Exists(LogPath)) return;
+        //     var conteudo = await File.ReadAllTextAsync(LogPath);
+        //     await GitHubService.PublicarJsonBancoDadosAsync(_rootDir, LogFileName, conteudo);
+        // }
+        // catch { }
     }
 
     private static decimal ExtrairDecimal(JsonNode? node)

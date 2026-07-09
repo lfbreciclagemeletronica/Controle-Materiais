@@ -21,8 +21,15 @@ public static class ReciboParserService
     {
         "material", "kg", "valor/kg", "total", "fornecedor", "peso", "valor", "data",
         "lfb reciclagem eletronica", "resultado da pesagem e triagem lfb",
-        "cnpj", "impurezas"
+        "cnpj", "impurezas",
+        "recibo de venda de estoque", "cliente", "recibo de venda"
     };
+
+    // Prefixos de linhas de cabeçalho do recibo de venda a ignorar no Passo 2
+    private static readonly string[] _prefixosCabecalhoVenda =
+    [
+        "cliente", "cnpj", "i.e.", "end:", "rua", "av.", "r$"
+    ];
 
     // Regex: número com 3 casas decimais — pt-BR (vírgula) OU invariant (ponto)
     // Ex: 22,710 | 1.234,567 | 1.258 | 22.710
@@ -129,6 +136,18 @@ public static class ReciboParserService
         CorrigirEspacosEntreDigitos(linhas);
         var linhasNorm = linhas.Select(NormalizarTexto).ToList();
 
+        // Localiza a linha do cabeçalho da tabela "MATERIAL" — tudo antes é cabeçalho do recibo
+        int inicioTabela = 0;
+        for (int i = 0; i < linhas.Count; i++)
+        {
+            if (NormalizarTexto(linhas[i]).Equals("material", StringComparison.OrdinalIgnoreCase) ||
+                NormalizarTexto(linhas[i]).StartsWith("material", StringComparison.OrdinalIgnoreCase))
+            {
+                inicioTabela = i + 1;
+                break;
+            }
+        }
+
         // ── Passo 1: itens do catálogo (prioridade por comprimento decrescente) ──
         var catalogoOrdenado = ItemCatalog.OrderedItems
             .OrderByDescending(n => n.Length)
@@ -142,7 +161,7 @@ public static class ReciboParserService
             if (_aliases.TryGetValue(nome, out var alts))
                 termos.AddRange(alts.Select(NormalizarTexto));
 
-            for (int i = 0; i < linhas.Count; i++)
+            for (int i = inicioTabela; i < linhas.Count; i++)
             {
                 if (!termos.Any(t => linhasNorm[i].Contains(t, StringComparison.OrdinalIgnoreCase)))
                     continue;
@@ -180,7 +199,7 @@ public static class ReciboParserService
         // Procura linhas não consumidas que parecem ser nomes seguidos de um peso N3
         // Heurística: linha de texto puro (sem dígitos) + linha seguinte com peso N3
         var nomesExtraEncontrados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < linhas.Count; i++)
+        for (int i = inicioTabela; i < linhas.Count; i++)
         {
             if (linhasConsumidas.Contains(i)) continue;
 
@@ -196,6 +215,13 @@ public static class ReciboParserService
 
             // Ignora se já é um item do catálogo
             if (catalogoOrdenado.Any(n => linhaNorm.Contains(NormalizarTexto(n), StringComparison.OrdinalIgnoreCase))) continue;
+
+            // Ignora nomes de pessoas/clientes: linha composta apenas por letras e espaços, toda em maiúsculas
+            // (ex: "MARCO ANTONIO", "VALMARC") — típico de cabeçalho de recibo de venda
+            if (Regex.IsMatch(linha, @"^[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÜÇ\s]+$") && linha == linha.ToUpperInvariant()) continue;
+
+            // Ignora linhas que começam com prefixos de cabeçalho de venda
+            if (_prefixosCabecalhoVenda.Any(p => linhaNorm.StartsWith(p, StringComparison.OrdinalIgnoreCase))) continue;
 
             // Tenta encontrar o peso nessa linha ou na próxima
             decimal? peso = ExtrairPrimeiroPeso(linha);

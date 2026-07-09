@@ -548,11 +548,25 @@ public class PesagensViewModel : ViewModelBase
     }
 
     // Extrai nome do cliente e data de um nome de arquivo no padrão:
-    // NomeCliente_dd-MM-yyyy_HH-mm   (underscores separam data e hora)
-    // ou NomeCliente_dd-MM-yyyy (sem hora)
+    // NomeCliente_ddMMyyyyHHmmss  (novo padrão — 14 dígitos contínuos)
+    // NomeCliente_dd-MM-yyyy_HH-mm   (padrão antigo com hora)
+    // ou NomeCliente_dd-MM-yyyy (padrão antigo sem hora)
     private static (string nome, string dataExibicao, DateTime dataRaw) ParsearNomeArquivoRecibo(string semExt, string filePath)
     {
-        // Padrão: termina com _dd-MM-yyyy_HH-mm
+        // Padrão novo: termina com _ddMMyyyyHHmmss (14 dígitos)
+        var matchNovo = System.Text.RegularExpressions.Regex.Match(
+            semExt, @"^(.+?)_(\d{14})$");
+        if (matchNovo.Success)
+        {
+            var nomeRaw = matchNovo.Groups[1].Value.Replace("_", " ");
+            var dataStr = matchNovo.Groups[2].Value;
+            if (DateTime.TryParseExact(dataStr, "ddMMyyyyHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var dt))
+                return (nomeRaw, dt.ToString("dd/MM/yyyy"), dt);
+        }
+
+        // Padrão antigo: termina com _dd-MM-yyyy_HH-mm
         var matchComHora = System.Text.RegularExpressions.Regex.Match(
             semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2})$");
         if (matchComHora.Success)
@@ -565,7 +579,7 @@ public class PesagensViewModel : ViewModelBase
                 return (nomeRaw, dt.ToString("dd/MM/yyyy"), dt);
         }
 
-        // Padrão sem hora: termina com _dd-MM-yyyy
+        // Padrão antigo sem hora: termina com _dd-MM-yyyy
         var matchSemHora = System.Text.RegularExpressions.Regex.Match(
             semExt, @"^(.+?)_(\d{2}-\d{2}-\d{4})$");
         if (matchSemHora.Success)

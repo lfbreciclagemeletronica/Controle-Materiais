@@ -90,14 +90,20 @@ public class SplashViewModel : INotifyPropertyChanged
             return;
         }
 
-        // Pull dos 3 repos em paralelo
-        var taskRecibos    = PullRecibosAsync();
-        var taskPesagens   = PullPesagensAsync();
-        var taskBancoDados = PullBancoDadosAsync();
+        // Pull dos 2 repos em paralelo (banco-de-dados: Em Desenvolvimento)
+        var taskRecibos  = PullRecibosAsync();
+        var taskPesagens = PullPesagensAsync();
 
-        await Task.WhenAll(taskRecibos, taskPesagens, taskBancoDados);
+        // TODO: Em Desenvolvimento — pull banco-de-dados desativado temporariamente
+        UI(() =>
+        {
+            ItemBancoDados.Status   = SyncStatus.Ok;
+            ItemBancoDados.Mensagem = "Banco de Dados: sincronização pausada (Em Desenvolvimento)";
+        });
 
-        // Verificação de vendas (depende do banco de dados pronto)
+        await Task.WhenAll(taskRecibos, taskPesagens);
+
+        // Verificação de vendas (conta PDFs em Recibos_Venda)
         await VerificarVendasAsync();
 
         UI(() => PodeContinuar = true);
@@ -214,91 +220,36 @@ public class SplashViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task VerificarVendasAsync()
+    private Task VerificarVendasAsync()
     {
         try
         {
-            var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
-            var recibosDir    = GitHubService.RecibosRepoDir(RootDir);
-            var vendaDir      = Path.Combine(recibosDir, "Recibos_Venda");
-
-            var avisos = new List<string>();
+            var recibosDir = GitHubService.RecibosRepoDir(RootDir);
+            var vendaDir   = Path.Combine(recibosDir, "Recibos_Venda");
 
             if (!Directory.Exists(vendaDir))
             {
-                UI(() => { ItemVendas.Status = SyncStatus.Ok; ItemVendas.Mensagem = "Sem novos recibos de vendas"; });
-                return;
+                UI(() => { ItemVendas.Status = SyncStatus.Ok; ItemVendas.Mensagem = "Sem recibos de venda"; });
+                return Task.CompletedTask;
             }
 
-            // Carregar todos os registros de venda existentes no banco de dados
-            var vendasNoBanco = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (Directory.Exists(bancoDadosDir))
-            {
-                foreach (var jsonFile in Directory.GetFiles(bancoDadosDir, "venda-*.json"))
-                {
-                    try
-                    {
-                        var json = JsonNode.Parse(await File.ReadAllTextAsync(jsonFile));
-                        var regs = json?["registros"]?.AsArray();
-                        if (regs is null) continue;
-                        foreach (var reg in regs)
-                        {
-                            var nome = reg?["nome"]?.GetValue<string>() ?? "";
-                            var data = reg?["data"]?.GetValue<string>() ?? "";
-                            vendasNoBanco.Add($"{nome}|{data}");
-                        }
-                    }
-                    catch { }
-                }
-            }
-
-            // Verificar PDFs de venda
-            var pdfs = Directory.GetFiles(vendaDir, "*.pdf")
-                .Where(f => !Path.GetFileName(f).StartsWith("ESTOQUE", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            int novosCount = 0;
-            var re = new Regex(@"^(.+?)_(\d{2}-\d{2}-\d{4})(_\d{2}-\d{2})?$");
-
-            foreach (var pdf in pdfs)
-            {
-                var semExt = Path.GetFileNameWithoutExtension(pdf);
-                var m = re.Match(semExt);
-                if (!m.Success) continue;
-
-                var nome = m.Groups[1].Value.Replace("_", " ");
-                var data = m.Groups[2].Value; // dd-MM-yyyy
-
-                // Normaliza para dd-MM-yyyy (já está nesse formato)
-                var chave = $"{nome}|{data}";
-                if (!vendasNoBanco.Contains(chave))
-                {
-                    var dataFmt = FormatarData(data);
-                    avisos.Add($"⚠ {nome} ({dataFmt}) não encontrado no banco de dados");
-                    novosCount++;
-                }
-            }
+            var pdfs = Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly);
+            var count = pdfs.Length;
 
             UI(() =>
             {
-                if (avisos.Count == 0)
-                {
-                    ItemVendas.Status   = SyncStatus.Ok;
-                    ItemVendas.Mensagem = "Sem novos recibos de vendas";
-                }
-                else
-                {
-                    ItemVendas.Status   = SyncStatus.Warn;
-                    ItemVendas.Mensagem = $"{avisos.Count} recibo(s) de venda sem registro no banco de dados";
-                    foreach (var a in avisos)
-                        ItemVendas.Detalhes.Add(a);
-                }
+                ItemVendas.Status   = SyncStatus.Ok;
+                ItemVendas.Mensagem = count == 0
+                    ? "Sem recibos de venda"
+                    : $"{count} recibo(s) de venda disponível(is)";
             });
         }
         catch (Exception ex)
         {
             UI(() => { ItemVendas.Status = SyncStatus.Error; ItemVendas.Mensagem = $"Erro: {ex.Message}"; });
         }
+
+        return Task.CompletedTask;
     }
 
     private static string FormatarData(string data)

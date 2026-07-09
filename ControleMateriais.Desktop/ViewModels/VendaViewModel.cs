@@ -290,7 +290,7 @@ public class VendaViewModel : ViewModelBase
         try
         { 
             var nomeSeguro = string.Concat(NomeCliente.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
-            var nomeBase   = $"{nomeSeguro}_{data:dd-MM-yyyy}";
+            var nomeBase   = $"{nomeSeguro}_{data:ddMMyyyyHHmmss}";
             nomeArquivoFinal = nomeBase + ".pdf";
 
             var vendaDir = RecibosVendaDir(_rootDir);
@@ -341,18 +341,6 @@ public class VendaViewModel : ViewModelBase
             registros.Add(reg);
 
             File.WriteAllText(vendaJsonPath, root.ToJsonString(JsonOpts), Encoding.UTF8);
-
-            // 3. Salva metadados leves para leitura na aba de recibos
-            var meta = new JsonObject
-            {
-                ["cliente"]    = NomeCliente,
-                ["pesoTotal"]  = JsonValue.Create(itensSelecionados.Sum(i => i.PesoAtual)),
-                ["valorVenda"] = JsonValue.Create(_valorVendaRaw),
-                ["data"]       = data.ToString("dd/MM/yyyy")
-            };
-            await File.WriteAllTextAsync(
-                filePathFinal + ".meta.json",
-                meta.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception ex)
         {
@@ -374,11 +362,12 @@ public class VendaViewModel : ViewModelBase
                     $"Venda {clienteSnapshot} - {DateTime.Now:dd/MM/yyyy}",
                     msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg));
 
-                var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
-                var vendaJsonPath = Path.Combine(bancoDadosDir, vendaJsonNome);
-                var vendaConteudo = await File.ReadAllTextAsync(vendaJsonPath);
-                await GitHubService.CommitJsonBancoDadosAsync(_rootDir, vendaJsonNome, vendaConteudo,
-                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg));
+                // TODO: Em Desenvolvimento — commit no banco-de-dados desativado temporariamente
+                // var bancoDadosDir = GitHubService.BancoDadosRepoDir(_rootDir);
+                // var vendaJsonPath = Path.Combine(bancoDadosDir, vendaJsonNome);
+                // var vendaConteudo = await File.ReadAllTextAsync(vendaJsonPath);
+                // await GitHubService.CommitJsonBancoDadosAsync(_rootDir, vendaJsonNome, vendaConteudo,
+                //     msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg));
             }
             catch (Exception ex)
             {

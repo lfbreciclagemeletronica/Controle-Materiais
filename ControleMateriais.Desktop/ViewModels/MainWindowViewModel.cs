@@ -631,8 +631,8 @@ public class MainWindowViewModel : ViewModelBase
         }
 
         var data = DateTime.Now;
-        var nomeArquivo = $"{NomeCliente}_{data:dd-MM-yyyy}.pdf"
-            .Replace(" ", "_").Replace("/", "-").Replace("\\", "-").Replace(":", "-");
+        var nomeSeguroMw = string.Concat(NomeCliente.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
+        var nomeArquivo = $"{nomeSeguroMw}_{data:ddMMyyyyHHmmss}.pdf";
 
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
@@ -754,14 +754,14 @@ public class MainWindowViewModel : ViewModelBase
             if (!File.Exists(compraJsonPath) || new FileInfo(compraJsonPath).Length == 0)
                 throw new InvalidOperationException($"Falha ao criar o arquivo JSON do recibo no banco de dados: {compraJsonPath}");
 
-            // Publica via Git se repo clonado
-            var bancoDadosGit = Path.Combine(bancoDadosDir, ".git");
-            if (Directory.Exists(bancoDadosGit))
-            {
-                AtualizarStatusTela("Enviando banco-de-dados ao GitHub...");
-                await GitHubService.PublicarJsonBancoDadosAsync(RootDir, compraJsonFile, conteudo,
-                    msg => AtualizarStatusTela(msg));
-            }
+            // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
+            // var bancoDadosGit = Path.Combine(bancoDadosDir, ".git");
+            // if (Directory.Exists(bancoDadosGit))
+            // {
+            //     AtualizarStatusTela("Enviando banco-de-dados ao GitHub...");
+            //     await GitHubService.PublicarJsonBancoDadosAsync(RootDir, compraJsonFile, conteudo,
+            //         msg => AtualizarStatusTela(msg));
+            // }
 
             EstoqueVM.Recarregar();
         }

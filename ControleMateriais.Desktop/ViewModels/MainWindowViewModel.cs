@@ -135,7 +135,6 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand IrParaCalculadoraPesosCommand { get; }
     public ICommand IrParaRecibosCommand { get; }
     public ICommand IrParaEstoqueCommand        { get; }
-    public ICommand IrParaEstoqueInicialCommand  { get; }
     public ICommand IrParaVendaCommand           { get; }
     public ICommand VoltarParaPesagensCommand { get; }
     public ICommand ConfigurarGitHubCommand { get; }
@@ -188,7 +187,6 @@ public class MainWindowViewModel : ViewModelBase
     public PesagensViewModel PesagensVM { get; }
     public EstoqueViewModel EstoqueVM { get; }
     public VendaViewModel    VendaVM   { get; }
-    public EstoqueInicialViewModel EstoqueInicialVM { get; }
 
     private PesagemItem? _pesagemAtiva;
 
@@ -216,7 +214,6 @@ public class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsCalculadoraPage));
                 OnPropertyChanged(nameof(IsEstoquePage));
                 OnPropertyChanged(nameof(IsVendaPage));
-                OnPropertyChanged(nameof(IsEstoqueInicialPage));
             }
         }
     }
@@ -226,7 +223,6 @@ public class MainWindowViewModel : ViewModelBase
     public bool IsCalculadoraPage        => _currentPage == AppPage.Calculadora;
     public bool IsEstoquePage            => _currentPage == AppPage.Estoque;
     public bool IsVendaPage              => _currentPage == AppPage.Venda;
-    public bool IsEstoqueInicialPage     => _currentPage == AppPage.EstoqueInicial;
 
     public decimal TotalGeral
     {
@@ -282,7 +278,6 @@ public class MainWindowViewModel : ViewModelBase
         IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Pesagens; });
         IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
         IrParaEstoqueCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
-        IrParaEstoqueInicialCommand  = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.EstoqueInicial; EstoqueInicialVM.Carregar(); });
         IrParaVendaCommand           = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
         VoltarParaPesagensCommand    = new DelegateCommand(VoltarParaPesagens);
         ConfigurarGitHubCommand      = new DelegateCommand(async () => await AbrirConfigGitHubAsync());
@@ -338,10 +333,8 @@ public class MainWindowViewModel : ViewModelBase
 
         CalculadoraVM    = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
         PesagensVM       = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
-        EstoqueInicialVM = new EstoqueInicialViewModel(RootDir, () => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
         EstoqueVM        = new EstoqueViewModel(RootDir,
-            irParaVendaAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); },
-            irParaEstoqueInicialAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.EstoqueInicial; EstoqueInicialVM.Carregar(); });
+            irParaVendaAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
         VendaVM          = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
         PesagensVM.AbrirReciboCallback        = AbrirReciboDetalhe;
         PesagensVM.CriarNovoReciboCallback    = CriarNovoRecibo;
@@ -1466,7 +1459,6 @@ public enum AppPage
     Recibos,
     Calculadora,
     Estoque,
-    Venda,
-    EstoqueInicial
+    Venda
 }
 

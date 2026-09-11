@@ -48,25 +48,6 @@ public class EstoqueViewModel : ViewModelBase
 
     public ObservableCollection<EstoqueItem>    Itens        { get; } = new();
     public ObservableCollection<ReciboVendaItem> RecibosVenda { get; } = new();
-    public ObservableCollection<string> EstoquesIniciaisDisponiveis { get; } = new();
-    public bool SemEstoqueInicial => EstoquesIniciaisDisponiveis.Count == 0;
-
-    private string _estoqueInicialSelecionado = string.Empty;
-    private bool _recarregando = false;
-    public string EstoqueInicialSelecionado
-    {
-        get => _estoqueInicialSelecionado;
-        set
-        {
-            if (value != _estoqueInicialSelecionado)
-            {
-                _estoqueInicialSelecionado = value;
-                OnPropertyChanged();
-                if (!_recarregando)
-                    Recarregar();
-            }
-        }
-    }
 
     private bool _recibosVendaVazia = true;
     public bool RecibosVendaVazia
@@ -132,14 +113,12 @@ public class EstoqueViewModel : ViewModelBase
 
     public ICommand SincronizarGitCommand        { get; }
     public ICommand IrParaVendaCommand           { get; }
-    public ICommand IrParaEstoqueInicialCommand  { get; }
 
-    public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null, Action? irParaEstoqueInicialAction = null)
+    public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null)
     {
         _rootDir = rootDir;
         SincronizarGitCommand        = new DelegateCommand(() => _ = SincronizarGitAsync());
         IrParaVendaCommand           = new DelegateCommand(() => irParaVendaAction?.Invoke());
-        IrParaEstoqueInicialCommand  = new DelegateCommand(() => irParaEstoqueInicialAction?.Invoke());
         AtualizarCommand          = new DelegateCommand(() => _ = AtualizarAsync());
         MigrarVendasCommand       = new DelegateCommand(() => _ = MigrarVendasAsync());
         AtualizarEstoqueCommand    = new DelegateCommand(Recarregar);
@@ -234,82 +213,6 @@ public class EstoqueViewModel : ViewModelBase
         catch (Exception ex) { Status = $"Erro ao excluir: {ex.Message}"; }
     }
 
-    // ── Caminho do estoque-inicial-MM-YYYY.json (dinâmico baseado na seleção) ──
-    private string EstoqueInicialPath
-    {
-        get
-        {
-            if (string.IsNullOrEmpty(EstoqueInicialSelecionado))
-                return string.Empty;
-            return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), $"{EstoqueInicialSelecionado}.json");
-        }
-    }
-
-    // ── Carrega lista de estoques iniciais disponíveis ───────────────────────
-    private void CarregarEstoquesIniciaisDisponiveis()
-    {
-        EstoquesIniciaisDisponiveis.Clear();
-        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
-        if (!Directory.Exists(dir)) return;
-
-        var arquivos = Directory.GetFiles(dir, "estoque-inicial-*.json")
-            .Select(Path.GetFileNameWithoutExtension)
-            .Where(f => !string.IsNullOrEmpty(f))
-            .OrderByDescending(f => f)
-            .ToList();
-
-        foreach (var arquivo in arquivos)
-            if (arquivo is not null)
-                EstoquesIniciaisDisponiveis.Add(arquivo);
-
-        // Auto-selecionar apenas se ainda não foi selecionado nada
-        if (string.IsNullOrEmpty(EstoqueInicialSelecionado) && EstoquesIniciaisDisponiveis.Any())
-        {
-            var mesAtual = DateTime.Now.ToString("estoque-inicial-MM-yyyy");
-            if (EstoquesIniciaisDisponiveis.Contains(mesAtual))
-                EstoqueInicialSelecionado = mesAtual;
-            else
-                EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
-        }
-
-        OnPropertyChanged(nameof(SemEstoqueInicial));
-    }
-
-    // Método público para carregar a lista de estoques iniciais (chamado pela View)
-    public void CarregarListaEstoquesIniciais()
-    {
-        CarregarEstoquesIniciaisDisponiveis();
-    }
-
-    // ── Lê estoque-inicial-MM-YYYY.json ────────────────────────────────────────
-    private Dictionary<string, decimal> LerEstoqueInicial()
-    {
-        var path = EstoqueInicialPath;
-        if (string.IsNullOrEmpty(path))
-        {
-            Status = "Nenhum estoque inicial encontrado. Clique em Sincronizar ou acesse Estoque Inicial.";
-            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        }
-        if (!File.Exists(path))
-        {
-            Status = "Não existe estoque inicial para o mês/ano selecionado.";
-            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        }
-        try
-        {
-            var obj = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
-            if (obj is null) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kvp in obj)
-            {
-                if (kvp.Key.Equals("data", StringComparison.OrdinalIgnoreCase)) continue;
-                dic[kvp.Key] = ExtrairDecimal(kvp.Value);
-            }
-            return dic;
-        }
-        catch { return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase); }
-    }
-
     // ── Lê arquivo mensal compra-MM-YYYY.json (apenas mês atual ou especificado) ───────────────
     private Dictionary<string, decimal> LerMesAtual(string? mesAno = null)
     {
@@ -387,16 +290,10 @@ public class EstoqueViewModel : ViewModelBase
         return dic;
     }
 
-    // ── Calcula estoque atual: vendas - (compras + estoque inicial) ───────────────────
+    // ── Calcula estoque atual: vendas - compras ───────────────────
     private Dictionary<string, decimal> CalcularEstoqueAtual()
     {
-        // Extrair mês/ano do estoque inicial selecionado
-        string mesAno = "01-2026"; // padrão
-        if (!string.IsNullOrEmpty(EstoqueInicialSelecionado) &&
-            EstoqueInicialSelecionado.StartsWith("estoque-inicial-"))
-        {
-            mesAno = EstoqueInicialSelecionado.Replace("estoque-inicial-", "");
-        }
+        var mesAno = DateTime.Now.ToString("MM-yyyy");
 
         // Começa com vendas (positivo)
         var totais = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -407,11 +304,6 @@ public class EstoqueViewModel : ViewModelBase
         // Subtrai compras do mesmo mês
         var mesAtual = LerMesAtual(mesAno);
         foreach (var kv in mesAtual)
-            totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
-
-        // Subtrai estoque inicial
-        var inicial = LerEstoqueInicial();
-        foreach (var kv in inicial)
             totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
 
         // Remove itens com zero
@@ -573,7 +465,6 @@ public class EstoqueViewModel : ViewModelBase
             // await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             Status = "Recibos sincronizados. (Banco de Dados: Em Desenvolvimento)";
 
-            CarregarListaEstoquesIniciais();
             Recarregar();
         }
         catch (Exception ex)

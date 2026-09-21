@@ -33,4 +33,26 @@ public partial class HomeView : UserControl
                 vm.GitConfigurado = true;
         }
     }
+
+    private static LogViewerWindow? _logViewer;
+
+    private void VerLogs_Click(object? sender, RoutedEventArgs e)
+    {
+        var owner = TopLevel.GetTopLevel(this) as Window;
+
+        // Reutiliza a janela se já estiver aberta, só traz para frente.
+        if (_logViewer is not null)
+        {
+            _logViewer.Activate();
+            return;
+        }
+
+        _logViewer = new LogViewerWindow();
+        _logViewer.Closed += (_, _) => _logViewer = null;
+
+        if (owner is not null)
+            _logViewer.Show(owner);
+        else
+            _logViewer.Show();
+    }
 }

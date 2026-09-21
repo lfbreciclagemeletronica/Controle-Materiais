@@ -166,6 +166,40 @@ public static class GitHubService
     }
 
     /// <summary>
+    /// Sincroniza (pull) o repo banco-de-dados e em seguida commita/faz push de um arquivo binário
+    /// já existente nele (ex.: o arquivo database.db após inserts no SQLite).
+    /// </summary>
+    public static async Task PublicarArquivoBancoDadosAsync(string rootDir, string nomeArquivo, string mensagemCommit,
+                                                              Action<string>? progresso = null)
+    {
+        if (!CredenciaisExistem(rootDir)) return;
+        var creds = CarregarCredenciais(rootDir)!;
+        if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return;
+
+        var repoDir = BancoDadosRepoDir(rootDir);
+        var gitDir  = Path.Combine(repoDir, ".git");
+        if (!Directory.Exists(gitDir)) return;
+
+        var remoteUrl = InjetarToken(creds.UrlBancoDados, creds.Token);
+        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+        await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
+        await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
+
+        progresso?.Invoke("Atualizando banco-de-dados (pull)...");
+        await RunAsync("git", "fetch origin main", repoDir);
+        await RunAsync("git", "rebase origin/main", repoDir);
+
+        progresso?.Invoke("Enviando banco de dados ao GitHub...");
+        await RunAsync("git", $"add \"{nomeArquivo}\"", repoDir);
+        var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
+        if (commit.exitCode == 0)
+        {
+            var branchAtual = await ObterBranchAtual(repoDir);
+            await RunAsync("git", $"push origin {branchAtual}", repoDir);
+        }
+    }
+
+    /// <summary>
     /// Remove o .json de estoque do repo banco-de-dados e faz push.
     /// </summary>
     public static async Task RemoverJsonBancoDadosAsync(string rootDir, string nomeArquivo,

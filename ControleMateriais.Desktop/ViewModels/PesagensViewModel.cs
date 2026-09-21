@@ -1,4 +1,5 @@
 using Avalonia.Platform.Storage;
+using ControleMateriais.Data.Models;
 using ControleMateriais.Desktop.Services;
 using System;
 using System.Collections.ObjectModel;
@@ -222,19 +223,78 @@ public class PesagensViewModel : ViewModelBase
     public ICommand AbrirReciboCommand        { get; }
     public ICommand CriarNovoCommand          { get; }
     public ICommand AbrirPdfCommand           { get; }
-    public ICommand DeletarReciboCommand      { get; }
     public ICommand DeletarPesagemCommand     { get; }
     public ICommand ExportarExcelCommand        { get; }
-    public ICommand ReconstruirBancoDadosCommand { get; }
 
     public Func<Task>?                          SolicitarConfiguracaoGitHubCallback { get; set; }
     public Action<PesagemItem>?                 AbrirReciboCallback { get; set; }
     public Action?                              CriarNovoReciboCallback { get; set; }
-    public Func<ReciboItem, Task>?              ConfirmarDeletarReciboCallback { get; set; }
     public Func<PesagemItem, Task>?             ConfirmarDeletarPesagemCallback { get; set; }
     public Action?                              NovoReciboPublicadoCallback { get; set; }
-    public Func<string, Task<bool>>?            ConfirmarReconstruirBancoDadosCallback { get; set; }
     public Action?                              EstoqueRecarregarCallback { get; set; }
+
+    // ── Vendas (movido de Controle de Estoque para o Sistema de Recibos) ───
+    // Reaproveita a instância de EstoqueViewModel (dados/lógica de RecibosVenda já existentes).
+    private EstoqueViewModel? _estoqueVM;
+    public EstoqueViewModel? EstoqueVM
+    {
+        get => _estoqueVM;
+        set { if (value != _estoqueVM) { _estoqueVM = value; OnPropertyChanged(); } }
+    }
+
+    public Action?     IrParaVendaCallback { get; set; }
+    public ICommand    IrParaVendaCommand  { get; }
+
+    // ── Fornecedores (Usuarios cadastrados no banco de dados SQLite) ────────
+    public ObservableCollection<Usuario> Fornecedores { get; } = new();
+    public ObservableCollection<Usuario> FornecedoresFiltrados { get; } = new();
+
+    private bool _carregandoFornecedores;
+    public bool CarregandoFornecedores
+    {
+        get => _carregandoFornecedores;
+        private set { if (value != _carregandoFornecedores) { _carregandoFornecedores = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusFornecedores = string.Empty;
+    public string StatusFornecedores
+    {
+        get => _statusFornecedores;
+        private set { if (value != _statusFornecedores) { _statusFornecedores = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusFornecedoresVisivel)); } }
+    }
+    public bool StatusFornecedoresVisivel => !string.IsNullOrEmpty(_statusFornecedores);
+
+    private string _filtroFornecedorNome = string.Empty;
+    public string FiltroFornecedorNome
+    {
+        get => _filtroFornecedorNome;
+        set { if (value != _filtroFornecedorNome) { _filtroFornecedorNome = value; OnPropertyChanged(); AtualizarFiltroFornecedores(); } }
+    }
+
+    public bool FornecedoresListaVazia => !CarregandoFornecedores && FornecedoresFiltrados.Count == 0;
+
+    private void AtualizarFiltroFornecedores()
+    {
+        FornecedoresFiltrados.Clear();
+        var nome = _filtroFornecedorNome?.Trim() ?? string.Empty;
+
+        foreach (var f in Fornecedores
+            .Where(f => string.IsNullOrEmpty(nome) || f.Nome.Contains(nome, StringComparison.OrdinalIgnoreCase)))
+        {
+            FornecedoresFiltrados.Add(f);
+        }
+
+        OnPropertyChanged(nameof(FornecedoresListaVazia));
+    }
+
+    public ICommand AtualizarFornecedoresCommand { get; }
+    public ICommand EditarFornecedorCommand      { get; }
+    public ICommand InativarFornecedorCommand    { get; }
+    public ICommand ReativarFornecedorCommand    { get; }
+
+    public Func<Usuario, Task>?      EditarFornecedorCallback { get; set; }
+    public Func<Usuario, Task<bool>>? ConfirmarInativarFornecedorCallback { get; set; }
+    public Func<Usuario, Task<bool>>? ConfirmarReativarFornecedorCallback { get; set; }
 
     public PesagensViewModel(Action voltarCallback, string rootDir)
     {
@@ -254,16 +314,131 @@ public class PesagensViewModel : ViewModelBase
             try { Process.Start(new ProcessStartInfo(item.CaminhoCompleto) { UseShellExecute = true }); }
             catch { }
         });
-        DeletarReciboCommand  = new DelegateCommand<ReciboItem>(item =>
-        {
-            if (item is not null) _ = ConfirmarDeletarReciboCallback?.Invoke(item);
-        });
         DeletarPesagemCommand = new DelegateCommand<PesagemItem>(item =>
         {
             if (item is not null) _ = ConfirmarDeletarPesagemCallback?.Invoke(item);
         });
         ExportarExcelCommand        = new DelegateCommand(() => _ = ExportarExcelAsync());
-        ReconstruirBancoDadosCommand = new DelegateCommand(() => _ = ReconstruirBancoDadosAsync());
+
+        AtualizarFornecedoresCommand = new DelegateCommand(() => _ = CarregarFornecedoresAsync());
+        EditarFornecedorCommand      = new DelegateCommand<Usuario>(item =>
+        {
+            if (item is not null) _ = EditarFornecedorCallback?.Invoke(item);
+        });
+        InativarFornecedorCommand    = new DelegateCommand<Usuario>(item => _ = InativarFornecedorAsync(item));
+        ReativarFornecedorCommand    = new DelegateCommand<Usuario>(item => _ = ReativarFornecedorAsync(item));
+
+        IrParaVendaCommand = new DelegateCommand(() => IrParaVendaCallback?.Invoke());
+    }
+
+    public async Task CarregarFornecedoresAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarFornecedoresAsync);
+        AppLogger.Info(correlationId, origem, "Carregando lista de fornecedores do banco de dados...");
+
+        CarregandoFornecedores = true;
+        StatusFornecedores = string.Empty;
+        try
+        {
+            var usuarios = await DataService.UsuarioRepository.GetTodosAsync();
+            Fornecedores.Clear();
+            foreach (var u in usuarios.OrderBy(u => u.Nome))
+                Fornecedores.Add(u);
+            AtualizarFiltroFornecedores();
+            AppLogger.Info(correlationId, origem, $"{Fornecedores.Count} fornecedor(es) carregado(s).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusFornecedores = $"Erro ao carregar fornecedores: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoFornecedores = false;
+            OnPropertyChanged(nameof(FornecedoresListaVazia));
+        }
+    }
+
+    public async Task SalvarFornecedorAsync(Usuario usuario)
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(SalvarFornecedorAsync);
+        AppLogger.Info(correlationId, origem, $"Salvando alterações do fornecedor Id={usuario.Id} ('{usuario.Nome}')...");
+        try
+        {
+            usuario.AtualizadoEm = DateTime.Now;
+            await DataService.UsuarioRepository.UpdateAsync(usuario);
+            AppLogger.Info(correlationId, origem, $"Fornecedor Id={usuario.Id} atualizado com sucesso.");
+            await CarregarFornecedoresAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusFornecedores = $"Erro ao salvar fornecedor: {ex.Message}";
+        }
+    }
+
+    private async Task InativarFornecedorAsync(Usuario? usuario)
+    {
+        if (usuario is null || !usuario.Ativo) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(InativarFornecedorAsync);
+        AppLogger.Info(correlationId, origem, $"Solicitada inativação do fornecedor Id={usuario.Id} ('{usuario.Nome}').");
+
+        if (ConfirmarInativarFornecedorCallback is not null)
+        {
+            var ok = await ConfirmarInativarFornecedorCallback(usuario);
+            if (!ok)
+            {
+                AppLogger.Info(correlationId, origem, "Inativação cancelada pelo usuário.");
+                return;
+            }
+        }
+
+        try
+        {
+            await DataService.UsuarioRepository.DeleteAsync(usuario.Id);
+            AppLogger.Info(correlationId, origem, $"Fornecedor Id={usuario.Id} inativado com sucesso.");
+            await CarregarFornecedoresAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusFornecedores = $"Erro ao inativar fornecedor: {ex.Message}";
+        }
+    }
+
+    private async Task ReativarFornecedorAsync(Usuario? usuario)
+    {
+        if (usuario is null || usuario.Ativo) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(ReativarFornecedorAsync);
+        AppLogger.Info(correlationId, origem, $"Solicitada reativação do fornecedor Id={usuario.Id} ('{usuario.Nome}').");
+
+        if (ConfirmarReativarFornecedorCallback is not null)
+        {
+            var ok = await ConfirmarReativarFornecedorCallback(usuario);
+            if (!ok)
+            {
+                AppLogger.Info(correlationId, origem, "Reativação cancelada pelo usuário.");
+                return;
+            }
+        }
+
+        try
+        {
+            await DataService.UsuarioRepository.ReativarAsync(usuario.Id);
+            AppLogger.Info(correlationId, origem, $"Fornecedor Id={usuario.Id} reativado com sucesso.");
+            await CarregarFornecedoresAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusFornecedores = $"Erro ao reativar fornecedor: {ex.Message}";
+        }
     }
 
     public void CarregarPesagens()
@@ -317,6 +492,11 @@ public class PesagensViewModel : ViewModelBase
     private async Task SincronizarAsync()
     {
         if (Sincronizando) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(SincronizarAsync);
+        AppLogger.Info(correlationId, origem, "Iniciando sincronização de pesagens com o GitHub...");
+
         Sincronizando = true;
         SyncPesagens.Status = SyncStatus.Loading;
         SyncPesagens.Mensagem = string.Empty;
@@ -412,9 +592,11 @@ public class PesagensViewModel : ViewModelBase
 
             SyncPesagens.Status = SyncStatus.Ok;
             SyncPesagens.Mensagem = renomeados.Count > 0 ? $"{renomeados.Count} pesagem(ns) sincronizada(s)" : "Nenhuma nova pesagem para sincronizar";
+            AppLogger.Info(correlationId, origem, $"Sincronização concluída: {SyncPesagens.Mensagem}");
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             SyncPesagens.Status = SyncStatus.Error;
             SyncPesagens.Mensagem = $"Erro: {ex.Message}";
         }
@@ -449,72 +631,6 @@ public class PesagensViewModel : ViewModelBase
         AtualizarFiltroRecibos();
         OnPropertyChanged(nameof(RecibosDirPresente));
         OnPropertyChanged(nameof(RecibosListaVazia));
-    }
-
-    public async Task DeletarReciboAsync(ReciboItem item)
-    {
-        try
-        {
-            var nomeArquivoPdf = Path.GetFileName(item.CaminhoCompleto);
-
-            // Extrair dados do .meta.json se existir, ou usar dados do item
-            string cliente = item.NomeArquivo;
-            string data = item.DataCriacao; // Formato dd/MM/yyyy
-            var metaPath = item.CaminhoCompleto + ".meta.json";
-            if (File.Exists(metaPath))
-            {
-                try
-                {
-                    var node = JsonNode.Parse(File.ReadAllText(metaPath));
-                    if (node?["cliente"] is JsonNode nc) cliente = nc.GetValue<string>();
-                    if (node?["data"] is JsonNode nd) data = nd.GetValue<string>();
-                }
-                catch { }
-            }
-
-            // Remover registro do JSON de compras
-            bool jsonModificado = GitHubService.RemoverRegistroDoJson(RootDir, "compra", cliente, data);
-
-            // Sincronizar JSON modificado com GitHub
-            if (jsonModificado && GitHubService.CredenciaisExistem(RootDir))
-            {
-                var mesAno = DateTime.ParseExact(data, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture).ToString("MM-yyyy");
-                var nomeJson = $"compra-{mesAno}.json";
-                MostrarStatusRecibos("Removendo dados do banco-de-dados...", ok: true);
-                await GitHubService.RemoverJsonBancoDadosAsync(RootDir,
-                    nomeJson,
-                    msg => MostrarStatusRecibos(msg, ok: true));
-            }
-
-            // Remove arquivo PDF local
-            if (File.Exists(item.CaminhoCompleto))
-                File.Delete(item.CaminhoCompleto);
-
-            // Remove .meta.json se existir
-            if (File.Exists(metaPath))
-                File.Delete(metaPath);
-
-            // Remove do Git e faz push
-            if (GitHubService.CredenciaisExistem(RootDir))
-            {
-                MostrarStatusRecibos("Removendo recibo do GitHub...", ok: true);
-                await GitHubService.RemoverReciboAsync(RootDir,
-                    nomeArquivoPdf,
-                    msg => MostrarStatusRecibos(msg, ok: true));
-                MostrarStatusRecibos(string.Empty, ok: true);
-            }
-
-            // Recalcular estoque
-            EstoqueRecarregarCallback?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            MostrarStatusRecibos($"Erro ao deletar: {ex.Message}", ok: false);
-        }
-        finally
-        {
-            CarregarRecibos();
-        }
     }
 
     public async Task DeletarPesagemAsync(PesagemItem item)
@@ -600,6 +716,11 @@ public class PesagensViewModel : ViewModelBase
     private async Task SincronizarRecibosAsync()
     {
         if (SincronizandoRecibos) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(SincronizarRecibosAsync);
+        AppLogger.Info(correlationId, origem, "Iniciando sincronização de recibos com o GitHub...");
+
         SincronizandoRecibos = true;
         SyncRecibos.Status = SyncStatus.Loading;
         SyncRecibos.Mensagem = string.Empty;
@@ -609,6 +730,7 @@ public class PesagensViewModel : ViewModelBase
         {
             if (!GitHubService.CredenciaisExistem(RootDir))
             {
+                AppLogger.Aviso(correlationId, origem, "GitHub não configurado.");
                 SyncRecibos.Status = SyncStatus.Error;
                 SyncRecibos.Mensagem = "GitHub não configurado";
                 return;
@@ -637,9 +759,11 @@ public class PesagensViewModel : ViewModelBase
                         : $"• {item.Nome} — {dataFmt}");
                 }
             }
+            AppLogger.Info(correlationId, origem, $"Sincronização concluída: {SyncRecibos.Mensagem}");
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             SyncRecibos.Status = SyncStatus.Error;
             SyncRecibos.Mensagem = $"Erro: {ex.Message}";
         }
@@ -762,64 +886,4 @@ public class PesagensViewModel : ViewModelBase
         }
     }
 
-    private bool _reconstruindoBancoDados;
-    public bool ReconstruindoBancoDados
-    {
-        get => _reconstruindoBancoDados;
-        private set { if (value != _reconstruindoBancoDados) { _reconstruindoBancoDados = value; OnPropertyChanged(); } }
-    }
-
-    private async Task ReconstruirBancoDadosAsync()
-    {
-        if (ReconstruindoBancoDados) return;
-
-        if (ConfirmarReconstruirBancoDadosCallback is not null)
-        {
-            var ok = await ConfirmarReconstruirBancoDadosCallback(
-                "Esta ação irá apagar todos os arquivos compra-MM-YYYY.json e venda-DD-MM-YYYY.json em banco-de-dados/\n" +
-                "mantendo apenas estoque-inicial-MM-YYYY.json.\n\n" +
-                "Os arquivos serão recriados a partir dos PDFs de recibos usando a nova estrutura.\n\n" +
-                "Deseja continuar?");
-            if (!ok) return;
-        }
-
-        ReconstruindoBancoDados = true;
-        MostrarStatusRecibos("Reconstruindo banco de dados...", ok: true);
-
-        try
-        {
-            var bancoDadosDir = GitHubService.BancoDadosRepoDir(RootDir);
-            if (!Directory.Exists(bancoDadosDir))
-            {
-                MostrarStatusRecibos("Diretório banco-de-dados não encontrado.", ok: false);
-                return;
-            }
-
-            // Sincroniza Recibos (incluindo Recibos_Venda/) antes de reconstruir
-            if (GitHubService.CredenciaisExistem(RootDir))
-            {
-                MostrarStatusRecibos("Sincronizando recibos de venda com GitHub...", ok: true);
-                await GitHubService.GarantirRecibosRepoAsync(RootDir,
-                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => MostrarStatusRecibos(msg, ok: true)));
-                await GitHubService.SincronizarRecibosAsync(RootDir,
-                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => MostrarStatusRecibos(msg, ok: true)));
-            }
-
-            await Task.Run(() =>
-                ReconstruirBancoDadosService.Reconstruir(RootDir,
-                    msg => Avalonia.Threading.Dispatcher.UIThread.Post(
-                        () => MostrarStatusRecibos(msg, ok: true))));
-
-            MostrarStatusRecibos("Banco de dados reconstruído com sucesso!", ok: true);
-            EstoqueRecarregarCallback?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            MostrarStatusRecibos($"Erro ao reconstruir: {ex.Message}", ok: false);
-        }
-        finally
-        {
-            ReconstruindoBancoDados = false;
-        }
-    }
 }

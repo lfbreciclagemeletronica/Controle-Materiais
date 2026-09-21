@@ -18,17 +18,6 @@ public static class DatabaseInitializer
         const string createTables = @"
             PRAGMA foreign_keys = ON;
 
-            CREATE TABLE IF NOT EXISTS Usuarios (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Nome TEXT NOT NULL,
-                Cpf TEXT UNIQUE,
-                Cnpj TEXT UNIQUE,
-                ChavePix TEXT NOT NULL,
-                CriadoEm TEXT NOT NULL DEFAULT (datetime('now')),
-                AtualizadoEm TEXT NOT NULL DEFAULT (datetime('now')),
-                Ativo INTEGER NOT NULL DEFAULT 1
-            );
-
             CREATE TABLE IF NOT EXISTS Itens (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Nome TEXT NOT NULL UNIQUE,
@@ -36,11 +25,22 @@ public static class DatabaseInitializer
                 Ativo INTEGER NOT NULL DEFAULT 1
             );
 
+            CREATE TABLE IF NOT EXISTS Usuarios (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Nome TEXT NOT NULL UNIQUE,
+                Cpf TEXT UNIQUE,
+                Cnpj TEXT UNIQUE,
+                ChavePix TEXT,
+                CriadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+                AtualizadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+                Ativo INTEGER NOT NULL DEFAULT 1
+            );
+
             CREATE TABLE IF NOT EXISTS RecibosCompra (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 UsuarioId INTEGER NOT NULL,
-                NumeroRecibo INTEGER UNIQUE,
                 DataRecibo TEXT NOT NULL,
+                CodigoRecibo TEXT NOT NULL,
                 ValorTotal REAL NOT NULL DEFAULT 0,
                 PesoTotalKg REAL NOT NULL DEFAULT 0,
                 CriadoEm TEXT NOT NULL DEFAULT (datetime('now')),
@@ -50,45 +50,19 @@ public static class DatabaseInitializer
 
             CREATE TABLE IF NOT EXISTS ReciboCompraItens (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ReciboCompraId INTEGER NOT NULL,
+                ReciboCodigo TEXT NOT NULL,
                 ItemId INTEGER NOT NULL,
                 PesoKg REAL NOT NULL CHECK (PesoKg >= 0),
                 PrecoPorKg REAL NOT NULL DEFAULT 0,
                 Total REAL NOT NULL DEFAULT 0,
 
-                FOREIGN KEY (ReciboCompraId) REFERENCES RecibosCompra(Id) ON DELETE CASCADE,
+                FOREIGN KEY (ReciboCodigo) REFERENCES RecibosCompra(CodigoRecibo) ON DELETE CASCADE,
                 FOREIGN KEY (ItemId) REFERENCES Itens(Id)
             );
 
-            CREATE TABLE IF NOT EXISTS RecibosVenda (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ClienteNome TEXT NOT NULL,
-                ClienteCpf TEXT,
-                ClienteCnpj TEXT,
-                ClienteChavePix TEXT,
-                NumeroRecibo INTEGER UNIQUE,
-                DataVenda TEXT NOT NULL,
-                ValorTotal REAL NOT NULL DEFAULT 0,
-                PesoTotalKg REAL NOT NULL DEFAULT 0,
-                CriadoEm TEXT NOT NULL DEFAULT (datetime('now')),
-
-                CHECK (
-                    (ClienteCpf IS NOT NULL AND ClienteCnpj IS NULL) OR
-                    (ClienteCpf IS NULL AND ClienteCnpj IS NOT NULL)
-                )
-            );
-
-            CREATE TABLE IF NOT EXISTS RecibosVendaItens (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ReciboVendaId INTEGER NOT NULL,
-                ItemId INTEGER NOT NULL,
-                PesoKg REAL NOT NULL CHECK (PesoKg >= 0),
-                PrecoPorKg REAL NOT NULL DEFAULT 0,
-                Total REAL NOT NULL DEFAULT 0,
-
-                FOREIGN KEY (ReciboVendaId) REFERENCES RecibosVenda(Id) ON DELETE CASCADE,
-                FOREIGN KEY (ItemId) REFERENCES Itens(Id)
-            );
+            -- SQLite exige que a coluna referenciada por uma FOREIGN KEY seja PRIMARY KEY
+            -- ou tenha um indice UNIQUE. Sem isso, o INSERT falha com erro de foreign key mismatch.
+            CREATE UNIQUE INDEX IF NOT EXISTS UX_RecibosCompra_CodigoRecibo ON RecibosCompra(CodigoRecibo);
 
             CREATE VIEW IF NOT EXISTS EstoqueView AS
             SELECT
@@ -96,32 +70,77 @@ public static class DatabaseInitializer
                 i.Nome AS ItemNome,
                 i.Ordem,
                 COALESCE(SUM(rci.PesoKg), 0) AS TotalComprasKg,
-                COALESCE(SUM(rvi.PesoKg), 0) AS TotalVendasKg,
-                COALESCE(SUM(rci.PesoKg), 0) - COALESCE(SUM(rvi.PesoKg), 0) AS SaldoKg
+                0 AS TotalVendasKg,
+                COALESCE(SUM(rci.PesoKg), 0) AS SaldoKg
             FROM Itens i
             LEFT JOIN ReciboCompraItens rci ON rci.ItemId = i.Id
-            LEFT JOIN RecibosVendaItens rvi ON rvi.ItemId = i.Id
             WHERE i.Ativo = 1
             GROUP BY i.Id, i.Nome, i.Ordem
-            ORDER BY i.Ordem;
-
-            CREATE TABLE IF NOT EXISTS Auditoria (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Tabela TEXT NOT NULL,
-                Operacao TEXT NOT NULL,
-                RegistroId INTEGER,
-                ValorAntigo TEXT,
-                ValorNovo TEXT,
-                Usuario TEXT,
-                DataHora TEXT NOT NULL
-            );";
+            ORDER BY i.Ordem;";
 
         connection.Execute(createTables);
-        SeedItems(connection);
+        MigrarEsquemaExistente(connection);
+        SeedItemsIfEmpty(connection);
     }
 
-    private static void SeedItems(SqliteConnection connection)
+    /// <summary>
+    /// Corrige bancos de dados criados antes da correção do esquema de RecibosCompra/ReciboCompraItens:
+    /// - Garante o índice único em RecibosCompra.CodigoRecibo (exigido pelo SQLite para a FOREIGN KEY).
+    /// - Corrige o tipo da coluna ReciboCompraItens.ReciboCodigo de INTEGER para TEXT (igual a CodigoRecibo),
+    ///   já que "CREATE TABLE IF NOT EXISTS" não altera tabelas já existentes.
+    /// </summary>
+    private static void MigrarEsquemaExistente(SqliteConnection connection)
     {
+        IEnumerable<dynamic> colunas = connection.Query("PRAGMA table_info(ReciboCompraItens);");
+        dynamic? colunaReciboCodigo = colunas.FirstOrDefault(c =>
+            string.Equals((string)c.name, "ReciboCodigo", StringComparison.OrdinalIgnoreCase));
+
+        if (colunaReciboCodigo is null) return; // tabela nova, já criada com o tipo correto
+        if (!string.Equals((string)colunaReciboCodigo.type, "INTEGER", StringComparison.OrdinalIgnoreCase)) return;
+
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            connection.Execute("ALTER TABLE ReciboCompraItens RENAME TO ReciboCompraItens_old;", transaction: transaction);
+
+            const string recriarTabela = @"
+                CREATE TABLE ReciboCompraItens (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ReciboCodigo TEXT NOT NULL,
+                    ItemId INTEGER NOT NULL,
+                    PesoKg REAL NOT NULL CHECK (PesoKg >= 0),
+                    PrecoPorKg REAL NOT NULL DEFAULT 0,
+                    Total REAL NOT NULL DEFAULT 0,
+
+                    FOREIGN KEY (ReciboCodigo) REFERENCES RecibosCompra(CodigoRecibo) ON DELETE CASCADE,
+                    FOREIGN KEY (ItemId) REFERENCES Itens(Id)
+                );";
+            connection.Execute(recriarTabela, transaction: transaction);
+
+            const string copiarDados = @"
+                INSERT INTO ReciboCompraItens (Id, ReciboCodigo, ItemId, PesoKg, PrecoPorKg, Total)
+                SELECT Id, CAST(ReciboCodigo AS TEXT), ItemId, PesoKg, PrecoPorKg, Total
+                FROM ReciboCompraItens_old;";
+            connection.Execute(copiarDados, transaction: transaction);
+
+            connection.Execute("DROP TABLE ReciboCompraItens_old;", transaction: transaction);
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    private static void SeedItemsIfEmpty(SqliteConnection connection)
+    {
+        const string checkSql = "SELECT COUNT(*) FROM Itens;";
+        var count = connection.ExecuteScalar<int>(checkSql);
+
+        if (count > 0) return; // Já tem dados, não faz seed
+
         const string sql = @"
             INSERT INTO Itens (Nome, Ordem) VALUES
             ('Placa Drive', 1),

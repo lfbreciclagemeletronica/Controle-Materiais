@@ -1,3 +1,4 @@
+using ControleMateriais.Data.Models;
 using ControleMateriais.Desktop.Services;
 using System;
 using System.Collections.Generic;
@@ -29,6 +30,13 @@ public class ReciboVendaItem
 }
 
 public class EstoqueItem
+{
+    public string  Material   { get; set; } = string.Empty;
+    public decimal TotalKg    { get; set; }
+    public string  TotalKgStr => TotalKg.ToString("N3", CultureInfo.GetCultureInfo("pt-BR")) + " kg";
+}
+
+public class ItemMensalWrapper
 {
     public string  Material   { get; set; } = string.Empty;
     public decimal TotalKg    { get; set; }
@@ -114,6 +122,72 @@ public class EstoqueViewModel : ViewModelBase
     public ICommand SincronizarGitCommand        { get; }
     public ICommand IrParaVendaCommand           { get; }
 
+    // ── Entradas (Recibos de Compra cadastrados no banco de dados SQLite) ──
+    public ObservableCollection<ReciboCompra> Entradas           { get; } = new();
+    public ObservableCollection<ReciboCompra> EntradasFiltradas  { get; } = new();
+
+    private bool _carregandoEntradas;
+    public bool CarregandoEntradas
+    {
+        get => _carregandoEntradas;
+        private set { if (value != _carregandoEntradas) { _carregandoEntradas = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusEntradas = string.Empty;
+    public string StatusEntradas
+    {
+        get => _statusEntradas;
+        private set { if (value != _statusEntradas) { _statusEntradas = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusEntradasVisivel)); } }
+    }
+    public bool StatusEntradasVisivel => !string.IsNullOrEmpty(_statusEntradas);
+
+    private string _filtroEntradas = string.Empty;
+    public string FiltroEntradas
+    {
+        get => _filtroEntradas;
+        set { if (value != _filtroEntradas) { _filtroEntradas = value; OnPropertyChanged(); AtualizarFiltroEntradas(); } }
+    }
+
+    public bool EntradasVazia => !CarregandoEntradas && EntradasFiltradas.Count == 0;
+
+    public ICommand AtualizarEntradasCommand { get; }
+    public ICommand AbrirEntradaCommand      { get; }
+
+    // Callback para abrir o modal com os itens do recibo selecionado
+    public Func<ReciboCompra, Task>? AbrirDetalhesEntradaCallback { get; set; }
+
+    // ── Estoque por Mês (quantidade de cada item em Kg, agrupado por mês) ──
+    private List<ItemMensal> _totaisMensaisRaw = new();
+
+    public ObservableCollection<MesOpcao> MesesCompras { get; } = new();
+    public ObservableCollection<ItemMensalWrapper> ItensPorMes { get; } = new();
+
+    private MesOpcao? _mesSelecionadoCompras;
+    public MesOpcao? MesSelecionadoCompras
+    {
+        get => _mesSelecionadoCompras;
+        set { if (value != _mesSelecionadoCompras) { _mesSelecionadoCompras = value; OnPropertyChanged(); AtualizarItensPorMes(); } }
+    }
+
+    private bool _carregandoTotaisMensais;
+    public bool CarregandoTotaisMensais
+    {
+        get => _carregandoTotaisMensais;
+        private set { if (value != _carregandoTotaisMensais) { _carregandoTotaisMensais = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusTotaisMensais = string.Empty;
+    public string StatusTotaisMensais
+    {
+        get => _statusTotaisMensais;
+        private set { if (value != _statusTotaisMensais) { _statusTotaisMensais = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusTotaisMensaisVisivel)); } }
+    }
+    public bool StatusTotaisMensaisVisivel => !string.IsNullOrEmpty(_statusTotaisMensais);
+
+    public bool ItensPorMesVazio => !CarregandoTotaisMensais && ItensPorMes.Count == 0;
+
+    public ICommand AtualizarTotaisMensaisCommand { get; }
+
     public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null)
     {
         _rootDir = rootDir;
@@ -124,6 +198,161 @@ public class EstoqueViewModel : ViewModelBase
         AtualizarEstoqueCommand    = new DelegateCommand(Recarregar);
         AbrirReciboVendaCommand   = new DelegateCommand<ReciboVendaItem?>(AbrirReciboVenda);
         ExcluirReciboVendaCommand = new DelegateCommand<ReciboVendaItem?>(r => _ = ExcluirReciboVendaAsync(r));
+
+        AtualizarEntradasCommand = new DelegateCommand(() => _ = CarregarEntradasAsync());
+        AbrirEntradaCommand      = new DelegateCommand<ReciboCompra>(item => _ = AbrirEntradaAsync(item));
+
+        AtualizarTotaisMensaisCommand = new DelegateCommand(() => _ = CarregarTotaisMensaisAsync());
+    }
+
+    // ── Carrega os totais mensais (por item) do banco de dados SQLite ──
+    public async Task CarregarTotaisMensaisAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarTotaisMensaisAsync);
+        AppLogger.Info(correlationId, origem, "Carregando totais mensais de compras por item...");
+
+        CarregandoTotaisMensais = true;
+        StatusTotaisMensais = string.Empty;
+        try
+        {
+            _totaisMensaisRaw = (await DataService.ReciboCompraRepository.GetTotaisPorMesAsync()).ToList();
+
+            var mesSelecionadoAnterior = _mesSelecionadoCompras;
+            MesesCompras.Clear();
+            foreach (var mes in _totaisMensaisRaw
+                .Select(t => t.Mes)
+                .Distinct()
+                .Select(m => new { Partes = m.Split('/'), Texto = m })
+                .Where(m => m.Partes.Length == 2)
+                .Select(m => new MesOpcao
+                {
+                    Mes = int.Parse(m.Partes[0]),
+                    Ano = int.Parse(m.Partes[1]),
+                    Label = new DateTime(int.Parse(m.Partes[1]), int.Parse(m.Partes[0]), 1)
+                        .ToString("MMMM/yyyy", CultureInfo.GetCultureInfo("pt-BR"))
+                })
+                .OrderByDescending(m => m.Ano).ThenByDescending(m => m.Mes))
+            {
+                MesesCompras.Add(mes);
+            }
+
+            _mesSelecionadoCompras = mesSelecionadoAnterior is not null
+                ? MesesCompras.FirstOrDefault(m => m.Ano == mesSelecionadoAnterior.Ano && m.Mes == mesSelecionadoAnterior.Mes)
+                : null;
+            _mesSelecionadoCompras ??= MesesCompras.FirstOrDefault();
+            OnPropertyChanged(nameof(MesSelecionadoCompras));
+
+            AtualizarItensPorMes();
+            AppLogger.Info(correlationId, origem, $"{MesesCompras.Count} mês(es) com dados encontrados.");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusTotaisMensais = $"Erro ao carregar totais mensais: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoTotaisMensais = false;
+            OnPropertyChanged(nameof(ItensPorMesVazio));
+        }
+    }
+
+    private void AtualizarItensPorMes()
+    {
+        ItensPorMes.Clear();
+
+        if (_mesSelecionadoCompras is not null)
+        {
+            var mesTexto = $"{_mesSelecionadoCompras.Mes:00}/{_mesSelecionadoCompras.Ano}";
+            foreach (var item in _totaisMensaisRaw
+                .Where(t => t.Mes == mesTexto)
+                .OrderByDescending(t => t.TotalKg))
+            {
+                ItensPorMes.Add(new ItemMensalWrapper { Material = item.ItemNome, TotalKg = item.TotalKg });
+            }
+        }
+
+        OnPropertyChanged(nameof(ItensPorMesVazio));
+    }
+
+    // ── Carrega os recibos de compra (Entradas) do banco de dados SQLite ──
+    public async Task CarregarEntradasAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarEntradasAsync);
+        AppLogger.Info(correlationId, origem, "Carregando entradas (recibos de compra) do banco de dados...");
+
+        CarregandoEntradas = true;
+        StatusEntradas = string.Empty;
+        try
+        {
+            var recibos = await DataService.ReciboCompraRepository.GetAllAsync();
+            Entradas.Clear();
+            foreach (var r in recibos)
+                Entradas.Add(r);
+            AtualizarFiltroEntradas();
+            AppLogger.Info(correlationId, origem, $"{Entradas.Count} entrada(s) carregada(s).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusEntradas = $"Erro ao carregar entradas: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoEntradas = false;
+            OnPropertyChanged(nameof(EntradasVazia));
+        }
+    }
+
+    private void AtualizarFiltroEntradas()
+    {
+        EntradasFiltradas.Clear();
+        var busca = _filtroEntradas?.Trim() ?? string.Empty;
+
+        foreach (var r in Entradas.Where(r => Corresponde(r, busca)))
+            EntradasFiltradas.Add(r);
+
+        OnPropertyChanged(nameof(EntradasVazia));
+
+        static bool Corresponde(ReciboCompra r, string busca)
+        {
+            if (string.IsNullOrEmpty(busca)) return true;
+            return r.UsuarioNome.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || r.CodigoRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || r.DataRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || r.ValorTotal.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")).Contains(busca, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    // ── Busca o recibo completo (com itens) e abre o modal de detalhes ──
+    private async Task AbrirEntradaAsync(ReciboCompra? entrada)
+    {
+        if (entrada is null) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(AbrirEntradaAsync);
+        AppLogger.Info(correlationId, origem, $"Abrindo detalhes da entrada Id={entrada.Id} (Codigo={entrada.CodigoRecibo}).");
+
+        try
+        {
+            var completo = await DataService.ReciboCompraRepository.GetByIdAsync(entrada.Id);
+            if (completo is null)
+            {
+                StatusEntradas = "Recibo não encontrado no banco de dados.";
+                return;
+            }
+            completo.UsuarioNome = entrada.UsuarioNome;
+
+            if (AbrirDetalhesEntradaCallback is not null)
+                await AbrirDetalhesEntradaCallback(completo);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusEntradas = $"Erro ao abrir entrada: {ex.Message}";
+        }
     }
 
     private static void AbrirReciboVenda(ReciboVendaItem? item)

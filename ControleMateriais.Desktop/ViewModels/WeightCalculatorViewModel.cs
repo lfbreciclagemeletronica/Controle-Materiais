@@ -16,6 +16,8 @@ public class WeightCalculatorViewModel : ViewModelBase
     private static readonly CultureInfo PtBR = CultureInfo.GetCultureInfo("pt-BR");
 
     public ObservableCollection<WeightItemWrapper> Itens { get; } = new();
+    public ObservableCollection<CustomWeightItemWrapper> ItensPersonalizados { get; } = new();
+    public ObservableCollection<string> NomesFornecedores { get; } = new();
 
     private decimal _pesoTotal;
     public decimal PesoTotal
@@ -27,6 +29,8 @@ public class WeightCalculatorViewModel : ViewModelBase
     public ICommand VoltarCommand { get; }
     public ICommand LimparCommand { get; }
     public ICommand SalvarEnviarCommand { get; }
+    public ICommand AdicionarCustomItemCommand { get; }
+    public ICommand RemoverCustomItemCommand { get; }
 
     public string RootDir { get; }
 
@@ -62,18 +66,57 @@ public class WeightCalculatorViewModel : ViewModelBase
         foreach (var nome in ItemCatalog.OrderedItems)
             Itens.Add(new WeightItemWrapper(nome, RecalcularTotal));
 
+        for (int i = 0; i < 4; i++)
+            ItensPersonalizados.Add(new CustomWeightItemWrapper(RecalcularTotal));
+
         VoltarCommand = new DelegateCommand(voltarCallback);
         LimparCommand = new DelegateCommand(Limpar);
         SalvarEnviarCommand = new DelegateCommand(() => _ = SalvarEnviarAsync());
+        AdicionarCustomItemCommand = new DelegateCommand(AdicionarCustomItem);
+        RemoverCustomItemCommand = new DelegateCommand<CustomWeightItemWrapper>(RemoverCustomItem);
 
+        RecalcularTotal();
+        _ = CarregarFornecedoresAsync();
+    }
+
+    public async Task CarregarFornecedoresAsync()
+    {
+        try
+        {
+            var usuarios = await DataService.UsuarioRepository.GetAllAsync();
+            NomesFornecedores.Clear();
+            foreach (var nome in usuarios.Select(u => u.Nome).OrderBy(n => n))
+                NomesFornecedores.Add(nome);
+        }
+        catch { }
+    }
+
+    private void AdicionarCustomItem()
+    {
+        ItensPersonalizados.Add(new CustomWeightItemWrapper(RecalcularTotal));
+    }
+
+    private void RemoverCustomItem(CustomWeightItemWrapper? item)
+    {
+        if (item is null) return;
+        ItensPersonalizados.Remove(item);
         RecalcularTotal();
     }
 
     private async Task SalvarEnviarAsync()
     {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(SalvarEnviarAsync);
+        AppLogger.Info(correlationId, origem, $"Iniciando salvamento de pesagem para o cliente '{NomeCliente}'.");
+
         var itens = Itens.Where(w => w.PesoAtual > 0).ToList();
-        if (!itens.Any())
+        var itensExtras = ItensPersonalizados
+            .Where(w => w.PesoAtual > 0 && !string.IsNullOrWhiteSpace(w.Nome))
+            .ToList();
+
+        if (!itens.Any() && !itensExtras.Any())
         {
+            AppLogger.Aviso(correlationId, origem, "Cancelado: nenhum peso informado.");
             MostrarStatus("Nenhum peso para salvar.", ok: false);
             return;
         }
@@ -88,7 +131,8 @@ public class WeightCalculatorViewModel : ViewModelBase
         {
             Cliente = cliente,
             Horario = agora.ToString("yyyy-MM-ddTHH:mm:ss"),
-            Itens = itens.Select(w => new { w.Nome, Peso = w.PesoAtual }),
+            Itens = itens.Select(w => new { w.Nome, Peso = w.PesoAtual })
+                .Concat(itensExtras.Select(w => new { w.Nome, Peso = w.PesoAtual })),
             StatusPesagem = "pendente"
         };
         var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
@@ -127,11 +171,14 @@ public class WeightCalculatorViewModel : ViewModelBase
         // 4. Enviar ao GitHub via git
         try
         {
+            AppLogger.Info(correlationId, origem, $"Enviando arquivo '{nomeArquivo}' ao GitHub...");
             await GitHubService.EnviarArquivoAsync(
                 RootDir, json, nomeArquivo, mensagemCommit,
                 msg => { Status = msg; StatusOk = true; });
+            AppLogger.Info(correlationId, origem, "Pesagem salva e enviada com sucesso.");
             foreach (var w in Itens)
                 w.Resetar();
+            ResetarItensPersonalizados();
             NomeCliente = string.Empty;
             RecalcularTotal();
             Status = string.Empty;
@@ -140,6 +187,7 @@ public class WeightCalculatorViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             MostrarStatus($"Erro GitHub: {ex.Message}", ok: false);
         }
     }
@@ -159,6 +207,8 @@ public class WeightCalculatorViewModel : ViewModelBase
     {
         foreach (var w in Itens)
             w.IsSelected = ReferenceEquals(w, item);
+        foreach (var w in ItensPersonalizados)
+            w.IsSelected = ReferenceEquals(w, item);
     }
 
     private void RecalcularTotal()
@@ -166,13 +216,23 @@ public class WeightCalculatorViewModel : ViewModelBase
         decimal total = 0m;
         foreach (var w in Itens)
             total += w.PesoAtual;
+        foreach (var w in ItensPersonalizados)
+            total += w.PesoAtual;
         PesoTotal = total;
+    }
+
+    private void ResetarItensPersonalizados()
+    {
+        ItensPersonalizados.Clear();
+        for (int i = 0; i < 4; i++)
+            ItensPersonalizados.Add(new CustomWeightItemWrapper(RecalcularTotal));
     }
 
     private void Limpar()
     {
         foreach (var w in Itens)
             w.Resetar();
+        ResetarItensPersonalizados();
         NomeCliente = string.Empty;
         RecalcularTotal();
     }
@@ -253,5 +313,76 @@ public class WeightItemWrapper : ViewModelBase
         _pesoTexto = "0,000";
         OnPropertyChanged(nameof(PesoTexto));
         OnPropertyChanged(nameof(PesoAtual));
+    }
+}
+
+public class CustomWeightItemWrapper : ViewModelBase
+{
+    private static readonly CultureInfo PtBR = CultureInfo.GetCultureInfo("pt-BR");
+    private readonly Action _onChanged;
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set { if (value != _isSelected) { _isSelected = value; OnPropertyChanged(); } }
+    }
+
+    private string _nome = string.Empty;
+    public string Nome
+    {
+        get => _nome;
+        set { if (value != _nome) { _nome = value; OnPropertyChanged(); } }
+    }
+
+    private bool _editando;
+    private string _pesoTextoAnterior = string.Empty;
+    private decimal _pesoAtual;
+
+    public decimal PesoAtual
+    {
+        get => _pesoAtual;
+        private set { if (value != _pesoAtual) { _pesoAtual = value; OnPropertyChanged(); _onChanged(); } }
+    }
+
+    private string _pesoTexto = "0,000";
+    public string PesoTexto
+    {
+        get => _pesoTexto;
+        set { if (value != _pesoTexto) { _pesoTexto = value; OnPropertyChanged(); } }
+    }
+
+    public CustomWeightItemWrapper(Action onChanged)
+    {
+        _onChanged = onChanged;
+    }
+
+    public void IniciarEdicao()
+    {
+        _pesoTextoAnterior = _pesoTexto;
+        _editando = true;
+        PesoTexto = string.Empty;
+    }
+
+    public void CancelarEdicao()
+    {
+        if (!_editando) return;
+        _editando = false;
+        PesoTexto = _pesoTextoAnterior;
+    }
+
+    public void ConfirmarEdicao()
+    {
+        if (!_editando) return;
+        _editando = false;
+        var raw = PesoTexto.Trim().Replace(" ", "");
+        if (raw.Contains(',') && raw.Contains('.'))
+            raw = raw.Replace(".", "").Replace(",", ".");
+        else
+            raw = raw.Replace(",", ".");
+        if (!decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            parsed = _pesoAtual;
+        PesoAtual = parsed >= 0 ? parsed : 0;
+        PesoTexto = PesoAtual.ToString("N3", PtBR);
     }
 }

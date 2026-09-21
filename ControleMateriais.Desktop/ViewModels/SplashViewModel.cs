@@ -90,18 +90,12 @@ public class SplashViewModel : INotifyPropertyChanged
             return;
         }
 
-        // Pull dos 2 repos em paralelo (banco-de-dados: Em Desenvolvimento)
-        var taskRecibos  = PullRecibosAsync();
-        var taskPesagens = PullPesagensAsync();
+        // Pull dos 3 repos em paralelo
+        var taskRecibos    = PullRecibosAsync();
+        var taskPesagens   = PullPesagensAsync();
+        var taskBancoDados = PullBancoDadosAsync();
 
-        // TODO: Em Desenvolvimento — pull banco-de-dados desativado temporariamente
-        UI(() =>
-        {
-            ItemBancoDados.Status   = SyncStatus.Ok;
-            ItemBancoDados.Mensagem = "Banco de Dados: sincronização pausada (Em Desenvolvimento)";
-        });
-
-        await Task.WhenAll(taskRecibos, taskPesagens);
+        await Task.WhenAll(taskRecibos, taskPesagens, taskBancoDados);
 
         // Verificação de vendas (conta PDFs em Recibos_Venda)
         await VerificarVendasAsync();

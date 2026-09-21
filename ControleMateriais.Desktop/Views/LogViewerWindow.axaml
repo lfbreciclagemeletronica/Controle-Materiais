@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:svc="using:ControleMateriais.Desktop.Services"
+        x:Class="ControleMateriais.Desktop.Views.LogViewerWindow"
+        Title="Logs do Sistema"
+        Width="880" Height="560"
+        MinWidth="600" MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="16" Background="{DynamicResource Brush.Surface}">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+      <TextBlock Grid.Row="0"
+                 Text="Logs do Sistema"
+                 FontSize="16" FontWeight="Bold"
+                 Foreground="White"
+                 Margin="0,0,0,10"/>
+
+      <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,10">
+        <TextBox Grid.Column="0"
+                 Name="FiltroBox"
+                 Watermark="Filtrar por texto ou CorrelationId..."
+                 TextChanged="FiltroBox_TextChanged"
+                 FontFamily="Consolas,monospace"
+                 FontSize="12"/>
+        <Button Grid.Column="1"
+                Content="Limpar"
+                Margin="8,0,0,0"
+                Click="Limpar_Click"/>
+        <ToggleButton Grid.Column="2"
+                      Name="AutoScrollToggle"
+                      Content="Auto-scroll"
+                      IsChecked="True"
+                      Margin="8,0,0,0"/>
+      </Grid>
+
+      <Border Grid.Row="2"
+              Background="#0A0A0A"
+              BorderBrush="{DynamicResource Brush.Border}"
+              BorderThickness="1" CornerRadius="6" Padding="4">
+        <ScrollViewer Name="LogScrollViewer" VerticalScrollBarVisibility="Auto">
+          <ItemsControl Name="LogItemsControl">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="svc:LogEntry">
+                <TextBlock Text="{Binding Linha}"
+                           FontFamily="Consolas,monospace"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="{Binding Level, Converter={x:Static svc:LogLevelBrushConverter.Instance}}"
+                           Padding="4,1"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Border>
+
+      <TextBlock Grid.Row="3"
+                 Text="Dica: cada operação (salvar recibo, sincronizar, editar fornecedor...) gera um CorrelationId único. Filtre por ele para ver só as mensagens daquele processamento."
+                 FontSize="11"
+                 Foreground="{DynamicResource Brush.TextSecondary}"
+                 TextWrapping="Wrap"
+                 Margin="0,8,0,0"/>
+
+    </Grid>
+  </Border>
+
+</Window>

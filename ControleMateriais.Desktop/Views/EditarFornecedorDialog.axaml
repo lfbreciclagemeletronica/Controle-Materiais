@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.EditarFornecedorDialog"
+        Title="Editar Fornecedor"
+        Width="420" Height="360"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Border Padding="28,24" Background="{DynamicResource Brush.Surface}">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <TextBlock Grid.Row="0"
+                 Text="Editar Fornecedor"
+                 FontSize="15" FontWeight="Bold"
+                 Foreground="White"
+                 Margin="0,0,0,16"/>
+
+      <StackPanel Grid.Row="1" Spacing="10">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Nome" FontSize="12" Foreground="#CCCCCC"/>
+          <TextBox Name="NomeBox" FontSize="13"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="CPF" FontSize="12" Foreground="#CCCCCC"/>
+          <TextBox Name="CpfBox" FontSize="13"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="CNPJ" FontSize="12" Foreground="#CCCCCC"/>
+          <TextBox Name="CnpjBox" FontSize="13"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="Chave Pix" FontSize="12" Foreground="#CCCCCC"/>
+          <TextBox Name="ChavePixBox" FontSize="13"/>
+        </StackPanel>
+
+        <TextBlock Name="ErroText"
+                   Foreground="#F44336"
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   IsVisible="False"/>
+      </StackPanel>
+
+      <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                  Spacing="10" Margin="0,16,0,0">
+        <Button Content="Cancelar" Click="Cancelar_Click" Width="90"/>
+        <Button Content="Salvar"
+                Click="Salvar_Click"
+                Classes="primary"
+                Width="90"/>
+      </StackPanel>
+
+    </Grid>
+  </Border>
+
+</Window>

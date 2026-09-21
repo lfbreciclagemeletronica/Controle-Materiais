@@ -270,14 +270,20 @@ public class VendaViewModel : ViewModelBase
 
     private async Task SalvarVendaAsync()
     {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(SalvarVendaAsync);
+        AppLogger.Info(correlationId, origem, $"Iniciando salvamento de venda para o cliente '{NomeCliente}'.");
+
         var itensSelecionados = Itens.Where(i => i.PesoAtual > 0).ToList();
         if (!itensSelecionados.Any())
         {
+            AppLogger.Aviso(correlationId, origem, "Cancelado: nenhum peso informado.");
             Status = "Informe o peso de pelo menos um item antes de salvar.";
             return;
         }
         if (string.IsNullOrWhiteSpace(NomeCliente))
         {
+            AppLogger.Aviso(correlationId, origem, "Cancelado: nome do cliente não informado.");
             Status = "Informe o nome do cliente.";
             return;
         }
@@ -341,9 +347,11 @@ public class VendaViewModel : ViewModelBase
             registros.Add(reg);
 
             File.WriteAllText(vendaJsonPath, root.ToJsonString(JsonOpts), Encoding.UTF8);
+            AppLogger.Info(correlationId, origem, $"PDF e JSON da venda salvos localmente ('{nomeArquivoFinal}').");
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             Status = $"Erro ao salvar venda: {ex.Message}";
             Salvando = false;
             return;
@@ -371,9 +379,12 @@ public class VendaViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
+                AppLogger.Erro(correlationId, origem, ex);
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = $"Aviso Git: {ex.Message}");
             }
         }
+
+        AppLogger.Info(correlationId, origem, "Processamento da venda concluído.");
 
         // 4. Abre modal de sucesso
         if (AbrirModalSucesso is not null)

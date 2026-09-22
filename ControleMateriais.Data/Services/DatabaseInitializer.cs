@@ -64,6 +64,30 @@ public static class DatabaseInitializer
             -- ou tenha um indice UNIQUE. Sem isso, o INSERT falha com erro de foreign key mismatch.
             CREATE UNIQUE INDEX IF NOT EXISTS UX_RecibosCompra_CodigoRecibo ON RecibosCompra(CodigoRecibo);
 
+            CREATE TABLE IF NOT EXISTS RecibosVenda (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ClienteNome TEXT NOT NULL,
+                DataVenda TEXT NOT NULL,
+                CodigoRecibo TEXT NOT NULL,
+                ValorTotal REAL NOT NULL DEFAULT 0,
+                PesoTotalKg REAL NOT NULL DEFAULT 0,
+                CriadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS UX_RecibosVenda_CodigoRecibo ON RecibosVenda(CodigoRecibo);
+
+            CREATE TABLE IF NOT EXISTS RecibosVendaItens (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ReciboCodigo TEXT NOT NULL,
+                ItemId INTEGER NOT NULL,
+                PesoKg REAL NOT NULL CHECK (PesoKg >= 0),
+                PrecoPorKg REAL NOT NULL DEFAULT 0,
+                Total REAL NOT NULL DEFAULT 0,
+
+                FOREIGN KEY (ReciboCodigo) REFERENCES RecibosVenda(CodigoRecibo) ON DELETE CASCADE,
+                FOREIGN KEY (ItemId) REFERENCES Itens(Id)
+            );
+
             CREATE VIEW IF NOT EXISTS EstoqueView AS
             SELECT
                 i.Id AS ItemId,

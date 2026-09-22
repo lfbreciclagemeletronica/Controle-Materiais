@@ -11,6 +11,25 @@ public class SqliteReciboVendaRepository : IReciboVendaRepository
     private SqliteConnection CreateConnection() =>
         new SqliteConnection(DbSettings.GetConnectionString());
 
+    // Gera um código de recibo aleatório de 6 dígitos que ainda não existe em RecibosVenda.
+    public async Task<string> GerarCodigoReciboAsync()
+    {
+        using var connection = CreateConnection();
+        await connection.OpenAsync();
+
+        const string sqlExiste = "SELECT COUNT(*) FROM RecibosVenda WHERE CodigoRecibo = @codigo;";
+        var random = Random.Shared;
+
+        for (var tentativa = 0; tentativa < 20; tentativa++)
+        {
+            var codigo = random.Next(100000, 1000000).ToString();
+            var existe = await connection.ExecuteScalarAsync<int>(sqlExiste, new { codigo });
+            if (existe == 0) return codigo;
+        }
+
+        throw new InvalidOperationException("Não foi possível gerar um código de recibo de venda único.");
+    }
+
     public async Task<int> InsertAsync(ReciboVenda recibo)
     {
         using var connection = CreateConnection();
@@ -21,18 +40,15 @@ public class SqliteReciboVendaRepository : IReciboVendaRepository
         try
         {
             const string sqlRecibo = @"
-                INSERT INTO RecibosVenda (ClienteNome, ClienteCpf, ClienteCnpj, ClienteChavePix, NumeroRecibo, DataVenda, ValorTotal, PesoTotalKg)
-                VALUES (@clienteNome, @clienteCpf, @clienteCnpj, @clienteChavePix, @numeroRecibo, @dataVenda, @valorTotal, @pesoTotalKg);
+                INSERT INTO RecibosVenda (ClienteNome, DataVenda, CodigoRecibo, ValorTotal, PesoTotalKg)
+                VALUES (@clienteNome, @dataVenda, @codigoRecibo, @valorTotal, @pesoTotalKg);
                 SELECT last_insert_rowid();";
 
             var parametrosRecibo = new
             {
                 clienteNome = recibo.ClienteNome,
-                clienteCpf = recibo.ClienteCpf,
-                clienteCnpj = recibo.ClienteCnpj,
-                clienteChavePix = recibo.ClienteChavePix,
-                numeroRecibo = recibo.NumeroRecibo,
                 dataVenda = recibo.DataVenda,
+                codigoRecibo = recibo.CodigoRecibo,
                 valorTotal = recibo.ValorTotal,
                 pesoTotalKg = recibo.PesoTotalKg
             };
@@ -40,14 +56,14 @@ public class SqliteReciboVendaRepository : IReciboVendaRepository
             var reciboId = await connection.ExecuteScalarAsync<int>(sqlRecibo, parametrosRecibo, transaction);
 
             const string sqlItem = @"
-                INSERT INTO RecibosVendaItens (ReciboVendaId, ItemId, PesoKg, PrecoPorKg, Total)
-                VALUES (@reciboVendaId, @itemId, @pesoKg, @precoPorKg, @total);";
+                INSERT INTO RecibosVendaItens (ReciboCodigo, ItemId, PesoKg, PrecoPorKg, Total)
+                VALUES (@reciboCodigo, @itemId, @pesoKg, @precoPorKg, @total);";
 
             foreach (var item in recibo.Itens)
             {
                 var parametrosItem = new
                 {
-                    reciboVendaId = reciboId,
+                    reciboCodigo = recibo.CodigoRecibo,
                     itemId = item.ItemId,
                     pesoKg = item.PesoKg,
                     precoPorKg = item.PrecoPorKg,
@@ -71,8 +87,7 @@ public class SqliteReciboVendaRepository : IReciboVendaRepository
     {
         const string sql = @"
             SELECT
-                rv.Id, rv.ClienteNome, rv.ClienteCpf, rv.ClienteCnpj, rv.ClienteChavePix,
-                rv.NumeroRecibo, rv.DataVenda, rv.ValorTotal, rv.PesoTotalKg, rv.CriadoEm
+                rv.Id, rv.ClienteNome, rv.DataVenda, rv.CodigoRecibo, rv.ValorTotal, rv.PesoTotalKg, rv.CriadoEm
             FROM RecibosVenda rv
             ORDER BY rv.DataVenda DESC;";
 
@@ -85,18 +100,17 @@ public class SqliteReciboVendaRepository : IReciboVendaRepository
     {
         const string sqlRecibo = @"
             SELECT
-                rv.Id, rv.ClienteNome, rv.ClienteCpf, rv.ClienteCnpj, rv.ClienteChavePix,
-                rv.NumeroRecibo, rv.DataVenda, rv.ValorTotal, rv.PesoTotalKg, rv.CriadoEm
+                rv.Id, rv.ClienteNome, rv.DataVenda, rv.CodigoRecibo, rv.ValorTotal, rv.PesoTotalKg, rv.CriadoEm
             FROM RecibosVenda rv
             WHERE rv.Id = @id;";
 
         const string sqlItens = @"
             SELECT
-                rvi.Id, rvi.ReciboVendaId, rvi.ItemId, rvi.PesoKg, rvi.PrecoPorKg, rvi.Total,
+                rvi.Id, rvi.ReciboCodigo, rvi.ItemId, rvi.PesoKg, rvi.PrecoPorKg, rvi.Total,
                 i.Nome AS ItemNome
             FROM RecibosVendaItens rvi
             JOIN Itens i ON i.Id = rvi.ItemId
-            WHERE rvi.ReciboVendaId = @id;";
+            WHERE rvi.ReciboCodigo = (SELECT CodigoRecibo FROM RecibosVenda WHERE Id = @id);";
 
         using var connection = CreateConnection();
         await connection.OpenAsync();

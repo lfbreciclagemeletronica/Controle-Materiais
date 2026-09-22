@@ -314,7 +314,7 @@
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
                     <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
-                    <TextBlock Grid.Column="2" Text="" Width="162"/>
+                    <TextBlock Grid.Column="2" Text="" Width="76"/>
                   </Grid>
 
                   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -346,12 +346,6 @@
                                         Width="76" FontSize="12"
                                         ToolTip.Tip="Abrir PDF do recibo"
                                         Command="{Binding $parent[ItemsControl].((vm:EstoqueViewModel)DataContext).AbrirReciboVendaCommand}"
-                                        CommandParameter="{Binding}"/>
-                                <Button Content="Excluir"
-                                        Width="80" FontSize="12"
-                                        Background="#C0392B" Foreground="White"
-                                        ToolTip.Tip="Excluir este recibo"
-                                        Command="{Binding $parent[ItemsControl].((vm:EstoqueViewModel)DataContext).ExcluirReciboVendaCommand}"
                                         CommandParameter="{Binding}"/>
                               </StackPanel>
                             </Grid>

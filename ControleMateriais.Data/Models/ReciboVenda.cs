@@ -4,11 +4,8 @@ public class ReciboVenda
 {
     public int Id { get; set; }
     public string ClienteNome { get; set; } = string.Empty;
-    public string? ClienteCpf { get; set; }
-    public string? ClienteCnpj { get; set; }
-    public string? ClienteChavePix { get; set; }
-    public long? NumeroRecibo { get; set; }
     public string DataVenda { get; set; } = string.Empty; // formato: 10/07/2026
+    public string CodigoRecibo { get; set; } = string.Empty; // Valor aleatório de 6 dígitos
     public decimal ValorTotal { get; set; }
     public decimal PesoTotalKg { get; set; }
     public DateTime CriadoEm { get; set; }

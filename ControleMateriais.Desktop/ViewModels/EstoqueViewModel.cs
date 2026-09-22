@@ -78,15 +78,7 @@ public class EstoqueViewModel : ViewModelBase
         set { if (value != _filtroMes) { _filtroMes = value; OnPropertyChanged(); CarregarRecibosVenda(); } }
     }
 
-    private bool _migrando;
-    public bool Migrando
-    {
-        get => _migrando;
-        private set { if (value != _migrando) { _migrando = value; OnPropertyChanged(); } }
-    }
-
     public ICommand AtualizarCommand       { get; }
-    public ICommand MigrarVendasCommand    { get; }
     public ICommand AtualizarEstoqueCommand { get; }
     public ICommand AbrirReciboVendaCommand { get; }
     public ICommand ExcluirReciboVendaCommand { get; }
@@ -188,13 +180,54 @@ public class EstoqueViewModel : ViewModelBase
 
     public ICommand AtualizarTotaisMensaisCommand { get; }
 
+    // ── Vendas (Recibos de Venda cadastrados no banco de dados SQLite) ──────
+    public ObservableCollection<ReciboVenda> VendasBanco          { get; } = new();
+    public ObservableCollection<ReciboVenda> VendasBancoFiltradas { get; } = new();
+
+    private bool _carregandoVendasBanco;
+    public bool CarregandoVendasBanco
+    {
+        get => _carregandoVendasBanco;
+        private set { if (value != _carregandoVendasBanco) { _carregandoVendasBanco = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusVendasBanco = string.Empty;
+    public string StatusVendasBanco
+    {
+        get => _statusVendasBanco;
+        private set { if (value != _statusVendasBanco) { _statusVendasBanco = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusVendasBancoVisivel)); } }
+    }
+    public bool StatusVendasBancoVisivel => !string.IsNullOrEmpty(_statusVendasBanco);
+
+    private string _filtroVendasBanco = string.Empty;
+    public string FiltroVendasBanco
+    {
+        get => _filtroVendasBanco;
+        set { if (value != _filtroVendasBanco) { _filtroVendasBanco = value; OnPropertyChanged(); AtualizarFiltroVendasBanco(); } }
+    }
+
+    private bool _migrandoVendasBanco;
+    public bool MigrandoVendasBanco
+    {
+        get => _migrandoVendasBanco;
+        private set { if (value != _migrandoVendasBanco) { _migrandoVendasBanco = value; OnPropertyChanged(); } }
+    }
+
+    public bool VendasBancoVazia => !CarregandoVendasBanco && VendasBancoFiltradas.Count == 0;
+
+    public ICommand AtualizarVendasBancoCommand { get; }
+    public ICommand ImportarVendasBancoCommand  { get; }
+    public ICommand AbrirVendaBancoCommand      { get; }
+
+    // Callback para abrir o modal com os itens da venda selecionada
+    public Func<ReciboVenda, Task>? AbrirDetalhesVendaCallback { get; set; }
+
     public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null)
     {
         _rootDir = rootDir;
         SincronizarGitCommand        = new DelegateCommand(() => _ = SincronizarGitAsync());
         IrParaVendaCommand           = new DelegateCommand(() => irParaVendaAction?.Invoke());
         AtualizarCommand          = new DelegateCommand(() => _ = AtualizarAsync());
-        MigrarVendasCommand       = new DelegateCommand(() => _ = MigrarVendasAsync());
         AtualizarEstoqueCommand    = new DelegateCommand(Recarregar);
         AbrirReciboVendaCommand   = new DelegateCommand<ReciboVendaItem?>(AbrirReciboVenda);
         ExcluirReciboVendaCommand = new DelegateCommand<ReciboVendaItem?>(r => _ = ExcluirReciboVendaAsync(r));
@@ -203,6 +236,131 @@ public class EstoqueViewModel : ViewModelBase
         AbrirEntradaCommand      = new DelegateCommand<ReciboCompra>(item => _ = AbrirEntradaAsync(item));
 
         AtualizarTotaisMensaisCommand = new DelegateCommand(() => _ = CarregarTotaisMensaisAsync());
+
+        AtualizarVendasBancoCommand = new DelegateCommand(() => _ = CarregarVendasBancoAsync());
+        ImportarVendasBancoCommand  = new DelegateCommand(() => _ = ImportarVendasBancoAsync());
+        AbrirVendaBancoCommand      = new DelegateCommand<ReciboVenda>(item => _ = AbrirVendaBancoAsync(item));
+    }
+
+    // ── Carrega os recibos de venda (banco de dados SQLite) ──
+    public async Task CarregarVendasBancoAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarVendasBancoAsync);
+        AppLogger.Info(correlationId, origem, "Carregando vendas do banco de dados...");
+
+        CarregandoVendasBanco = true;
+        StatusVendasBanco = string.Empty;
+        try
+        {
+            var vendas = await DataService.ReciboVendaRepository.GetAllAsync();
+            VendasBanco.Clear();
+            foreach (var v in vendas)
+                VendasBanco.Add(v);
+            AtualizarFiltroVendasBanco();
+            AppLogger.Info(correlationId, origem, $"{VendasBanco.Count} venda(s) carregada(s).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusVendasBanco = $"Erro ao carregar vendas: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoVendasBanco = false;
+            OnPropertyChanged(nameof(VendasBancoVazia));
+        }
+    }
+
+    private void AtualizarFiltroVendasBanco()
+    {
+        VendasBancoFiltradas.Clear();
+        var busca = _filtroVendasBanco?.Trim() ?? string.Empty;
+
+        foreach (var v in VendasBanco
+            .Where(v => Corresponde(v, busca))
+            .OrderByDescending(ParseData))
+        {
+            VendasBancoFiltradas.Add(v);
+        }
+
+        OnPropertyChanged(nameof(VendasBancoVazia));
+
+        static bool Corresponde(ReciboVenda v, string busca)
+        {
+            if (string.IsNullOrEmpty(busca)) return true;
+            return v.ClienteNome.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || v.CodigoRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || v.DataVenda.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || v.ValorTotal.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")).Contains(busca, StringComparison.OrdinalIgnoreCase);
+        }
+
+        static DateTime ParseData(ReciboVenda v) =>
+            DateTime.TryParseExact(v.DataVenda, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                ? dt
+                : DateTime.MinValue;
+    }
+
+    // ── Lê os PDFs de Recibos_Venda existentes e grava no banco de dados ──
+    private async Task ImportarVendasBancoAsync()
+    {
+        if (MigrandoVendasBanco) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(ImportarVendasBancoAsync);
+        AppLogger.Info(correlationId, origem, "Iniciando importação de PDFs de venda para o banco de dados...");
+
+        MigrandoVendasBanco = true;
+        StatusVendasBanco = "Importando recibos de venda...";
+        try
+        {
+            var (importados, ignorados, comErro) = await MigrarRecibosVendaParaBancoService.MigrarAsync(
+                _rootDir, msg => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    StatusVendasBanco = msg;
+                    AppLogger.Info(correlationId, origem, msg);
+                }));
+
+            StatusVendasBanco = $"Importação concluída: {importados} novo(s), {ignorados} já existente(s), {comErro} com erro.";
+            await CarregarVendasBancoAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusVendasBanco = $"Erro ao importar: {ex.Message}";
+        }
+        finally
+        {
+            MigrandoVendasBanco = false;
+        }
+    }
+
+    // ── Busca a venda completa (com itens) e abre o modal de detalhes ──
+    private async Task AbrirVendaBancoAsync(ReciboVenda? venda)
+    {
+        if (venda is null) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(AbrirVendaBancoAsync);
+        AppLogger.Info(correlationId, origem, $"Abrindo detalhes da venda Id={venda.Id} (Codigo={venda.CodigoRecibo}).");
+
+        try
+        {
+            var completo = await DataService.ReciboVendaRepository.GetByIdAsync(venda.Id);
+            if (completo is null)
+            {
+                StatusVendasBanco = "Venda não encontrada no banco de dados.";
+                return;
+            }
+
+            if (AbrirDetalhesVendaCallback is not null)
+                await AbrirDetalhesVendaCallback(completo);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusVendasBanco = $"Erro ao abrir venda: {ex.Message}";
+        }
     }
 
     // ── Carrega os totais mensais (por item) do banco de dados SQLite ──
@@ -311,8 +469,12 @@ public class EstoqueViewModel : ViewModelBase
         EntradasFiltradas.Clear();
         var busca = _filtroEntradas?.Trim() ?? string.Empty;
 
-        foreach (var r in Entradas.Where(r => Corresponde(r, busca)))
+        foreach (var r in Entradas
+            .Where(r => Corresponde(r, busca))
+            .OrderByDescending(ParseData))
+        {
             EntradasFiltradas.Add(r);
+        }
 
         OnPropertyChanged(nameof(EntradasVazia));
 
@@ -324,6 +486,11 @@ public class EstoqueViewModel : ViewModelBase
                 || r.DataRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
                 || r.ValorTotal.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")).Contains(busca, StringComparison.OrdinalIgnoreCase);
         }
+
+        static DateTime ParseData(ReciboCompra r) =>
+            DateTime.TryParseExact(r.DataRecibo, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                ? dt
+                : DateTime.MinValue;
     }
 
     // ── Busca o recibo completo (com itens) e abre o modal de detalhes ──
@@ -360,27 +527,6 @@ public class EstoqueViewModel : ViewModelBase
         if (item is null || !File.Exists(item.CaminhoCompleto)) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(item.CaminhoCompleto) { UseShellExecute = true }); }
         catch { }
-    }
-
-    private async Task MigrarVendasAsync()
-    {
-        if (Migrando) return;
-        Migrando = true;
-        Status = "Migrando vendas...";
-        try
-        {
-            await Task.Run(() => MigrarVendasParaJson.Migrar(_rootDir, msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg)));
-            Status = "Migração concluída.";
-            Recarregar();
-        }
-        catch (Exception ex)
-        {
-            Status = $"Erro na migração: {ex.Message}";
-        }
-        finally
-        {
-            Migrando = false;
-        }
     }
 
     private async Task ExcluirReciboVendaAsync(ReciboVendaItem? item)

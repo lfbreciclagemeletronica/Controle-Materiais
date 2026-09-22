@@ -16,6 +16,13 @@ public class Program
       CultureInfo.DefaultThreadCurrentCulture = culture;
       CultureInfo.DefaultThreadCurrentUICulture = culture;
 
+      // Não chamamos DatabaseInitializer.EnsureDatabase() aqui: ela roda depois da
+      // sincronização (pull) do repositório banco-de-dados na SplashWindow (App.axaml.cs),
+      // para não criar/tocar o database.db local antes do clone/pull do Git.
+
+      // Uncomment to test database read
+      // TestDatabaseRead.Test();
+
       BuildAvaloniaApp()
         .StartWithClassicDesktopLifetime(args);
     }

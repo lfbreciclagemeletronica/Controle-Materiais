@@ -1,3 +1,4 @@
+using ControleMateriais.Data.Models;
 using ControleMateriais.Desktop.Services;
 using System;
 using System.Collections.Generic;
@@ -35,6 +36,13 @@ public class EstoqueItem
     public string  TotalKgStr => TotalKg.ToString("N3", CultureInfo.GetCultureInfo("pt-BR")) + " kg";
 }
 
+public class ItemMensalWrapper
+{
+    public string  Material   { get; set; } = string.Empty;
+    public decimal TotalKg    { get; set; }
+    public string  TotalKgStr => TotalKg.ToString("N3", CultureInfo.GetCultureInfo("pt-BR")) + " kg";
+}
+
 public class EstoqueViewModel : ViewModelBase
 {
     private static readonly JsonSerializerOptions _jsonOpts = new()
@@ -48,25 +56,6 @@ public class EstoqueViewModel : ViewModelBase
 
     public ObservableCollection<EstoqueItem>    Itens        { get; } = new();
     public ObservableCollection<ReciboVendaItem> RecibosVenda { get; } = new();
-    public ObservableCollection<string> EstoquesIniciaisDisponiveis { get; } = new();
-    public bool SemEstoqueInicial => EstoquesIniciaisDisponiveis.Count == 0;
-
-    private string _estoqueInicialSelecionado = string.Empty;
-    private bool _recarregando = false;
-    public string EstoqueInicialSelecionado
-    {
-        get => _estoqueInicialSelecionado;
-        set
-        {
-            if (value != _estoqueInicialSelecionado)
-            {
-                _estoqueInicialSelecionado = value;
-                OnPropertyChanged();
-                if (!_recarregando)
-                    Recarregar();
-            }
-        }
-    }
 
     private bool _recibosVendaVazia = true;
     public bool RecibosVendaVazia
@@ -89,15 +78,7 @@ public class EstoqueViewModel : ViewModelBase
         set { if (value != _filtroMes) { _filtroMes = value; OnPropertyChanged(); CarregarRecibosVenda(); } }
     }
 
-    private bool _migrando;
-    public bool Migrando
-    {
-        get => _migrando;
-        private set { if (value != _migrando) { _migrando = value; OnPropertyChanged(); } }
-    }
-
     public ICommand AtualizarCommand       { get; }
-    public ICommand MigrarVendasCommand    { get; }
     public ICommand AtualizarEstoqueCommand { get; }
     public ICommand AbrirReciboVendaCommand { get; }
     public ICommand ExcluirReciboVendaCommand { get; }
@@ -132,19 +113,413 @@ public class EstoqueViewModel : ViewModelBase
 
     public ICommand SincronizarGitCommand        { get; }
     public ICommand IrParaVendaCommand           { get; }
-    public ICommand IrParaEstoqueInicialCommand  { get; }
 
-    public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null, Action? irParaEstoqueInicialAction = null)
+    // ── Entradas (Recibos de Compra cadastrados no banco de dados SQLite) ──
+    public ObservableCollection<ReciboCompra> Entradas           { get; } = new();
+    public ObservableCollection<ReciboCompra> EntradasFiltradas  { get; } = new();
+
+    private bool _carregandoEntradas;
+    public bool CarregandoEntradas
+    {
+        get => _carregandoEntradas;
+        private set { if (value != _carregandoEntradas) { _carregandoEntradas = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusEntradas = string.Empty;
+    public string StatusEntradas
+    {
+        get => _statusEntradas;
+        private set { if (value != _statusEntradas) { _statusEntradas = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusEntradasVisivel)); } }
+    }
+    public bool StatusEntradasVisivel => !string.IsNullOrEmpty(_statusEntradas);
+
+    private string _filtroEntradas = string.Empty;
+    public string FiltroEntradas
+    {
+        get => _filtroEntradas;
+        set { if (value != _filtroEntradas) { _filtroEntradas = value; OnPropertyChanged(); AtualizarFiltroEntradas(); } }
+    }
+
+    public bool EntradasVazia => !CarregandoEntradas && EntradasFiltradas.Count == 0;
+
+    public ICommand AtualizarEntradasCommand { get; }
+    public ICommand AbrirEntradaCommand      { get; }
+
+    // Callback para abrir o modal com os itens do recibo selecionado
+    public Func<ReciboCompra, Task>? AbrirDetalhesEntradaCallback { get; set; }
+
+    // ── Estoque por Mês (quantidade de cada item em Kg, agrupado por mês) ──
+    private List<ItemMensal> _totaisMensaisRaw = new();
+
+    public ObservableCollection<MesOpcao> MesesCompras { get; } = new();
+    public ObservableCollection<ItemMensalWrapper> ItensPorMes { get; } = new();
+
+    private MesOpcao? _mesSelecionadoCompras;
+    public MesOpcao? MesSelecionadoCompras
+    {
+        get => _mesSelecionadoCompras;
+        set { if (value != _mesSelecionadoCompras) { _mesSelecionadoCompras = value; OnPropertyChanged(); AtualizarItensPorMes(); } }
+    }
+
+    private bool _carregandoTotaisMensais;
+    public bool CarregandoTotaisMensais
+    {
+        get => _carregandoTotaisMensais;
+        private set { if (value != _carregandoTotaisMensais) { _carregandoTotaisMensais = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusTotaisMensais = string.Empty;
+    public string StatusTotaisMensais
+    {
+        get => _statusTotaisMensais;
+        private set { if (value != _statusTotaisMensais) { _statusTotaisMensais = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusTotaisMensaisVisivel)); } }
+    }
+    public bool StatusTotaisMensaisVisivel => !string.IsNullOrEmpty(_statusTotaisMensais);
+
+    public bool ItensPorMesVazio => !CarregandoTotaisMensais && ItensPorMes.Count == 0;
+
+    public ICommand AtualizarTotaisMensaisCommand { get; }
+
+    // ── Vendas (Recibos de Venda cadastrados no banco de dados SQLite) ──────
+    public ObservableCollection<ReciboVenda> VendasBanco          { get; } = new();
+    public ObservableCollection<ReciboVenda> VendasBancoFiltradas { get; } = new();
+
+    private bool _carregandoVendasBanco;
+    public bool CarregandoVendasBanco
+    {
+        get => _carregandoVendasBanco;
+        private set { if (value != _carregandoVendasBanco) { _carregandoVendasBanco = value; OnPropertyChanged(); } }
+    }
+
+    private string _statusVendasBanco = string.Empty;
+    public string StatusVendasBanco
+    {
+        get => _statusVendasBanco;
+        private set { if (value != _statusVendasBanco) { _statusVendasBanco = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusVendasBancoVisivel)); } }
+    }
+    public bool StatusVendasBancoVisivel => !string.IsNullOrEmpty(_statusVendasBanco);
+
+    private string _filtroVendasBanco = string.Empty;
+    public string FiltroVendasBanco
+    {
+        get => _filtroVendasBanco;
+        set { if (value != _filtroVendasBanco) { _filtroVendasBanco = value; OnPropertyChanged(); AtualizarFiltroVendasBanco(); } }
+    }
+
+    private bool _migrandoVendasBanco;
+    public bool MigrandoVendasBanco
+    {
+        get => _migrandoVendasBanco;
+        private set { if (value != _migrandoVendasBanco) { _migrandoVendasBanco = value; OnPropertyChanged(); } }
+    }
+
+    public bool VendasBancoVazia => !CarregandoVendasBanco && VendasBancoFiltradas.Count == 0;
+
+    public ICommand AtualizarVendasBancoCommand { get; }
+    public ICommand ImportarVendasBancoCommand  { get; }
+    public ICommand AbrirVendaBancoCommand      { get; }
+
+    // Callback para abrir o modal com os itens da venda selecionada
+    public Func<ReciboVenda, Task>? AbrirDetalhesVendaCallback { get; set; }
+
+    public EstoqueViewModel(string rootDir, Action? irParaVendaAction = null)
     {
         _rootDir = rootDir;
         SincronizarGitCommand        = new DelegateCommand(() => _ = SincronizarGitAsync());
         IrParaVendaCommand           = new DelegateCommand(() => irParaVendaAction?.Invoke());
-        IrParaEstoqueInicialCommand  = new DelegateCommand(() => irParaEstoqueInicialAction?.Invoke());
         AtualizarCommand          = new DelegateCommand(() => _ = AtualizarAsync());
-        MigrarVendasCommand       = new DelegateCommand(() => _ = MigrarVendasAsync());
         AtualizarEstoqueCommand    = new DelegateCommand(Recarregar);
         AbrirReciboVendaCommand   = new DelegateCommand<ReciboVendaItem?>(AbrirReciboVenda);
         ExcluirReciboVendaCommand = new DelegateCommand<ReciboVendaItem?>(r => _ = ExcluirReciboVendaAsync(r));
+
+        AtualizarEntradasCommand = new DelegateCommand(() => _ = CarregarEntradasAsync());
+        AbrirEntradaCommand      = new DelegateCommand<ReciboCompra>(item => _ = AbrirEntradaAsync(item));
+
+        AtualizarTotaisMensaisCommand = new DelegateCommand(() => _ = CarregarTotaisMensaisAsync());
+
+        AtualizarVendasBancoCommand = new DelegateCommand(() => _ = CarregarVendasBancoAsync());
+        ImportarVendasBancoCommand  = new DelegateCommand(() => _ = ImportarVendasBancoAsync());
+        AbrirVendaBancoCommand      = new DelegateCommand<ReciboVenda>(item => _ = AbrirVendaBancoAsync(item));
+    }
+
+    // ── Carrega os recibos de venda (banco de dados SQLite) ──
+    public async Task CarregarVendasBancoAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarVendasBancoAsync);
+        AppLogger.Info(correlationId, origem, "Carregando vendas do banco de dados...");
+
+        CarregandoVendasBanco = true;
+        StatusVendasBanco = string.Empty;
+        try
+        {
+            var vendas = await DataService.ReciboVendaRepository.GetAllAsync();
+            VendasBanco.Clear();
+            foreach (var v in vendas)
+                VendasBanco.Add(v);
+            AtualizarFiltroVendasBanco();
+            AppLogger.Info(correlationId, origem, $"{VendasBanco.Count} venda(s) carregada(s).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusVendasBanco = $"Erro ao carregar vendas: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoVendasBanco = false;
+            OnPropertyChanged(nameof(VendasBancoVazia));
+        }
+    }
+
+    private void AtualizarFiltroVendasBanco()
+    {
+        VendasBancoFiltradas.Clear();
+        var busca = _filtroVendasBanco?.Trim() ?? string.Empty;
+
+        foreach (var v in VendasBanco
+            .Where(v => Corresponde(v, busca))
+            .OrderByDescending(ParseData))
+        {
+            VendasBancoFiltradas.Add(v);
+        }
+
+        OnPropertyChanged(nameof(VendasBancoVazia));
+
+        static bool Corresponde(ReciboVenda v, string busca)
+        {
+            if (string.IsNullOrEmpty(busca)) return true;
+            return v.ClienteNome.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || v.CodigoRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || v.DataVenda.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || v.ValorTotal.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")).Contains(busca, StringComparison.OrdinalIgnoreCase);
+        }
+
+        static DateTime ParseData(ReciboVenda v) =>
+            DateTime.TryParseExact(v.DataVenda, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                ? dt
+                : DateTime.MinValue;
+    }
+
+    // ── Lê os PDFs de Recibos_Venda existentes e grava no banco de dados ──
+    private async Task ImportarVendasBancoAsync()
+    {
+        if (MigrandoVendasBanco) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(ImportarVendasBancoAsync);
+        AppLogger.Info(correlationId, origem, "Iniciando importação de PDFs de venda para o banco de dados...");
+
+        MigrandoVendasBanco = true;
+        StatusVendasBanco = "Importando recibos de venda...";
+        try
+        {
+            var (importados, ignorados, comErro) = await MigrarRecibosVendaParaBancoService.MigrarAsync(
+                _rootDir, msg => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    StatusVendasBanco = msg;
+                    AppLogger.Info(correlationId, origem, msg);
+                }));
+
+            StatusVendasBanco = $"Importação concluída: {importados} novo(s), {ignorados} já existente(s), {comErro} com erro.";
+            await CarregarVendasBancoAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusVendasBanco = $"Erro ao importar: {ex.Message}";
+        }
+        finally
+        {
+            MigrandoVendasBanco = false;
+        }
+    }
+
+    // ── Busca a venda completa (com itens) e abre o modal de detalhes ──
+    private async Task AbrirVendaBancoAsync(ReciboVenda? venda)
+    {
+        if (venda is null) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(AbrirVendaBancoAsync);
+        AppLogger.Info(correlationId, origem, $"Abrindo detalhes da venda Id={venda.Id} (Codigo={venda.CodigoRecibo}).");
+
+        try
+        {
+            var completo = await DataService.ReciboVendaRepository.GetByIdAsync(venda.Id);
+            if (completo is null)
+            {
+                StatusVendasBanco = "Venda não encontrada no banco de dados.";
+                return;
+            }
+
+            if (AbrirDetalhesVendaCallback is not null)
+                await AbrirDetalhesVendaCallback(completo);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusVendasBanco = $"Erro ao abrir venda: {ex.Message}";
+        }
+    }
+
+    // ── Carrega os totais mensais (por item) do banco de dados SQLite ──
+    public async Task CarregarTotaisMensaisAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarTotaisMensaisAsync);
+        AppLogger.Info(correlationId, origem, "Carregando totais mensais de compras por item...");
+
+        CarregandoTotaisMensais = true;
+        StatusTotaisMensais = string.Empty;
+        try
+        {
+            _totaisMensaisRaw = (await DataService.ReciboCompraRepository.GetTotaisPorMesAsync()).ToList();
+
+            var mesSelecionadoAnterior = _mesSelecionadoCompras;
+            MesesCompras.Clear();
+            foreach (var mes in _totaisMensaisRaw
+                .Select(t => t.Mes)
+                .Distinct()
+                .Select(m => new { Partes = m.Split('/'), Texto = m })
+                .Where(m => m.Partes.Length == 2)
+                .Select(m => new MesOpcao
+                {
+                    Mes = int.Parse(m.Partes[0]),
+                    Ano = int.Parse(m.Partes[1]),
+                    Label = new DateTime(int.Parse(m.Partes[1]), int.Parse(m.Partes[0]), 1)
+                        .ToString("MMMM/yyyy", CultureInfo.GetCultureInfo("pt-BR"))
+                })
+                .OrderByDescending(m => m.Ano).ThenByDescending(m => m.Mes))
+            {
+                MesesCompras.Add(mes);
+            }
+
+            _mesSelecionadoCompras = mesSelecionadoAnterior is not null
+                ? MesesCompras.FirstOrDefault(m => m.Ano == mesSelecionadoAnterior.Ano && m.Mes == mesSelecionadoAnterior.Mes)
+                : null;
+            _mesSelecionadoCompras ??= MesesCompras.FirstOrDefault();
+            OnPropertyChanged(nameof(MesSelecionadoCompras));
+
+            AtualizarItensPorMes();
+            AppLogger.Info(correlationId, origem, $"{MesesCompras.Count} mês(es) com dados encontrados.");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusTotaisMensais = $"Erro ao carregar totais mensais: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoTotaisMensais = false;
+            OnPropertyChanged(nameof(ItensPorMesVazio));
+        }
+    }
+
+    private void AtualizarItensPorMes()
+    {
+        ItensPorMes.Clear();
+
+        if (_mesSelecionadoCompras is not null)
+        {
+            var mesTexto = $"{_mesSelecionadoCompras.Mes:00}/{_mesSelecionadoCompras.Ano}";
+            foreach (var item in _totaisMensaisRaw
+                .Where(t => t.Mes == mesTexto)
+                .OrderByDescending(t => t.TotalKg))
+            {
+                ItensPorMes.Add(new ItemMensalWrapper { Material = item.ItemNome, TotalKg = item.TotalKg });
+            }
+        }
+
+        OnPropertyChanged(nameof(ItensPorMesVazio));
+    }
+
+    // ── Carrega os recibos de compra (Entradas) do banco de dados SQLite ──
+    public async Task CarregarEntradasAsync()
+    {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(CarregarEntradasAsync);
+        AppLogger.Info(correlationId, origem, "Carregando entradas (recibos de compra) do banco de dados...");
+
+        CarregandoEntradas = true;
+        StatusEntradas = string.Empty;
+        try
+        {
+            var recibos = await DataService.ReciboCompraRepository.GetAllAsync();
+            Entradas.Clear();
+            foreach (var r in recibos)
+                Entradas.Add(r);
+            AtualizarFiltroEntradas();
+            AppLogger.Info(correlationId, origem, $"{Entradas.Count} entrada(s) carregada(s).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusEntradas = $"Erro ao carregar entradas: {ex.Message}";
+        }
+        finally
+        {
+            CarregandoEntradas = false;
+            OnPropertyChanged(nameof(EntradasVazia));
+        }
+    }
+
+    private void AtualizarFiltroEntradas()
+    {
+        EntradasFiltradas.Clear();
+        var busca = _filtroEntradas?.Trim() ?? string.Empty;
+
+        foreach (var r in Entradas
+            .Where(r => Corresponde(r, busca))
+            .OrderByDescending(ParseData))
+        {
+            EntradasFiltradas.Add(r);
+        }
+
+        OnPropertyChanged(nameof(EntradasVazia));
+
+        static bool Corresponde(ReciboCompra r, string busca)
+        {
+            if (string.IsNullOrEmpty(busca)) return true;
+            return r.UsuarioNome.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || r.CodigoRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || r.DataRecibo.Contains(busca, StringComparison.OrdinalIgnoreCase)
+                || r.ValorTotal.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")).Contains(busca, StringComparison.OrdinalIgnoreCase);
+        }
+
+        static DateTime ParseData(ReciboCompra r) =>
+            DateTime.TryParseExact(r.DataRecibo, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                ? dt
+                : DateTime.MinValue;
+    }
+
+    // ── Busca o recibo completo (com itens) e abre o modal de detalhes ──
+    private async Task AbrirEntradaAsync(ReciboCompra? entrada)
+    {
+        if (entrada is null) return;
+
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(AbrirEntradaAsync);
+        AppLogger.Info(correlationId, origem, $"Abrindo detalhes da entrada Id={entrada.Id} (Codigo={entrada.CodigoRecibo}).");
+
+        try
+        {
+            var completo = await DataService.ReciboCompraRepository.GetByIdAsync(entrada.Id);
+            if (completo is null)
+            {
+                StatusEntradas = "Recibo não encontrado no banco de dados.";
+                return;
+            }
+            completo.UsuarioNome = entrada.UsuarioNome;
+
+            if (AbrirDetalhesEntradaCallback is not null)
+                await AbrirDetalhesEntradaCallback(completo);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            StatusEntradas = $"Erro ao abrir entrada: {ex.Message}";
+        }
     }
 
     private static void AbrirReciboVenda(ReciboVendaItem? item)
@@ -152,27 +527,6 @@ public class EstoqueViewModel : ViewModelBase
         if (item is null || !File.Exists(item.CaminhoCompleto)) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(item.CaminhoCompleto) { UseShellExecute = true }); }
         catch { }
-    }
-
-    private async Task MigrarVendasAsync()
-    {
-        if (Migrando) return;
-        Migrando = true;
-        Status = "Migrando vendas...";
-        try
-        {
-            await Task.Run(() => MigrarVendasParaJson.Migrar(_rootDir, msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => Status = msg)));
-            Status = "Migração concluída.";
-            Recarregar();
-        }
-        catch (Exception ex)
-        {
-            Status = $"Erro na migração: {ex.Message}";
-        }
-        finally
-        {
-            Migrando = false;
-        }
     }
 
     private async Task ExcluirReciboVendaAsync(ReciboVendaItem? item)
@@ -232,82 +586,6 @@ public class EstoqueViewModel : ViewModelBase
                 await AbrirModalExclusaoCallback(etapas);
         }
         catch (Exception ex) { Status = $"Erro ao excluir: {ex.Message}"; }
-    }
-
-    // ── Caminho do estoque-inicial-MM-YYYY.json (dinâmico baseado na seleção) ──
-    private string EstoqueInicialPath
-    {
-        get
-        {
-            if (string.IsNullOrEmpty(EstoqueInicialSelecionado))
-                return string.Empty;
-            return Path.Combine(GitHubService.BancoDadosRepoDir(_rootDir), $"{EstoqueInicialSelecionado}.json");
-        }
-    }
-
-    // ── Carrega lista de estoques iniciais disponíveis ───────────────────────
-    private void CarregarEstoquesIniciaisDisponiveis()
-    {
-        EstoquesIniciaisDisponiveis.Clear();
-        var dir = GitHubService.BancoDadosRepoDir(_rootDir);
-        if (!Directory.Exists(dir)) return;
-
-        var arquivos = Directory.GetFiles(dir, "estoque-inicial-*.json")
-            .Select(Path.GetFileNameWithoutExtension)
-            .Where(f => !string.IsNullOrEmpty(f))
-            .OrderByDescending(f => f)
-            .ToList();
-
-        foreach (var arquivo in arquivos)
-            if (arquivo is not null)
-                EstoquesIniciaisDisponiveis.Add(arquivo);
-
-        // Auto-selecionar apenas se ainda não foi selecionado nada
-        if (string.IsNullOrEmpty(EstoqueInicialSelecionado) && EstoquesIniciaisDisponiveis.Any())
-        {
-            var mesAtual = DateTime.Now.ToString("estoque-inicial-MM-yyyy");
-            if (EstoquesIniciaisDisponiveis.Contains(mesAtual))
-                EstoqueInicialSelecionado = mesAtual;
-            else
-                EstoqueInicialSelecionado = EstoquesIniciaisDisponiveis.First();
-        }
-
-        OnPropertyChanged(nameof(SemEstoqueInicial));
-    }
-
-    // Método público para carregar a lista de estoques iniciais (chamado pela View)
-    public void CarregarListaEstoquesIniciais()
-    {
-        CarregarEstoquesIniciaisDisponiveis();
-    }
-
-    // ── Lê estoque-inicial-MM-YYYY.json ────────────────────────────────────────
-    private Dictionary<string, decimal> LerEstoqueInicial()
-    {
-        var path = EstoqueInicialPath;
-        if (string.IsNullOrEmpty(path))
-        {
-            Status = "Nenhum estoque inicial encontrado. Clique em Sincronizar ou acesse Estoque Inicial.";
-            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        }
-        if (!File.Exists(path))
-        {
-            Status = "Não existe estoque inicial para o mês/ano selecionado.";
-            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        }
-        try
-        {
-            var obj = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
-            if (obj is null) return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            var dic = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kvp in obj)
-            {
-                if (kvp.Key.Equals("data", StringComparison.OrdinalIgnoreCase)) continue;
-                dic[kvp.Key] = ExtrairDecimal(kvp.Value);
-            }
-            return dic;
-        }
-        catch { return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase); }
     }
 
     // ── Lê arquivo mensal compra-MM-YYYY.json (apenas mês atual ou especificado) ───────────────
@@ -387,16 +665,10 @@ public class EstoqueViewModel : ViewModelBase
         return dic;
     }
 
-    // ── Calcula estoque atual: vendas - (compras + estoque inicial) ───────────────────
+    // ── Calcula estoque atual: vendas - compras ───────────────────
     private Dictionary<string, decimal> CalcularEstoqueAtual()
     {
-        // Extrair mês/ano do estoque inicial selecionado
-        string mesAno = "01-2026"; // padrão
-        if (!string.IsNullOrEmpty(EstoqueInicialSelecionado) &&
-            EstoqueInicialSelecionado.StartsWith("estoque-inicial-"))
-        {
-            mesAno = EstoqueInicialSelecionado.Replace("estoque-inicial-", "");
-        }
+        var mesAno = DateTime.Now.ToString("MM-yyyy");
 
         // Começa com vendas (positivo)
         var totais = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -407,11 +679,6 @@ public class EstoqueViewModel : ViewModelBase
         // Subtrai compras do mesmo mês
         var mesAtual = LerMesAtual(mesAno);
         foreach (var kv in mesAtual)
-            totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
-
-        // Subtrai estoque inicial
-        var inicial = LerEstoqueInicial();
-        foreach (var kv in inicial)
             totais[kv.Key] = totais.TryGetValue(kv.Key, out var atual) ? atual - kv.Value : -kv.Value;
 
         // Remove itens com zero
@@ -573,7 +840,6 @@ public class EstoqueViewModel : ViewModelBase
             // await GitHubService.GarantirBancoDadosRepoAsync(_rootDir, msg => Status = msg);
             Status = "Recibos sincronizados. (Banco de Dados: Em Desenvolvimento)";
 
-            CarregarListaEstoquesIniciais();
             Recarregar();
         }
         catch (Exception ex)

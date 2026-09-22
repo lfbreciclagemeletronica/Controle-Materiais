@@ -74,10 +74,13 @@
                      Foreground="{DynamicResource Brush.TextPrimary}">
             <Run Text="Nome: "/><Run Text="*" Foreground="#FF4444" FontWeight="Bold"/>
           </TextBlock>
-          <TextBox Grid.Column="1"
-                   Text="{Binding NomeCliente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                   Watermark="Nome do cliente / responsável (obrigatório)"
-                   HorizontalAlignment="Stretch"/>
+          <AutoCompleteBox Grid.Column="1"
+                           Text="{Binding NomeCliente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           ItemsSource="{Binding NomesFornecedores}"
+                           FilterMode="Contains"
+                           MinimumPrefixLength="0"
+                           Watermark="Nome do cliente / responsável (obrigatório)"
+                           HorizontalAlignment="Stretch"/>
         </Grid>
 
         <!-- Status de exportação em tempo real -->

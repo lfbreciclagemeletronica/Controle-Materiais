@@ -11,7 +11,8 @@
     <Grid RowDefinitions="*,Auto">
 
       <StackPanel Grid.Row="0" Spacing="10" VerticalAlignment="Center">
-        <TextBlock Text="Confirmar exclusão"
+        <TextBlock Name="TituloText"
+                   Text="Confirmar exclusão"
                    FontSize="15" FontWeight="Bold"
                    Foreground="White"/>
         <TextBlock Name="MensagemText"
@@ -23,7 +24,8 @@
       <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right"
                   Spacing="10" Margin="0,16,0,0">
         <Button Content="Cancelar" Click="Cancelar_Click" Width="90"/>
-        <Button Content="Excluir"
+        <Button Name="ConfirmarButton"
+                Content="Excluir"
                 Click="Confirmar_Click"
                 Background="#C0392B"
                 Foreground="White"

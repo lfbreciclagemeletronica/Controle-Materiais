@@ -81,4 +81,30 @@ public partial class WeightCalculatorView : UserControl
         if (sender is Border border && DataContext is WeightCalculatorViewModel vm)
             vm.SelecionarItem(border.DataContext);
     }
+
+    private void CustomPesoTextBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomWeightItemWrapper wrapper
+            && DataContext is WeightCalculatorViewModel vm)
+        {
+            vm.SelecionarItem(wrapper);
+            wrapper.IniciarEdicao();
+            tb.SelectAll();
+        }
+    }
+
+    private void CustomPesoTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomWeightItemWrapper wrapper)
+        {
+            if (e.Key == Key.Enter) { wrapper.ConfirmarEdicao(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { wrapper.CancelarEdicao(); TopLevel.GetTopLevel(tb)?.Focus(); e.Handled = true; }
+        }
+    }
+
+    private void CustomPesoTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is CustomWeightItemWrapper wrapper)
+            wrapper.ConfirmarEdicao();
+    }
 }

@@ -1,5 +1,6 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using ControleMateriais.Data.Models;
 using ControleMateriais.Desktop.Serialization;
 using ControleMateriais.Desktop.Services;
 using ControleMateriais.Models;
@@ -39,6 +40,7 @@ public class MainWindowViewModel : ViewModelBase
     public ObservableCollection<MaterialItem> Itens { get; } = new();
     public ObservableCollection<PesoWrapper> ItensEditaveis { get; } = new();
     public ObservableCollection<CustomItemWrapper> ItensPersonalizados { get; } = new();
+    public ObservableCollection<string> NomesFornecedores { get; } = new();
     private decimal _totalGeral;
     private decimal _pesoTotal;
 
@@ -135,7 +137,6 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand IrParaCalculadoraPesosCommand { get; }
     public ICommand IrParaRecibosCommand { get; }
     public ICommand IrParaEstoqueCommand        { get; }
-    public ICommand IrParaEstoqueInicialCommand  { get; }
     public ICommand IrParaVendaCommand           { get; }
     public ICommand VoltarParaPesagensCommand { get; }
     public ICommand ConfigurarGitHubCommand { get; }
@@ -188,7 +189,6 @@ public class MainWindowViewModel : ViewModelBase
     public PesagensViewModel PesagensVM { get; }
     public EstoqueViewModel EstoqueVM { get; }
     public VendaViewModel    VendaVM   { get; }
-    public EstoqueInicialViewModel EstoqueInicialVM { get; }
 
     private PesagemItem? _pesagemAtiva;
 
@@ -216,7 +216,6 @@ public class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsCalculadoraPage));
                 OnPropertyChanged(nameof(IsEstoquePage));
                 OnPropertyChanged(nameof(IsVendaPage));
-                OnPropertyChanged(nameof(IsEstoqueInicialPage));
             }
         }
     }
@@ -226,7 +225,6 @@ public class MainWindowViewModel : ViewModelBase
     public bool IsCalculadoraPage        => _currentPage == AppPage.Calculadora;
     public bool IsEstoquePage            => _currentPage == AppPage.Estoque;
     public bool IsVendaPage              => _currentPage == AppPage.Venda;
-    public bool IsEstoqueInicialPage     => _currentPage == AppPage.EstoqueInicial;
 
     public decimal TotalGeral
     {
@@ -282,7 +280,6 @@ public class MainWindowViewModel : ViewModelBase
         IrParaRecibosCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Pesagens; });
         IrParaCalculadoraPesosCommand = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Calculadora; });
         IrParaEstoqueCommand         = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
-        IrParaEstoqueInicialCommand  = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.EstoqueInicial; EstoqueInicialVM.Carregar(); });
         IrParaVendaCommand           = new DelegateCommand(() => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
         VoltarParaPesagensCommand    = new DelegateCommand(VoltarParaPesagens);
         ConfigurarGitHubCommand      = new DelegateCommand(async () => await AbrirConfigGitHubAsync());
@@ -338,16 +335,120 @@ public class MainWindowViewModel : ViewModelBase
 
         CalculadoraVM    = new WeightCalculatorViewModel(() => CurrentPage = AppPage.Home, RootDir);
         PesagensVM       = new PesagensViewModel(() => CurrentPage = AppPage.Home, RootDir);
-        EstoqueInicialVM = new EstoqueInicialViewModel(RootDir, () => { IsGerindoTabela = false; CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
         EstoqueVM        = new EstoqueViewModel(RootDir,
-            irParaVendaAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); },
-            irParaEstoqueInicialAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.EstoqueInicial; EstoqueInicialVM.Carregar(); });
-        VendaVM          = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Estoque; EstoqueVM.Recarregar(); });
+            irParaVendaAction: () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); });
+        VendaVM          = new VendaViewModel(RootDir, () => { CurrentPage = AppPage.Pesagens; EstoqueVM.Recarregar(); });
         PesagensVM.AbrirReciboCallback        = AbrirReciboDetalhe;
         PesagensVM.CriarNovoReciboCallback    = CriarNovoRecibo;
         PesagensVM.EstoqueRecarregarCallback  = () => EstoqueVM.Recarregar();
+        PesagensVM.EstoqueVM = EstoqueVM;
+        PesagensVM.IrParaVendaCallback = () => { IsGerindoTabela = false; CurrentPage = AppPage.Venda; VendaVM.CarregarItensExtras(); };
 
         _ = CarregarPrecosNaInicializacaoAsync();
+        _ = CarregarFornecedoresAsync();
+    }
+
+    public async Task CarregarFornecedoresAsync()
+    {
+        try
+        {
+            var usuarios = await DataService.UsuarioRepository.GetAllAsync();
+            NomesFornecedores.Clear();
+            foreach (var nome in usuarios.Select(u => u.Nome).OrderBy(n => n))
+                NomesFornecedores.Add(nome);
+        }
+        catch { }
+    }
+
+    // Garante que o fornecedor informado exista (ativo) na tabela Usuarios.
+    // Se não existir, cadastra automaticamente após o recibo ser processado.
+    // Retorna o Usuario (com Id) para uso no INSERT do recibo, ou null se falhar.
+    private async Task<Usuario?> GarantirFornecedorCadastradoAsync(string nomeCliente, string correlationId)
+    {
+        var nome = nomeCliente.Trim();
+        if (string.IsNullOrWhiteSpace(nome)) return null;
+
+        const string origem = nameof(GarantirFornecedorCadastradoAsync);
+        try
+        {
+            AppLogger.Info(correlationId, origem, $"Garantindo fornecedor '{nome}' na tabela Usuarios...");
+            var usuario = await DataService.UsuarioRepository.GetOrCreateAsync(nome);
+            AppLogger.Info(correlationId, origem, $"Fornecedor '{nome}' garantido com Id={usuario.Id}.");
+
+            if (!NomesFornecedores.Any(n => n.Equals(nome, StringComparison.OrdinalIgnoreCase)))
+                NomesFornecedores.Add(nome);
+
+            return usuario;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            // Não bloqueia a exportação do recibo caso o cadastro do fornecedor falhe
+            ShowToast($"Aviso: não foi possível cadastrar o fornecedor no banco de dados: {ex.Message}", isError: false);
+            return null;
+        }
+    }
+
+    // Salva o recibo de compra (fornecedor + itens) no banco de dados SQLite,
+    // seguindo a ordem: garante Usuario -> cria RecibosCompra -> garante cada Item -> cria ReciboCompraItens.
+    private async Task SalvarReciboNoBancoDeDadosAsync(Usuario usuario, DateTime data,
+        IReadOnlyList<(string Nome, decimal PesoAtual, decimal PrecoPorKg)> itensRecibo, string correlationId)
+    {
+        const string origem = nameof(SalvarReciboNoBancoDeDadosAsync);
+        try
+        {
+            var codigoRecibo = await DataService.ReciboCompraRepository.GerarCodigoReciboAsync();
+            AppLogger.Info(correlationId, origem, $"Código de recibo gerado: {codigoRecibo}");
+
+            var reciboCompra = new ReciboCompra
+            {
+                UsuarioId = usuario.Id,
+                DataRecibo = data.ToString("dd/MM/yyyy"),
+                CodigoRecibo = codigoRecibo,
+                ValorTotal = TotalGeral,
+                PesoTotalKg = PesoTotal
+            };
+            AppLogger.Info(correlationId, origem,
+                $"Montando RecibosCompra: UsuarioId={usuario.Id}, Codigo={codigoRecibo}, Valor={TotalGeral:C}, Peso={PesoTotal:N3}kg, {itensRecibo.Count} item(ns).");
+
+            foreach (var (nome, peso, precoPorKg) in itensRecibo)
+            {
+                var item = await DataService.ItemRepository.GetOrCreateAsync(nome);
+                AppLogger.Info(correlationId, origem,
+                    $"Item garantido '{nome}' (Id={item.Id}): Peso={peso:N3}kg, PrecoPorKg={precoPorKg:C}.");
+                reciboCompra.Itens.Add(new ReciboCompraItem
+                {
+                    ItemId = item.Id,
+                    PesoKg = peso,
+                    PrecoPorKg = precoPorKg
+                });
+            }
+
+            var reciboId = await DataService.ReciboCompraRepository.InsertAsync(reciboCompra);
+            AppLogger.Info(correlationId, origem,
+                $"Recibo de compra salvo com sucesso no banco de dados (Id={reciboId}, Codigo={codigoRecibo}).");
+
+            // Envia o database.db atualizado (com os inserts) ao repositório banco-de-dados no GitHub
+            try
+            {
+                AppLogger.Info(correlationId, origem, "Enviando database.db atualizado ao GitHub...");
+                await GitHubService.PublicarArquivoBancoDadosAsync(RootDir, "database.db",
+                    $"Recibo {usuario.Nome} - {data:dd/MM/yyyy} (Codigo {codigoRecibo})",
+                    msg => AppLogger.Info(correlationId, origem, msg));
+                AppLogger.Info(correlationId, origem, "database.db enviado ao GitHub com sucesso.");
+            }
+            catch (Exception exGit)
+            {
+                AppLogger.Erro(correlationId, origem, exGit);
+                ShowToast($"Aviso: recibo salvo localmente, mas não foi possível sincronizar o banco de dados com o GitHub: {exGit.Message}", isError: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            // Não bloqueia a exportação do recibo (PDF/GitHub) caso o banco de dados falhe
+            ShowToast($"Aviso: não foi possível salvar o recibo no banco de dados: {ex.Message}", isError: false);
+        }
     }
 
     public async Task SincronizarTudoAsync()
@@ -618,14 +719,20 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task ExportarAsync()
     {
+        var correlationId = AppLogger.NewCorrelationId();
+        const string origem = nameof(ExportarAsync);
+        AppLogger.Info(correlationId, origem, $"Início da geração de recibo para o cliente '{NomeCliente}'.");
+
         if (string.IsNullOrWhiteSpace(NomeCliente))
         {
+            AppLogger.Aviso(correlationId, origem, "Cancelado: nome do fornecedor não informado.");
             ShowToast("Informe o nome do fornecedor antes de exportar.", isError: true);
             return;
         }
 
         if (!GitHubService.CredenciaisExistem(RootDir))
         {
+            AppLogger.Aviso(correlationId, origem, "Cancelado: credenciais do GitHub não configuradas.");
             ShowToast("Configure as credenciais do GitHub na tela inicial antes de exportar.", isError: true);
             return;
         }
@@ -637,16 +744,22 @@ public class MainWindowViewModel : ViewModelBase
         var topLevel = (Avalonia.Application.Current?.ApplicationLifetime as
                         Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?
                         .MainWindow;
-        if (topLevel is null) return;
+        if (topLevel is null)
+        {
+            AppLogger.Erro(correlationId, origem, "Cancelado: janela principal não encontrada.");
+            return;
+        }
 
         // Garante que o repo Recibos está clonado (com migração se necessário)
         try
         {
+            AppLogger.Info(correlationId, origem, "Preparando repositório de Recibos...");
             ShowToast("Preparando repositório de Recibos...");
             await GitHubService.GarantirRecibosRepoAsync(RootDir, msg => ShowToast(msg));
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             ShowToast($"Erro ao preparar repositório de Recibos: {ex.Message}", isError: true);
             return;
         }
@@ -661,7 +774,9 @@ public class MainWindowViewModel : ViewModelBase
         }
 
         AtualizarStatusTela("Gerando PDF...");
+        AppLogger.Info(correlationId, origem, $"Gerando PDF do recibo em '{filePath}'.");
         GerarReciboPdf(filePath);
+        AppLogger.Info(correlationId, origem, "PDF gerado com sucesso.");
 
         // Captura snapshot dos itens para o banco de dados ANTES de qualquer limpeza
         var itensEstoque = Itens.Where(i => i.PesoAtual > 0)
@@ -671,9 +786,22 @@ public class MainWindowViewModel : ViewModelBase
                 .Select(c => (c.Nome, c.PesoAtual)))
             .ToList();
 
+        var itensRecibo = Itens.Where(i => i.PesoAtual > 0)
+            .Select(i => (i.Nome, i.PesoAtual, i.PrecoPorKg))
+            .Concat(ItensPersonalizados
+                .Where(c => c.PesoAtual > 0 && !string.IsNullOrWhiteSpace(c.Nome))
+                .Select(c => (c.Nome, c.PesoAtual, c.PrecoPorKg)))
+            .ToList();
+
+        // Garante que o fornecedor exista na tabela Usuarios e salva o recibo (fornecedor + itens) no banco SQLite
+        var usuarioRecibo = await GarantirFornecedorCadastradoAsync(NomeCliente, correlationId);
+        if (usuarioRecibo is not null)
+            await SalvarReciboNoBancoDeDadosAsync(usuarioRecibo, data, itensRecibo, correlationId);
+
         if (_pesagemAtiva is not null)
         {
             AtualizarStatusTela("Atualizando pesagem...");
+            AppLogger.Info(correlationId, origem, $"Marcando pesagem '{_pesagemAtiva.NomeArquivo}' como concluída.");
             await MarcarPesagemConcluidaAsync(_pesagemAtiva, filePath, data);
             _pesagemAtiva = null;
         }
@@ -682,15 +810,18 @@ public class MainWindowViewModel : ViewModelBase
         try
         {
             AtualizarStatusTela("Sincronizando com GitHub...");
+            AppLogger.Info(correlationId, origem, "Publicando PDF do recibo no repositório GitHub...");
             await GitHubService.PublicarReciboAsync(
                 RootDir, filePath,
                 $"Recibo {NomeCliente} - {data:dd/MM/yyyy}",
                 msg => AtualizarStatusTela(msg));
             AtualizarStatusTela("Recibo enviado ao GitHub com sucesso.");
+            AppLogger.Info(correlationId, origem, "Recibo publicado no GitHub com sucesso.");
             PesagensVM.NovoReciboPublicadoCallback?.Invoke();
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             AtualizarStatusTela($"Aviso: não foi possível sincronizar — {ex.Message}", ok: false);
         }
 
@@ -767,8 +898,11 @@ public class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            AppLogger.Erro(correlationId, origem, ex);
             AtualizarStatusTela($"Aviso: erro ao salvar banco-de-dados — {ex.Message}", ok: false);
         }
+
+        AppLogger.Info(correlationId, origem, "Processamento do recibo concluído.");
 
         // Abre modal de sucesso somente após tudo concluído
         var dialog = new Views.ReciboSucessoDialog(Path.GetFileName(filePath), filePath);
@@ -1466,7 +1600,6 @@ public enum AppPage
     Recibos,
     Calculadora,
     Estoque,
-    Venda,
-    EstoqueInicial
+    Venda
 }
 

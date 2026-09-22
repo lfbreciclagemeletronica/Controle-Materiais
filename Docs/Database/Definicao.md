@@ -10,7 +10,6 @@
 
 - Projeto Class Library dentro do solution ControleMateriais
 - Construção usando o Repository Pattern
-- Criptografia de dados
 - Rotina inteligente de backup com limpeza automatizada no encerramento da aplicação
 
 ## Definição Arquitetural
@@ -22,8 +21,7 @@ A solution do projeto deve ser dividida em dois projetos:
 
 ## Dependências 
 
-- `Microsoft.Data.Sqlite.Core` : Drive oficial da Microsoft para o SQLite.
-- `SQLitePCLRaw.bundle.e_sqlcipher` : Suport a criptografia usando SQLCipher.
+- `Microsoft.Data.Sqlite` : Drive oficial da Microsoft para o SQLite (inclui o provider nativo embutido).
 - `Dapper` : Micro-ORM para consultas rápidas e seguras usando parâmetros.
 
 ## Estrutura 

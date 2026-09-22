@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ControleMateriais.Desktop.ViewModels"
              xmlns:conv="using:ControleMateriais.Desktop.Converters"
+             xmlns:data="using:ControleMateriais.Data.Models"
              x:Class="ControleMateriais.Desktop.Views.PesagensView"
              x:DataType="vm:PesagensViewModel">
 
@@ -11,6 +12,12 @@
                                FalseBrush="#F44336"/>
     <conv:StatusPesagemBrushConverter x:Key="StatusCorBrush"/>
     <conv:StringEqualsConverter x:Key="StrEq"/>
+    <conv:BoolToStringConverter x:Key="AtivoStatusTexto"
+                                TrueText="Ativo"
+                                FalseText="Inativo"/>
+    <conv:BoolToStringConverter x:Key="AtivoStatusTooltip"
+                                TrueText="Fornecedor ativo"
+                                FalseText="Fornecedor inativo — clique para reativar"/>
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -59,21 +66,24 @@
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"/>
 
-        <Button Grid.Column="2"
-                Content="+ Novo"
-                Classes="primary"
-                HorizontalAlignment="Right"
-                Command="{Binding CriarNovoCommand}"
-                ToolTip.Tip="Criar recibo do zero sem pesagem"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Nova Venda"
+                  Command="{Binding IrParaVendaCommand}"
+                  ToolTip.Tip="Registrar uma nova venda"/>
+          <Button Content="Nova Compra"
+                  Classes="primary"
+                  Command="{Binding CriarNovoCommand}"
+                  ToolTip.Tip="Criar recibo de compra do zero sem pesagem"/>
+        </StackPanel>
       </Grid>
 
       <!-- TabControl -->
       <TabControl Grid.Row="1" Name="MainTabControl">
 
         <!-- ══════════════════════════════════════════════════
-             ABA 1: RECIBOS
+             ABA 1: COMPRAS
              ══════════════════════════════════════════════════ -->
-        <TabItem Header="Recibos">
+        <TabItem Header="Compras">
           <Grid RowDefinitions="Auto,Auto,Auto,*">
 
             <!-- Barra: filtros + botões -->
@@ -90,16 +100,14 @@
                           ToolTip.Tip="Filtrar por mês"/>
               </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                <Button Content="📊 Exportar Excel"
+                <Button Content="Atualizar"
+                        IsEnabled="{Binding !SincronizandoRecibos}"
+                        Command="{Binding SincronizarRecibosCommand}"
+                        ToolTip.Tip="Sincronizar e recarregar a lista de recibos"/>
+                <Button Content="Exportar Excel"
                         IsEnabled="{Binding !ExportandoExcel}"
                         Command="{Binding ExportarExcelCommand}"
                         ToolTip.Tip="Gerar planilha Excel com pesagens por dia de todos os recibos"/>
-                <Button Content="🔄 Reconstruir Banco"
-                        IsEnabled="{Binding !ReconstruindoBancoDados}"
-                        Command="{Binding ReconstruirBancoDadosCommand}"
-                        Background="#E65100"
-                        Foreground="White"
-                        ToolTip.Tip="Apaga todos os JSONs e reconstrói o banco-de-dados a partir dos PDFs de recibos"/>
               </StackPanel>
             </Grid>
 
@@ -202,7 +210,7 @@
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
                     <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
                                Foreground="{DynamicResource Brush.TextPrimary}"/>
-                    <TextBlock Grid.Column="2" Text="" Width="162"/>
+                    <TextBlock Grid.Column="2" Text="" Width="76"/>
                   </Grid>
 
                   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -230,18 +238,11 @@
                                          FontSize="12"
                                          Foreground="White"/>
                               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
-                                <Button Content="📄 Abrir"
+                                <Button Content="Abrir"
                                         Width="76"
                                         FontSize="12"
                                         Click="AbrirPdf_Click"
                                         ToolTip.Tip="Abrir PDF do recibo"/>
-                                <Button Content="🗑 Excluir"
-                                        Width="80"
-                                        FontSize="12"
-                                        Background="#C0392B"
-                                        Foreground="White"
-                                        Click="DeletarRecibo_Click"
-                                        ToolTip.Tip="Excluir este recibo"/>
                               </StackPanel>
                             </Grid>
                           </Border>
@@ -258,7 +259,111 @@
         </TabItem>
 
         <!-- ══════════════════════════════════════════════════
-             ABA 2: PESAGENS
+             ABA 2: VENDAS (movido de Controle de Estoque)
+             ══════════════════════════════════════════════════ -->
+        <TabItem Header="Vendas">
+          <Grid RowDefinitions="Auto,Auto,*" DataContext="{Binding EstoqueVM}" x:DataType="vm:EstoqueViewModel">
+
+            <!-- Filtros + botão Atualizar -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,8,0,8">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBox Text="{Binding FiltroNome}"
+                         Watermark="Filtrar por cliente..."
+                         Width="180" FontSize="12"
+                         VerticalAlignment="Center"/>
+                <TextBox Text="{Binding FiltroMes}"
+                         Watermark="Mês/Ano (ex: 05/2026)"
+                         Width="160" FontSize="12"
+                         VerticalAlignment="Center"/>
+              </StackPanel>
+              <Button Grid.Column="1"
+                      Content="Atualizar"
+                      Command="{Binding AtualizarCommand}"
+                      IsEnabled="{Binding !Atualizando}"
+                      FontSize="12"
+                      VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Status -->
+            <TextBlock Grid.Row="1"
+                       Text="{Binding Status}"
+                       IsVisible="{Binding StatusVisivel}"
+                       HorizontalAlignment="Center"
+                       FontSize="12" Foreground="#4CAF50"
+                       Margin="0,0,0,4"/>
+
+            <!-- Lista -->
+            <Grid Grid.Row="2">
+              <!-- Vazio -->
+              <TextBlock IsVisible="{Binding RecibosVendaVazia}"
+                         Text="Nenhum recibo de venda encontrado."
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource Brush.TextSecondary}"
+                         FontSize="13"/>
+
+              <Border IsVisible="{Binding !RecibosVendaVazia}"
+                      Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="{DynamicResource Brush.Border}"
+                      BorderThickness="1" CornerRadius="8" Padding="8">
+                <Grid RowDefinitions="Auto,*">
+
+                  <!-- Cabeçalho -->
+                  <Grid Grid.Row="0" ColumnDefinitions="*,130,Auto" Margin="12,4,12,6">
+                    <TextBlock Grid.Column="0" Text="Recibo" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="1" Text="Data" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="2" Text="" Width="76"/>
+                  </Grid>
+
+                  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding RecibosVenda}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ReciboVendaItem">
+                          <Border BorderBrush="{DynamicResource Brush.Border}"
+                                  BorderThickness="0,0,0,1"
+                                  Padding="0,6">
+                            <Border.Styles>
+                              <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#22FFFFFF"/>
+                              </Style>
+                            </Border.Styles>
+                            <Grid ColumnDefinitions="*,130,Auto" Margin="12,2">
+                              <TextBlock Grid.Column="0"
+                                         Text="{Binding NomeCliente}"
+                                         VerticalAlignment="Center"
+                                         FontSize="13"
+                                         TextTrimming="CharacterEllipsis"
+                                         Foreground="White"/>
+                              <TextBlock Grid.Column="1"
+                                         Text="{Binding DataCriacao}"
+                                         VerticalAlignment="Center"
+                                         FontSize="12"
+                                         Foreground="White"/>
+                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
+                                <Button Content="Abrir"
+                                        Width="76" FontSize="12"
+                                        ToolTip.Tip="Abrir PDF do recibo"
+                                        Command="{Binding $parent[ItemsControl].((vm:EstoqueViewModel)DataContext).AbrirReciboVendaCommand}"
+                                        CommandParameter="{Binding}"/>
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+
+                </Grid>
+              </Border>
+            </Grid>
+
+          </Grid>
+        </TabItem>
+
+        <!-- ══════════════════════════════════════════════════
+             ABA 3: PESAGENS
              ══════════════════════════════════════════════════ -->
         <TabItem Header="Pesagens">
           <Grid RowDefinitions="Auto,Auto,Auto,*">
@@ -287,6 +392,11 @@
                               Tag="falhou"
                               Click="FiltroButton_Click"/>
               </StackPanel>
+              <Button Grid.Column="1"
+                      Content="Atualizar"
+                      IsEnabled="{Binding !Sincronizando}"
+                      Command="{Binding SincronizarCommand}"
+                      ToolTip.Tip="Sincronizar e recarregar a lista de pesagens"/>
             </Grid>
 
             <!-- Status sincronização pesagens -->
@@ -407,7 +517,7 @@
                                        FontWeight="Bold" FontSize="12"
                                        Foreground="{Binding StatusPesagem, Converter={StaticResource StatusCorBrush}}"/>
                             <Button Grid.Column="3"
-                                    Content="🗑 Excluir"
+                                    Content="Excluir"
                                     Width="80"
                                     FontSize="12"
                                     Background="#C0392B"
@@ -434,6 +544,139 @@
                        Foreground="{DynamicResource Brush.TextSecondary}"
                        FontSize="13"/>
 
+          </Grid>
+        </TabItem>
+
+        <!-- ══════════════════════════════════════════════════
+             ABA 4: FORNECEDORES
+             ══════════════════════════════════════════════════ -->
+        <TabItem Header="Fornecedores">
+          <Grid RowDefinitions="Auto,Auto,*">
+
+            <!-- Barra: busca + atualizar -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,8">
+              <TextBox Grid.Column="0"
+                       Text="{Binding FiltroFornecedorNome, Mode=TwoWay}"
+                       Watermark="Buscar por nome..."
+                       Width="220" FontSize="12"
+                       VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1"
+                         Text="Fornecedores cadastrados no banco de dados"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Right"
+                         Margin="0,0,12,0"
+                         FontSize="13"
+                         Foreground="{DynamicResource Brush.TextSecondary}"/>
+              <Button Grid.Column="2"
+                      Content="Atualizar"
+                      IsEnabled="{Binding !CarregandoFornecedores}"
+                      Command="{Binding AtualizarFornecedoresCommand}"
+                      ToolTip.Tip="Recarregar lista de fornecedores do banco de dados"/>
+            </Grid>
+
+            <!-- Status -->
+            <TextBlock Grid.Row="1"
+                       IsVisible="{Binding StatusFornecedoresVisivel}"
+                       Text="{Binding StatusFornecedores}"
+                       Foreground="#F44336"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,6"/>
+
+            <!-- Corpo -->
+            <Grid Grid.Row="2">
+
+              <TextBlock IsVisible="{Binding FornecedoresListaVazia}"
+                         Text="Nenhum fornecedor cadastrado."
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource Brush.TextSecondary}"
+                         FontSize="13"/>
+
+              <Border IsVisible="{Binding !FornecedoresListaVazia}"
+                      Background="{DynamicResource Brush.SurfaceAlt}"
+                      BorderBrush="{DynamicResource Brush.Border}"
+                      BorderThickness="1" CornerRadius="8" Padding="8">
+                <Grid RowDefinitions="Auto,*">
+
+                  <!-- Cabeçalho -->
+                  <Grid Grid.Row="0" ColumnDefinitions="*,140,180,90,Auto" Margin="12,4,12,6">
+                    <TextBlock Grid.Column="0" Text="Nome" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="1" Text="CNPJ" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="2" Text="Chave Pix" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="3" Text="Status" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Grid.Column="4" Text="" Width="176"/>
+                  </Grid>
+
+                  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding FornecedoresFiltrados}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="data:Usuario">
+                          <Border BorderBrush="{DynamicResource Brush.Border}"
+                                  BorderThickness="0,0,0,1"
+                                  Padding="0,6">
+                            <Border.Styles>
+                              <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#22FFFFFF"/>
+                              </Style>
+                            </Border.Styles>
+                            <Grid ColumnDefinitions="*,140,180,90,Auto" Margin="12,2">
+                              <TextBlock Grid.Column="0"
+                                         Text="{Binding Nome}"
+                                         VerticalAlignment="Center"
+                                         FontSize="13"
+                                         TextTrimming="CharacterEllipsis"
+                                         Foreground="White"/>
+                              <TextBlock Grid.Column="1"
+                                         Text="{Binding Cnpj}"
+                                         VerticalAlignment="Center"
+                                         FontSize="12"
+                                         Foreground="White"/>
+                              <TextBlock Grid.Column="2"
+                                         Text="{Binding ChavePix}"
+                                         VerticalAlignment="Center"
+                                         FontSize="12"
+                                         TextTrimming="CharacterEllipsis"
+                                         Foreground="White"/>
+                              <TextBlock Grid.Column="3"
+                                         Text="{Binding Ativo, Converter={StaticResource AtivoStatusTexto}}"
+                                         VerticalAlignment="Center"
+                                         FontSize="12"
+                                         FontWeight="Bold"
+                                         Foreground="{Binding Ativo, Converter={StaticResource SyncStatusBrush}}"
+                                         Cursor="Hand"
+                                         PointerPressed="StatusFornecedor_PointerPressed"
+                                         ToolTip.Tip="{Binding Ativo, Converter={StaticResource AtivoStatusTooltip}}"/>
+                              <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
+                                <Button Content="Editar"
+                                        Width="82"
+                                        FontSize="12"
+                                        Click="EditarFornecedor_Click"
+                                        ToolTip.Tip="Editar dados deste fornecedor"/>
+                                <Button Content="Inativar"
+                                        Width="80"
+                                        FontSize="12"
+                                        Background="#C0392B"
+                                        Foreground="White"
+                                        IsVisible="{Binding Ativo}"
+                                        Click="ExcluirFornecedor_Click"
+                                        ToolTip.Tip="Inativar este fornecedor (recibos não são afetados)"/>
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+
+                </Grid>
+              </Border>
+
+            </Grid>
           </Grid>
         </TabItem>
 

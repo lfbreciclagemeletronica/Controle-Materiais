@@ -4,6 +4,7 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
+using ControleMateriais.Data.Services;
 using ControleMateriais.Desktop.ViewModels;
 using ControleMateriais.Desktop.Views;
 
@@ -27,6 +28,11 @@ public partial class App : Application
 
             splash.StartAndShow(() =>
             {
+                // Só cria/migra o banco de dados local DEPOIS do pull do repositório
+                // banco-de-dados (feito na SplashWindow), evitando conflito de clone/checkout
+                // com um database.db local que ainda não existia.
+                DatabaseInitializer.EnsureDatabase();
+
                 var main = new MainWindow();
                 desktop.MainWindow = main;
                 main.Show();

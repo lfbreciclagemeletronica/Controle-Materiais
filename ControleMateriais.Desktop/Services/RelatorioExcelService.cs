@@ -159,33 +159,6 @@ public static class RelatorioExcelService
             .OrderBy(d => ParseData(d))
             .ToList();
 
-        // ── 3. Ler estoque inicial do mês ─────────────────────────────────────
-        progresso?.Invoke($"Lendo estoque inicial do mês {mesAno}...");
-        var estoqueInicial = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-
-        var estoqueInicialPath = Path.Combine(bancoDadosDir, $"estoque-inicial-{mesAno}.json");
-        if (!File.Exists(estoqueInicialPath))
-            estoqueInicialPath = Path.Combine(bancoDadosDir, "estoque-inicial.json");
-
-        if (File.Exists(estoqueInicialPath))
-        {
-            try
-            {
-                var obj = JsonNode.Parse(File.ReadAllText(estoqueInicialPath))?.AsObject();
-                if (obj is not null)
-                {
-                    foreach (var kvp in obj)
-                    {
-                        if (kvp.Key.Equals("data", StringComparison.OrdinalIgnoreCase) ||
-                            kvp.Key.Equals("mes",  StringComparison.OrdinalIgnoreCase) ||
-                            kvp.Key.Equals("ano",  StringComparison.OrdinalIgnoreCase)) continue;
-                        estoqueInicial[kvp.Key] = ExtrairDecimal(kvp.Value);
-                    }
-                }
-            }
-            catch { }
-        }
-
         // ── 4. Montar lista de linhas ─────────────────────────────────────────
         var linhasItens = ItemCatalog.OrderedItems
             .Concat(extrasGlobal.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
@@ -213,10 +186,6 @@ public static class RelatorioExcelService
         var vendaGrandTotalFill  = XLColor.FromHtml("#FFE0B2");
         var vendaTotalHeaderFill = XLColor.FromHtml("#BF360C");
 
-        // Cores — estoque inicial (roxo)
-        var estoqueInicialHeaderFill = XLColor.FromHtml("#6A1B9A");
-        var estoqueInicialCellFill   = XLColor.FromHtml("#F3E5F5");
-
         // Cores — estoque atual (azul)
         var estoqueHeaderFill     = XLColor.FromHtml("#0D47A1");
         var estoqueCellFill       = XLColor.FromHtml("#E3F2FD");
@@ -228,14 +197,12 @@ public static class RelatorioExcelService
         // Col 2+datasCompra.Count        = TOTAL (compras kg)
         // Col 3+datasCompra.Count ..     = dias de venda
         // Col 3+datasCompra.Count+datasVenda.Count = TOTAL VENDAS
-        // +1 = Estoque Inicial
         // +1 = Estoque Atual
         int colCompDayStart  = 2;
         int colComprasTotal  = colCompDayStart + datasCompra.Count;
         int colVendaStart    = colComprasTotal + 1;
         int colTotalVendas   = colVendaStart + datasVenda.Count;
-        int colEstoqueInicial = colTotalVendas + 1;
-        int colEstoqueAtual   = colEstoqueInicial + 1;
+        int colEstoqueAtual   = colTotalVendas + 1;
 
         // ── Cabeçalho ─────────────────────────────────────────────────────────
         EstiloHeader(ws.Cell(1, 1), headerFill, headerFont);
@@ -263,9 +230,6 @@ public static class RelatorioExcelService
             EstiloHeader(ws.Cell(1, colTotalVendas), vendaTotalHeaderFill, headerFont);
             ws.Cell(1, colTotalVendas).Value = "TOTAL VENDAS";
         }
-
-        EstiloHeader(ws.Cell(1, colEstoqueInicial), estoqueInicialHeaderFill, headerFont);
-        ws.Cell(1, colEstoqueInicial).Value = "Estoque Inicial";
 
         EstiloHeader(ws.Cell(1, colEstoqueAtual), estoqueHeaderFill, headerFont);
         ws.Cell(1, colEstoqueAtual).Value = "Estoque Atual";
@@ -323,15 +287,8 @@ public static class RelatorioExcelService
                 cellTV.Style.Fill.BackgroundColor = vendaTotalColFill;
             }
 
-            // — Estoque Inicial —
-            var ei = estoqueInicial.TryGetValue(nome, out var eiVal) ? eiVal : 0m;
-            var cellEI = ws.Cell(excelRow, colEstoqueInicial);
-            if (ei != 0m) { cellEI.SetValue(ei.ToString("N3", PtBR)); cellEI.Style.Font.Bold = true; }
-            cellEI.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
-            cellEI.Style.Fill.BackgroundColor = estoqueInicialCellFill;
-
-            // — Estoque Atual = TOTAL VENDAS − (TOTAL Compras + Estoque Inicial) —
-            decimal estoqueAtualVal = rowTotalVenda - (rowTotalCompra + ei);
+            // — Estoque Atual = TOTAL VENDAS − TOTAL Compras —
+            decimal estoqueAtualVal = rowTotalVenda - rowTotalCompra;
             var cellEA = ws.Cell(excelRow, colEstoqueAtual);
             if (estoqueAtualVal != 0m) { cellEA.SetValue(estoqueAtualVal.ToString("N3", PtBR)); cellEA.Style.Font.Bold = true; }
             cellEA.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
@@ -404,14 +361,7 @@ public static class RelatorioExcelService
             cellGTV.Style.Fill.BackgroundColor = vendaGrandTotalFill;
         }
 
-        decimal grandTotalEI = estoqueInicial.Values.Sum();
-        var cellGEI = ws.Cell(totalRow, colEstoqueInicial);
-        cellGEI.SetValue(grandTotalEI.ToString("N3", PtBR));
-        cellGEI.Style.Font.Bold = true;
-        cellGEI.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
-        cellGEI.Style.Fill.BackgroundColor = XLColor.FromHtml("#E1BEE7");
-
-        decimal grandTotalEstoqueAtual = grandTotalVenda - (grandTotalCompras + grandTotalEI);
+        decimal grandTotalEstoqueAtual = grandTotalVenda - grandTotalCompras;
         var cellGrandEstoque = ws.Cell(totalRow, colEstoqueAtual);
         cellGrandEstoque.SetValue(grandTotalEstoqueAtual.ToString("N3", PtBR));
         cellGrandEstoque.Style.Font.Bold = true;
@@ -467,7 +417,6 @@ public static class RelatorioExcelService
             ws.Column(colVendaStart + d).Width = 14;
         if (datasVenda.Count > 0)
             ws.Column(colTotalVendas).Width = 16;
-        ws.Column(colEstoqueInicial).Width = 16;
         ws.Column(colEstoqueAtual).Width   = 16;
 
         ws.SheetView.Freeze(1, 1);

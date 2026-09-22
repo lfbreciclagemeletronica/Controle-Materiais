@@ -57,6 +57,10 @@
       <Button Content="⚙ Configurar GitHub"
               Click="ConfigurarGitHub_Click"
               ToolTip.Tip="Configurar credenciais de acesso ao GitHub"/>
+
+      <Button Content="Ver Logs"
+              Click="VerLogs_Click"
+              ToolTip.Tip="Ver logs do sistema em tempo real (debugging)"/>
     </StackPanel>
 
     <!-- Conteúdo central -->
@@ -80,7 +84,7 @@
                  Margin="0,0,0,6"/>
 
       <!-- Versão -->
-      <TextBlock Text="V5.0.7"
+      <TextBlock Text="V5.0.8"
                  FontSize="13"
                  HorizontalAlignment="Center"
                  Foreground="White"

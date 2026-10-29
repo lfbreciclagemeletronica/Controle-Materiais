@@ -118,6 +118,9 @@
                       <Style Selector="Border:pointerover">
                         <Setter Property="Background" Value="#0A3B82F6"/>
                       </Style>
+                      <Style Selector="Border:focus-within">
+                        <Setter Property="Background" Value="#2A4FC3F7"/>
+                      </Style>
                     </Border.Styles>
                     <Grid ColumnDefinitions="*,180">
                       <TextBlock Grid.Column="0"
@@ -163,6 +166,9 @@
                       <Style Selector="Border:pointerover">
                         <Setter Property="Background" Value="#0A3B82F6"/>
                       </Style>
+                      <Style Selector="Border:focus-within">
+                        <Setter Property="Background" Value="#2A4FC3F7"/>
+                      </Style>
                     </Border.Styles>
                     <Grid ColumnDefinitions="*,180">
                       <TextBlock Grid.Column="0"
@@ -180,6 +186,67 @@
                                GotFocus="PesoTextBox_GotFocus"
                                LostFocus="PesoTextBox_LostFocus"
                                KeyDown="PesoTextBox_KeyDown"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Itens personalizados -->
+            <Border BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,4,0,0" Padding="20,6,20,6">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Itens Personalizados"
+                           FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.TextSecondary}"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        Content="+ Adicionar Item"
+                        Command="{Binding AdicionarCustomItemCommand}"
+                        FontSize="10" Padding="8,4"/>
+              </Grid>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding ItensPersonalizados}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VendaItemWrapper">
+                  <Border BorderBrush="{DynamicResource Brush.Border}"
+                          BorderThickness="0,0,0,1"
+                          Padding="20,6">
+                    <Border.Styles>
+                      <Style Selector="Border:pointerover">
+                        <Setter Property="Background" Value="#0A3B82F6"/>
+                      </Style>
+                      <Style Selector="Border:focus-within">
+                        <Setter Property="Background" Value="#2A4FC3F7"/>
+                      </Style>
+                    </Border.Styles>
+                    <Grid ColumnDefinitions="*,180">
+                      <TextBox Grid.Column="0"
+                               Text="{Binding Nome, Mode=TwoWay}"
+                               Watermark="Nome do item..."
+                               FontSize="12"
+                               Margin="0,0,40,0"
+                               VerticalAlignment="Center"/>
+                      <TextBox Grid.Column="1"
+                               Text="{Binding PesoTexto}"
+                               FontSize="12"
+                               TextAlignment="Right"
+                               Width="160"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               GotFocus="PesoTextBox_GotFocus"
+                               LostFocus="PesoTextBox_LostFocus"
+                               KeyDown="PesoTextBox_KeyDown"/>
+                      <Button Grid.Column="0"
+                              Content="×"
+                              Command="{Binding $parent[UserControl].((vm:VendaViewModel)DataContext).RemoverCustomItemCommand}"
+                              CommandParameter="{Binding}"
+                              FontSize="16" Padding="0" Width="24" Height="24"
+                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                              Background="Transparent" Foreground="#F44336"
+                              BorderThickness="0" Cursor="Hand"/>
                     </Grid>
                   </Border>
                 </DataTemplate>

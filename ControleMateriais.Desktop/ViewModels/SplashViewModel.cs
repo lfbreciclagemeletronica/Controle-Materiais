@@ -1,4 +1,4 @@
-using Avalonia.Threading;
+﻿using Avalonia.Threading;
 using ControleMateriais.Desktop.Services;
 using System;
 using System.Collections.Generic;
@@ -20,18 +20,48 @@ public class SyncItem : INotifyPropertyChanged
     private SyncStatus _status = SyncStatus.Loading;
     private string _mensagem = string.Empty;
 
+    private string _spinner = "⠋";
+
     public string Label { get; init; } = string.Empty;
+    public string LabelConcluido { get; init; } = string.Empty;
+    public string LabelAviso { get; init; } = string.Empty;
+    public string MensagemErro { get; init; } = "Falha ao atualizar neste computador!";
+    public string ErroTecnico { get; set; } = string.Empty;
+    public bool TemErroTecnico => !string.IsNullOrEmpty(ErroTecnico);
+
+    public string Spinner
+    {
+        get => _spinner;
+        set { _spinner = value; OnPropertyChanged(); }
+    }
+
+    public string Texto => _status switch
+    {
+        SyncStatus.Loading => Label,
+        SyncStatus.Ok => LabelConcluido,
+        SyncStatus.Warn => string.IsNullOrEmpty(LabelAviso) ? Label : LabelAviso,
+        _ => string.IsNullOrEmpty(_mensagem) ? MensagemErro : _mensagem
+    };
+
+    public void DefinirErro(string tecnico)
+    {
+        ErroTecnico = tecnico;
+        OnPropertyChanged(nameof(ErroTecnico));
+        OnPropertyChanged(nameof(TemErroTecnico));
+        Mensagem = MensagemErro;
+        Status = SyncStatus.Error;
+    }
 
     public SyncStatus Status
     {
         get => _status;
-        set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsLoading)); OnPropertyChanged(nameof(IsOk)); OnPropertyChanged(nameof(IsWarn)); OnPropertyChanged(nameof(IsError)); OnPropertyChanged(nameof(IsDone)); }
+        set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(Texto)); OnPropertyChanged(nameof(IsLoading)); OnPropertyChanged(nameof(IsOk)); OnPropertyChanged(nameof(IsWarn)); OnPropertyChanged(nameof(IsError)); OnPropertyChanged(nameof(IsDone)); }
     }
 
     public string Mensagem
     {
         get => _mensagem;
-        set { _mensagem = value; OnPropertyChanged(); }
+        set { _mensagem = value; OnPropertyChanged(); OnPropertyChanged(nameof(Texto)); }
     }
 
     public ObservableCollection<string> Detalhes { get; } = new();
@@ -68,10 +98,66 @@ public class SplashViewModel : INotifyPropertyChanged
         private set { _semCredenciais = value; OnPropertyChanged(); }
     }
 
-    public SyncItem ItemRecibos    { get; } = new() { Label = "Atualizando recibos do sistema remoto..." };
-    public SyncItem ItemPesagens   { get; } = new() { Label = "Atualizando pesagens do sistema remoto..." };
-    public SyncItem ItemBancoDados { get; } = new() { Label = "Atualizando banco de dados do sistema remoto..." };
-    public SyncItem ItemVendas     { get; } = new() { Label = "Verificando recibos de vendas..." };
+    private static readonly string[] SpinnerFrames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(90) };
+    private int _frame;
+    private string _barraTexto = string.Empty;
+
+    public SyncItem ItemRecibos    { get; } = new() { Label = "Atualizando recibos de compra...", LabelConcluido = "Recibos de compra atualizados", LabelAviso = "Recibos de compra não atualizados", MensagemErro = "Falha em atualizar os recibos neste computador!" };
+    public SyncItem ItemPesagens   { get; } = new() { Label = "Atualizando pesagens...", LabelConcluido = "Pesagens atualizadas", LabelAviso = "Pesagens não atualizadas", MensagemErro = "Falha em atualizar as pesagens neste computador!" };
+    public SyncItem ItemBancoDados { get; } = new() { Label = "Atualizando banco de dados...", LabelConcluido = "Banco de dados atualizado", LabelAviso = "Banco de dados não atualizado", MensagemErro = "Falha em atualizar o banco de dados neste computador!" };
+    public SyncItem ItemVendas     { get; } = new() { Label = "Atualizando recibos de venda...", LabelConcluido = "Recibos de venda atualizados", LabelAviso = "Recibos de venda não atualizados", MensagemErro = "Falha em atualizar os recibos de venda neste computador!" };
+
+    private bool _semInternet;
+    public bool SemInternet
+    {
+        get => _semInternet;
+        private set { _semInternet = value; OnPropertyChanged(); }
+    }
+
+    private static async Task<bool> TemInternetAsync()
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+            using var r = await http.GetAsync("https://github.com", System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    public IReadOnlyList<SyncItem> Itens { get; }
+
+    public string BarraTexto
+    {
+        get => _barraTexto;
+        private set { _barraTexto = value; OnPropertyChanged(); }
+    }
+
+    public SplashViewModel()
+    {
+        Itens = new[] { ItemRecibos, ItemPesagens, ItemBancoDados, ItemVendas };
+        foreach (var i in Itens)
+            i.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(SyncItem.Status)) AtualizarBarra(); };
+        AtualizarBarra();
+
+        _timer.Tick += (_, _) =>
+        {
+            var f = SpinnerFrames[_frame++ % SpinnerFrames.Length];
+            foreach (var i in Itens) i.Spinner = f;
+        };
+        _timer.Start();
+    }
+
+    private void AtualizarBarra()
+    {
+        const int largura = 30;
+        var pct = Itens.Count(i => i.IsOk) * 100 / Itens.Count;
+        var cheio = pct * largura / 100;
+        BarraTexto = $"[{new string('█', cheio)}{new string('░', largura - cheio)}] {pct,3}%";
+        if (Itens.All(i => i.IsDone)) _timer.Stop();
+        if (Itens.All(i => i.IsOk)) SyncInfo.UltimaAtualizacao = DateTime.Now;
+    }
 
     public async Task IniciarSincronizacaoAsync()
     {
@@ -90,6 +176,17 @@ public class SplashViewModel : INotifyPropertyChanged
             return;
         }
 
+        if (!await TemInternetAsync())
+        {
+            UI(() =>
+            {
+                SemInternet = true;
+                foreach (var item in Itens) item.Status = SyncStatus.Warn;
+                PodeContinuar = true;
+            });
+            return;
+        }
+
         // Pull dos 3 repos em paralelo
         var taskRecibos    = PullRecibosAsync();
         var taskPesagens   = PullPesagensAsync();
@@ -103,6 +200,9 @@ public class SplashViewModel : INotifyPropertyChanged
         UI(() => PodeContinuar = true);
     }
 
+    private static string Tecnico(Exception ex, string classificacao) =>
+        Regex.Replace($"{classificacao}\n\n--- Detalhe técnico ---\n{ex}", @"://[^@/\s]+@", "://***@");
+
     // Helper: marshal an action to the UI thread
     private static void UI(Action a) => Dispatcher.UIThread.Post(a);
 
@@ -110,34 +210,13 @@ public class SplashViewModel : INotifyPropertyChanged
     {
         try
         {
-            var novos = await GitHubService.PullRecibosAsync(RootDir,
-                msg => { /* progresso interno */ });
-
-            UI(() =>
-            {
-                if (novos.Count == 0)
-                {
-                    ItemRecibos.Status   = SyncStatus.Ok;
-                    ItemRecibos.Mensagem = "Recibos locais já atualizados, sem novos recibos";
-                }
-                else
-                {
-                    ItemRecibos.Status   = SyncStatus.Ok;
-                    ItemRecibos.Mensagem = $"{novos.Count} novo(s) recibo(s) recebido(s)";
-                    foreach (var (nome, data) in novos)
-                    {
-                        var dataFmt = FormatarData(data);
-                        ItemRecibos.Detalhes.Add(string.IsNullOrEmpty(dataFmt)
-                            ? $"• {nome}"
-                            : $"• {nome} — {dataFmt}");
-                    }
-                }
-            });
+            await GitHubService.PullRecibosAsync(RootDir, msg => { });
+            UI(() => ItemRecibos.Status = SyncStatus.Ok);
         }
         catch (Exception ex)
         {
             var msg = GitHubService.ClassificarErroGit(ex.Message, "pull de Recibos");
-            UI(() => { ItemRecibos.Status = SyncStatus.Error; ItemRecibos.Mensagem = msg; });
+            var tec = Tecnico(ex, msg); UI(() => ItemRecibos.DefinirErro(tec));
         }
     }
 
@@ -145,34 +224,13 @@ public class SplashViewModel : INotifyPropertyChanged
     {
         try
         {
-            var novos = await GitHubService.PullPesagensAsync(RootDir,
-                msg => { });
-
-            UI(() =>
-            {
-                if (novos.Count == 0)
-                {
-                    ItemPesagens.Status   = SyncStatus.Ok;
-                    ItemPesagens.Mensagem = "Pesagens locais já atualizadas, sem novas pesagens";
-                }
-                else
-                {
-                    ItemPesagens.Status   = SyncStatus.Ok;
-                    ItemPesagens.Mensagem = $"{novos.Count} nova(s) pesagem(ns) recebida(s)";
-                    foreach (var (nome, data) in novos)
-                    {
-                        var dataFmt = FormatarData(data);
-                        ItemPesagens.Detalhes.Add(string.IsNullOrEmpty(dataFmt)
-                            ? $"• {nome}"
-                            : $"• {nome} — {dataFmt}");
-                    }
-                }
-            });
+            await GitHubService.PullPesagensAsync(RootDir, msg => { });
+            UI(() => ItemPesagens.Status = SyncStatus.Ok);
         }
         catch (Exception ex)
         {
             var msg = GitHubService.ClassificarErroGit(ex.Message, "pull de Pesagens");
-            UI(() => { ItemPesagens.Status = SyncStatus.Error; ItemPesagens.Mensagem = msg; });
+            var tec = Tecnico(ex, msg); UI(() => ItemPesagens.DefinirErro(tec));
         }
     }
 
@@ -180,37 +238,13 @@ public class SplashViewModel : INotifyPropertyChanged
     {
         try
         {
-            var novos = await GitHubService.PullBancoDadosAsync(RootDir,
-                msg => { });
-
-            UI(() =>
-            {
-                if (novos.Count == 0)
-                {
-                    ItemBancoDados.Status   = SyncStatus.Ok;
-                    ItemBancoDados.Mensagem = "Banco de dados já atualizado, sem novos registros";
-                }
-                else
-                {
-                    ItemBancoDados.Status   = SyncStatus.Ok;
-                    ItemBancoDados.Mensagem = $"{novos.Count} novo(s) registro(s) no banco de dados";
-                    foreach (var (arquivo, cliente, data) in novos)
-                    {
-                        var dataFmt = FormatarData(data);
-                        if (string.IsNullOrEmpty(cliente))
-                            ItemBancoDados.Detalhes.Add($"• {arquivo}");
-                        else
-                            ItemBancoDados.Detalhes.Add(string.IsNullOrEmpty(dataFmt)
-                                ? $"• {arquivo}: {cliente}"
-                                : $"• {arquivo}: {cliente} — {dataFmt}");
-                    }
-                }
-            });
+            await GitHubService.PullBancoDadosAsync(RootDir, msg => { });
+            UI(() => ItemBancoDados.Status = SyncStatus.Ok);
         }
         catch (Exception ex)
         {
             var msg = GitHubService.ClassificarErroGit(ex.Message, "pull de Banco de Dados");
-            UI(() => { ItemBancoDados.Status = SyncStatus.Error; ItemBancoDados.Mensagem = msg; });
+            var tec = Tecnico(ex, msg); UI(() => ItemBancoDados.DefinirErro(tec));
         }
     }
 
@@ -221,26 +255,14 @@ public class SplashViewModel : INotifyPropertyChanged
             var recibosDir = GitHubService.RecibosRepoDir(RootDir);
             var vendaDir   = Path.Combine(recibosDir, "Recibos_Venda");
 
-            if (!Directory.Exists(vendaDir))
-            {
-                UI(() => { ItemVendas.Status = SyncStatus.Ok; ItemVendas.Mensagem = "Sem recibos de venda"; });
-                return Task.CompletedTask;
-            }
+            if (Directory.Exists(vendaDir))
+                _ = Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly);
 
-            var pdfs = Directory.GetFiles(vendaDir, "*.pdf", SearchOption.TopDirectoryOnly);
-            var count = pdfs.Length;
-
-            UI(() =>
-            {
-                ItemVendas.Status   = SyncStatus.Ok;
-                ItemVendas.Mensagem = count == 0
-                    ? "Sem recibos de venda"
-                    : $"{count} recibo(s) de venda disponível(is)";
-            });
+            UI(() => ItemVendas.Status = SyncStatus.Ok);
         }
         catch (Exception ex)
         {
-            UI(() => { ItemVendas.Status = SyncStatus.Error; ItemVendas.Mensagem = $"Erro: {ex.Message}"; });
+            var tec = Tecnico(ex, "Verificação de recibos de venda"); UI(() => ItemVendas.DefinirErro(tec));
         }
 
         return Task.CompletedTask;
@@ -257,3 +279,4 @@ public class SplashViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? p = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(p));
 }
+

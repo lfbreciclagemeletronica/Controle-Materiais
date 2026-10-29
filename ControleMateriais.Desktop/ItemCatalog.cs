@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace ControleMateriais.Desktop
@@ -40,7 +40,7 @@ namespace ControleMateriais.Desktop
             "Placa de HD",
             "Placa de Celular Completa",
             "Celular Sem tampa e bateria (Botão e Flip)",
-            "Celular Smart sem tampa e Sem bateria",
+            "Celular Smart com bateria removível (pesado s/bateria)",
             "Celular Smart Com Bateria Blindada",
             "Celular Replicas blindado e sem Baterias",
             "Memórias Douradas",
@@ -56,7 +56,7 @@ namespace ControleMateriais.Desktop
             "Baterias de Notebook",
             "Baterias de Tablet",
             "Baterias de Celular",
-            "Fonte completa",
+            "Fonte Completa - Desktop",
             "Raio X",
             "Desmanche Eletrônicos Consultar",
         };
@@ -70,7 +70,9 @@ namespace ControleMateriais.Desktop
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Celular Smart sem Bateria Botão e Flip"]  = "Celular Sem tampa e bateria (Botão e Flip)",
-                ["Celular Smart Sem Bateria"]               = "Celular Smart sem tampa e Sem bateria",
+                ["Celular Smart Sem Bateria"]               = "Celular Smart com bateria removível (pesado s/bateria)",
+                ["Celular Smart sem tampa e Sem bateria"]   = "Celular Smart com bateria removível (pesado s/bateria)",
+                ["Fonte completa"]                          = "Fonte Completa - Desktop",
                 ["Celular Smart Com Bateria"]               = "Celular Smart Com Bateria Blindada",
                 ["Celular Replicas com e sem Baterias"]     = "Celular Replicas blindado e sem Baterias",
             };

@@ -1,4 +1,4 @@
-using ControleMateriais.Desktop;
+﻿using ControleMateriais.Desktop;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
@@ -46,7 +46,8 @@ public static class ReciboParserService
         {
             ["HD sem placa/Sucateado"]                           = ["HD sem Placa Sucateado", "HD sem Placa", "HD Sucateado"],
             ["Celular Sem tampa e bateria (Botão e Flip)"]       = ["Celular Smart sem Bateria Botão e Flip", "Celular Sem bateria Botao e Flip", "Celular Sem bateria Botão e Flip", "Sem bateria Botao e Flip"],
-            ["Celular Smart sem tampa e Sem bateria"]            = ["Celular Smart Sem Bateria"],
+            ["Celular Smart com bateria removível (pesado s/bateria)"]            = ["Celular Smart sem tampa e Sem bateria", "Celular Smart Sem Bateria"],
+            ["Fonte Completa - Desktop"]                       = ["Fonte completa"],
             ["Celular Smart Com Bateria Blindada"]               = ["Celular Smart Com Bateria"],
             ["Celular Replicas blindado e sem Baterias"]         = ["Celular Replicas com e sem Baterias", "Celular Replicas com e sem Bateria", "Replicas com e sem Baterias"],
             ["Memória Prata"]                                    = ["Memorias Prata", "Memórias Prata", "Memoria Prateada"],

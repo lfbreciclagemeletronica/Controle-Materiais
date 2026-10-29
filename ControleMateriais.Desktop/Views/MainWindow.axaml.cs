@@ -21,6 +21,7 @@ public partial class MainWindow : Window
 
     private async Task VerificarInicializacaoAsync(MainWindowViewModel vm)
     {
+        _ = vm.VerificarAtualizacaoAsync();
         if (!GitHubService.CredenciaisExistem(MainWindowViewModel.RootDirPublic))
         {
             await AbrirDialogoGitHubAsync();

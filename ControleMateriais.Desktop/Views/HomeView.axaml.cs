@@ -34,6 +34,12 @@ public partial class HomeView : UserControl
         }
     }
 
+    private void AbrirRelease_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel { NovaVersaoUrl.Length: > 0 } vm)
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(vm.NovaVersaoUrl) { UseShellExecute = true });
+    }
+
     private static LogViewerWindow? _logViewer;
 
     private void VerLogs_Click(object? sender, RoutedEventArgs e)

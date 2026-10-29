@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ControleMateriais.Desktop.Views.ErroDetalheWindow"
+        Title="Detalhes do erro"
+        Width="760" Height="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#0C0C0C"
+        FontFamily="avares://ControleMateriais.Desktop/Assets/Fonts#JetBrainsMono Nerd Font Mono"
+        FontSize="13"
+        Foreground="#CCCCCC">
+  <Window.Styles>
+    <Style Selector="Button">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="#3FB950"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="#3FB950"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Padding" Value="16,8"/>
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#1F3D2A"/>
+      <Setter Property="Foreground" Value="#7EE787"/>
+    </Style>
+  </Window.Styles>
+  <Grid RowDefinitions="Auto,*,Auto" Margin="24">
+    <StackPanel Spacing="4" Margin="0,0,0,12">
+      <TextBlock x:Name="TituloText" FontWeight="Bold" FontSize="15" Foreground="#F85149" TextWrapping="Wrap"/>
+      <TextBlock Text="Informação técnica para o desenvolvedor." Foreground="#8B949E" FontSize="12"/>
+    </StackPanel>
+    <Border Grid.Row="1" BorderBrush="#30363D" BorderThickness="1" Padding="10">
+      <ScrollViewer>
+        <SelectableTextBlock x:Name="DetalheText" TextWrapping="Wrap" Foreground="#CCCCCC"/>
+      </ScrollViewer>
+    </Border>
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,12,0,0">
+      <Button Content="[ Copiar ]" Click="Copiar_Click"/>
+      <Button Content="[ Fechar ]" Click="Fechar_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>

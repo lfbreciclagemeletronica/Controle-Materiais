@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -176,27 +176,53 @@ public static class GitHubService
         var creds = CarregarCredenciais(rootDir)!;
         if (string.IsNullOrWhiteSpace(creds.UrlBancoDados)) return;
 
-        var repoDir = BancoDadosRepoDir(rootDir);
-        var gitDir  = Path.Combine(repoDir, ".git");
-        if (!Directory.Exists(gitDir)) return;
+        await SincronizarBancoDadosCoreAsync(rootDir, creds, nomeArquivo, mensagemCommit, progresso);
+    }
 
-        var remoteUrl = InjetarToken(creds.UrlBancoDados, creds.Token);
-        await RunAsync("git", $"remote set-url origin {remoteUrl}", repoDir);
+    /// <summary>
+    /// Commita o arquivo (se alterado), faz fetch + rebase e push. O commit é feito ANTES do rebase
+    /// (rebase com arquivo modificado falharia) e qualquer falha é propagada como exceção.
+    /// Retorna true se houve push, false se não havia nada a enviar.
+    /// </summary>
+    private static async Task<bool> SincronizarBancoDadosCoreAsync(string rootDir, GitHubCredenciais creds,
+        string nomeArquivo, string mensagemCommit, Action<string>? progresso)
+    {
+        var repoDir = BancoDadosRepoDir(rootDir);
+        if (!Directory.Exists(Path.Combine(repoDir, ".git"))) return false;
+
+        await RunAsync("git", $"remote set-url origin {InjetarToken(creds.UrlBancoDados, creds.Token)}", repoDir);
         await RunAsync("git", $"config user.email \"{creds.GitEmail}\"", repoDir);
         await RunAsync("git", $"config user.name \"{creds.GitUsuario}\"", repoDir);
 
+        // Apenas o arquivo informado é versionado (evita enviar backups e arquivos temporários).
+        await RunAsync("git", $"add \"{nomeArquivo}\"", repoDir);
+        var status = await RunAsync("git", $"status --porcelain -- \"{nomeArquivo}\"", repoDir);
+        if (!string.IsNullOrWhiteSpace(status.stdout))
+        {
+            var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
+            if (commit.exitCode != 0) throw new Exception($"commit de Banco de Dados falhou: {commit.stderr}{commit.stdout}");
+            progresso?.Invoke("Alteração do banco de dados registrada (commit).");
+        }
+
         progresso?.Invoke("Atualizando banco-de-dados (pull)...");
-        await RunAsync("git", "fetch origin main", repoDir);
-        await RunAsync("git", "rebase origin/main", repoDir);
+        var fetch = await RunAsync("git", "fetch origin main", repoDir);
+        if (fetch.exitCode != 0) throw new Exception(fetch.stderr);
+
+        var rebase = await RunAsync("git", "rebase origin/main", repoDir);
+        if (rebase.exitCode != 0)
+        {
+            await RunAsync("git", "rebase --abort", repoDir);
+            throw new Exception($"rebase de Banco de Dados falhou (conflito com a versão remota): {rebase.stderr}{rebase.stdout}");
+        }
+
+        var log = await RunAsync("git", "log origin/main..HEAD --oneline", repoDir);
+        if (string.IsNullOrWhiteSpace(log.stdout)) return false;
 
         progresso?.Invoke("Enviando banco de dados ao GitHub...");
-        await RunAsync("git", $"add \"{nomeArquivo}\"", repoDir);
-        var commit = await RunAsync("git", $"commit -m \"{mensagemCommit}\"", repoDir);
-        if (commit.exitCode == 0)
-        {
-            var branchAtual = await ObterBranchAtual(repoDir);
-            await RunAsync("git", $"push origin {branchAtual}", repoDir);
-        }
+        var branch = await ObterBranchAtual(repoDir);
+        var push = await RunAsync("git", $"push origin {branch}", repoDir);
+        if (push.exitCode != 0) throw new Exception($"push de Banco de Dados falhou: {push.stderr}{push.stdout}");
+        return true;
     }
 
     /// <summary>
@@ -1273,22 +1299,17 @@ public static class GitHubService
             }
         }
 
-        // TODO: Em Desenvolvimento — sincronização banco-de-dados desativada temporariamente
-        // if (!string.IsNullOrWhiteSpace(creds.UrlBancoDados))
-        // {
-        //     try
-        //     {
-        //         await SincronizarRepo(
-        //             BancoDadosRepoDir(rootDir),
-        //             InjetarToken(creds.UrlBancoDados, creds.Token),
-        //             "Banco de Dados");
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         progresso?.Invoke($"[Banco de Dados] {ClassificarErroGit(ex.Message, "sincronização de Banco de Dados")}");
-        //     }
-        // }
-        progresso?.Invoke("Banco de Dados: sincronização pausada (Em Desenvolvimento).");
+        if (!string.IsNullOrWhiteSpace(creds.UrlBancoDados))
+        {
+            try
+            {
+                await SincronizarBancoDadosAoFecharAsync(rootDir, creds, progresso);
+            }
+            catch (Exception ex)
+            {
+                progresso?.Invoke($"[Banco de Dados] {ClassificarErroGit(ex.Message, "sincronização de Banco de Dados")}");
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(creds.UrlRecibos))
         {
@@ -1323,6 +1344,14 @@ public static class GitHubService
         progresso?.Invoke("Sincronização concluída.");
     }
 
+    private static async Task SincronizarBancoDadosAoFecharAsync(string rootDir, GitHubCredenciais creds, Action<string>? progresso)
+    {
+        if (!Directory.Exists(Path.Combine(BancoDadosRepoDir(rootDir), ".git"))) return;
+
+        progresso?.Invoke("Sincronizando Banco de Dados...");
+        var enviou = await SincronizarBancoDadosCoreAsync(rootDir, creds, "database.db", "Sincronização automática ao fechar", progresso);
+        progresso?.Invoke(enviou ? "Banco de Dados sincronizado." : "Banco de Dados já atualizado.");
+    }
     /// <summary>
     /// Classifica o stderr de um comando git e retorna uma mensagem orientativa.
     /// </summary>

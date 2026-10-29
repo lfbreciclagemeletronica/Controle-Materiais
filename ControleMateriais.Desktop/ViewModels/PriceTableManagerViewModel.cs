@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using ControleMateriais.Desktop.Serialization;
@@ -563,7 +563,8 @@ namespace ControleMateriais.Desktop.ViewModels
                 ["HD sem Placa/Sucateado"]                        = new[] { "HD sem Placa Sucateado", "HD sem Placa", "HD Sucateado" },
                 ["Desmanche Eletrônicos Consultar Itens"]          = new[] { "Desmanche Eletronicos Consultar itens", "Desmanche Eletrônicos Consultar", "Desmanche Eletronicos" },
                 ["Celular Sem tampa e bateria (Botão e Flip)"]     = new[] { "Celular Smart sem Bateria Botão e Flip", "Celular Sem bateria Botao e Flip", "Celular Sem bateria Botão e Flip", "Sem bateria Botao e Flip" },
-                ["Celular Smart sem tampa e Sem bateria"]          = new[] { "Celular Smart Sem Bateria" },
+                ["Celular Smart com bateria removível (pesado s/bateria)"]          = new[] { "Celular Smart sem tampa e Sem bateria", "Celular Smart Sem Bateria" },
+                ["Fonte Completa - Desktop"]                     = new[] { "Fonte completa" },
                 ["Celular Smart Com Bateria Blindada"]             = new[] { "Celular Smart Com Bateria" },
                 ["Celular Replicas blindado e sem Baterias"]       = new[] { "Celular Replicas com e sem Baterias", "Celular Replicas com e sem Bateria", "Replicas com e sem Baterias" },
                 ["Memória Prata"]                                  = new[] { "Memorias Prata", "Memórias Prata", "Memoria Prateada" },

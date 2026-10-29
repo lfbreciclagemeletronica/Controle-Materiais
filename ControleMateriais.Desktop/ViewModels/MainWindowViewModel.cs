@@ -182,6 +182,36 @@ public class MainWindowViewModel : ViewModelBase
     }
     public bool GitNaoConfigurado => !_gitConfigurado;
 
+    public string UltimaAtualizacaoTexto =>
+        SyncInfo.UltimaAtualizacao is { } d ? $"Atualizado em {d:dd/MM/yyyy HH:mm:ss}" : string.Empty;
+
+    private string _novaVersaoMensagem = "";
+    public string NovaVersaoMensagem
+    {
+        get => _novaVersaoMensagem;
+        private set { _novaVersaoMensagem = value; OnPropertyChanged(); OnPropertyChanged(nameof(NovaVersaoDisponivel)); }
+    }
+    public bool NovaVersaoDisponivel => !string.IsNullOrEmpty(_novaVersaoMensagem);
+    public string NovaVersaoUrl { get; private set; } = "";
+
+    private bool _versaoEmDesenvolvimento;
+    public bool VersaoEmDesenvolvimento
+    {
+        get => _versaoEmDesenvolvimento;
+        private set { _versaoEmDesenvolvimento = value; OnPropertyChanged(); }
+    }
+
+    public async Task VerificarAtualizacaoAsync()
+    {
+        var r = await UpdateCheckService.VerificarAsync();
+        if (r is null) return;
+        var (estado, tag, url) = r.Value;
+        VersaoEmDesenvolvimento = estado == EstadoVersao.EmDesenvolvimento;
+        if (estado != EstadoVersao.NovaDisponivel) return;
+        NovaVersaoUrl = url;
+        NovaVersaoMensagem = $"Nova versão disponível: {tag}. Baixe a atualização na página de releases.";
+    }
+
     public Func<Task>? AbrirDialogoGitHubCallback { get; set; }
 
     public PriceTableManagerViewModel TabelaVM { get; }

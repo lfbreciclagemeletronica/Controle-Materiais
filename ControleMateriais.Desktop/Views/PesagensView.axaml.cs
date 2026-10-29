@@ -82,17 +82,17 @@ public partial class PesagensView : UserControl
         if (index == 0 && !_sincComprasFeita)
         {
             _sincComprasFeita = true;
-            vm.SincronizarRecibosCommand.Execute(null);
+            vm.CarregarRecibos();
         }
         else if (index == 1 && !_sincVendasFeita)
         {
             _sincVendasFeita = true;
-            vm.EstoqueVM?.AtualizarCommand.Execute(null);
+            vm.EstoqueVM?.Recarregar();
         }
         else if (index == 2 && !_sincPesagensFeita)
         {
             _sincPesagensFeita = true;
-            vm.SincronizarCommand.Execute(null);
+            vm.CarregarPesagens();
         }
         else if (index == 3 && !_fornecedoresCarregados)
         {

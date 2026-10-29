@@ -23,7 +23,12 @@ public class VendaItemWrapper : ViewModelBase
 {
     private static readonly CultureInfo PtBR = CultureInfo.GetCultureInfo("pt-BR");
 
-    public string Nome { get; }
+    private string _nome;
+    public string Nome
+    {
+        get => _nome;
+        set { if (value != _nome) { _nome = value; OnPropertyChanged(); } }
+    }
 
     private decimal _pesoAtual;
     public decimal PesoAtual
@@ -50,7 +55,7 @@ public class VendaItemWrapper : ViewModelBase
 
     public VendaItemWrapper(string nome)
     {
-        Nome = nome;
+        _nome = nome;
     }
 
     public void IniciarEdicao()
@@ -96,6 +101,8 @@ public class VendaViewModel : ViewModelBase
     public ObservableCollection<VendaItemWrapper> Itens      { get; } = new();
     public ObservableCollection<VendaItemWrapper> ItensFixos  { get; } = new();
     public ObservableCollection<VendaItemWrapper> ItensExtras { get; } = new();
+
+    public ObservableCollection<VendaItemWrapper> ItensPersonalizados { get; } = new();
 
     private bool _temItensExtras;
     public bool TemItensExtras
@@ -161,6 +168,8 @@ public class VendaViewModel : ViewModelBase
     public ICommand VoltarCommand  { get; }
     public ICommand SalvarCommand  { get; }
     public ICommand LimparCommand  { get; }
+    public ICommand AdicionarCustomItemCommand { get; }
+    public ICommand RemoverCustomItemCommand   { get; }
 
     public Func<Task<Window?>>? ObterJanelaCallback { get; set; }
 
@@ -183,6 +192,14 @@ public class VendaViewModel : ViewModelBase
         VoltarCommand = new DelegateCommand(() => _voltarCallback());
         SalvarCommand = new DelegateCommand(() => _ = SalvarVendaAsync());
         LimparCommand = new DelegateCommand(Limpar);
+        AdicionarCustomItemCommand = new DelegateCommand(() =>
+            ItensPersonalizados.Add(new VendaItemWrapper(string.Empty) { PesoChanged = RecalcularTotal }));
+        RemoverCustomItemCommand = new DelegateCommand<VendaItemWrapper>(item =>
+        {
+            if (item is null) return;
+            ItensPersonalizados.Remove(item);
+            RecalcularTotal();
+        });
     }
 
     public void CarregarItensExtras()
@@ -253,7 +270,7 @@ public class VendaViewModel : ViewModelBase
 
     private void RecalcularTotal()
     {
-        PesoTotal = Itens.Sum(i => i.PesoAtual);
+        PesoTotal = Itens.Sum(i => i.PesoAtual) + ItensPersonalizados.Sum(i => i.PesoAtual);
     }
 
     private void Limpar()
@@ -263,6 +280,7 @@ public class VendaViewModel : ViewModelBase
         _valorVendaTexto = "R$ 0,00";
         OnPropertyChanged(nameof(ValorVendaTexto));
         foreach (var i in Itens) i.ResetarPeso();
+        ItensPersonalizados.Clear();
         RecalcularTotal();
         Status = string.Empty;
         CarregarItensExtras();
@@ -274,7 +292,9 @@ public class VendaViewModel : ViewModelBase
         const string origem = nameof(SalvarVendaAsync);
         AppLogger.Info(correlationId, origem, $"Iniciando salvamento de venda para o cliente '{NomeCliente}'.");
 
-        var itensSelecionados = Itens.Where(i => i.PesoAtual > 0).ToList();
+        var itensSelecionados = Itens.Where(i => i.PesoAtual > 0)
+            .Concat(ItensPersonalizados.Where(i => i.PesoAtual > 0 && !string.IsNullOrWhiteSpace(i.Nome)))
+            .ToList();
         if (!itensSelecionados.Any())
         {
             AppLogger.Aviso(correlationId, origem, "Cancelado: nenhum peso informado.");
@@ -355,6 +375,49 @@ public class VendaViewModel : ViewModelBase
             Status = $"Erro ao salvar venda: {ex.Message}";
             Salvando = false;
             return;
+        }
+
+        // 2b. Insere o recibo de venda no banco de dados (RecibosVenda + RecibosVendaItens)
+        try
+        {
+            var codigoRecibo = await DataService.ReciboVendaRepository.GerarCodigoReciboAsync();
+            var reciboVenda = new ControleMateriais.Data.Models.ReciboVenda
+            {
+                ClienteNome = NomeCliente,
+                DataVenda = data.ToString("dd/MM/yyyy"),
+                CodigoRecibo = codigoRecibo,
+                ValorTotal = _valorVendaRaw,
+                PesoTotalKg = itensSelecionados.Sum(i => i.PesoAtual)
+            };
+            foreach (var item in itensSelecionados)
+            {
+                var itemDb = await DataService.ItemRepository.GetOrCreateAsync(item.Nome);
+                reciboVenda.Itens.Add(new ControleMateriais.Data.Models.ReciboVendaItem
+                {
+                    ItemId = itemDb.Id,
+                    PesoKg = item.PesoAtual
+                });
+            }
+
+            var reciboVendaId = await DataService.ReciboVendaRepository.InsertAsync(reciboVenda);
+            AppLogger.Info(correlationId, origem, $"Recibo de venda salvo no banco de dados (Id={reciboVendaId}, Codigo={codigoRecibo}).");
+
+            try
+            {
+                await GitHubService.PublicarArquivoBancoDadosAsync(_rootDir, "database.db",
+                    $"Venda {NomeCliente} - {data:dd/MM/yyyy} (Codigo {codigoRecibo})",
+                    msg => AppLogger.Info(correlationId, origem, msg));
+            }
+            catch (Exception exGit)
+            {
+                AppLogger.Erro(correlationId, origem, exGit);
+                Status = $"Aviso: venda salva localmente, mas não foi possível sincronizar o banco de dados com o GitHub: {exGit.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Erro(correlationId, origem, ex);
+            Status = $"Aviso: não foi possível salvar a venda no banco de dados: {ex.Message}";
         }
 
         // 3. Commita localmente (sem push — push ocorre ao fechar o app)

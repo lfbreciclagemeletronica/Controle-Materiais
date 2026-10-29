@@ -15,7 +15,7 @@ public partial class EstoqueView : UserControl
         {
             if (DataContext is EstoqueViewModel vm)
             {
-                _ = vm.SincronizarGitAsync();
+                vm.Recarregar();
                 _ = vm.CarregarEntradasAsync();
                 _ = vm.CarregarTotaisMensaisAsync();
                 _ = vm.CarregarVendasBancoAsync();

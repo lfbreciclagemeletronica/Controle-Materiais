@@ -50,6 +50,12 @@ public partial class SplashWindow : Window
         _ = Task.Run(() => _vm.IniciarSincronizacaoAsync());
     }
 
+    private async void SaibaMais_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is SyncItem item)
+            await new ErroDetalheWindow(item.Label.TrimEnd('.'), item.ErroTecnico).ShowDialog(this);
+    }
+
     private void ContinuarPara()
     {
         _onFinished?.Invoke();

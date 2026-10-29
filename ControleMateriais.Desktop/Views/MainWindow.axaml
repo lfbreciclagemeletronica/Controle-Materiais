@@ -78,6 +78,15 @@
         </StackPanel>
       </Border>
 
+      <!-- Última atualização (canto superior direito) -->
+      <TextBlock Text="{Binding UltimaAtualizacaoTexto}"
+                 Foreground="#4CAF50"
+                 FontSize="11"
+                 MinHeight="18"
+                 HorizontalAlignment="Right"
+                 VerticalAlignment="Center"
+                 Margin="0,6,14,0"/>
+
       <!-- CONTAINER PRINCIPAL -->
       <Grid Grid.Row="1" Margin="10">
 
